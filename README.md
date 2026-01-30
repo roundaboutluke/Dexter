@@ -21,6 +21,7 @@ In addition to parity with the core tracking/matching logic, PoracleGo adds:
 - **Max Battle** tracking/alerts.
 - **Spawn “changed Pokémon” alerts** for encounter updates where the Pokémon changes mid-lifespan.
 - **Quest AR / No-AR support for tracking** (quests were previously parsed, but you couldn’t *distinguish/target* AR vs No-AR in tracking), including digest output for both when applicable.
+- **PvP link helpers** for Pokémon names that require special URL formatting (e.g. Mr. Mime → `Mr_Mime` / `mr_mime`).
 
 ## Prerequisites
 
@@ -65,6 +66,11 @@ Templates (DTS):
 - `config/dts.json` is created on first start from `config/defaults/dts.json`.
 - Edit `config/dts.json` to change alert formatting, embeds, maps, etc.
 - If you are reusing PoracleJS DTS templates verbatim, you may need **minor formatting tweaks**: PoracleGo uses a different Handlebars engine and whitespace/newline handling around block helpers can differ slightly.
+
+PvP links (DTS helper):
+
+- Use `{{pvpSlug nameEng}}` for PvPIVs-style URLs (e.g. `Mr_Mime`).
+- Use `{{lowercase (pvpSlug nameEng)}}` for PvPoke-style URLs (e.g. `mr_mime`).
 
 ## Building for Production
 
