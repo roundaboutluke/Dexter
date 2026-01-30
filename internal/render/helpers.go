@@ -1253,6 +1253,9 @@ func mapHelper(name interface{}, value interface{}, options *raymond.Options) st
 	}
 	mapping, _ := entry["map"].(map[string]any)
 	result := mapping[fmt.Sprintf("%v", value)]
+	if result == nil {
+		return ""
+	}
 	if isCurrentBlockHelper(options, "map") {
 		return options.FnWith(result)
 	}
@@ -1272,6 +1275,9 @@ func map2Helper(name interface{}, value interface{}, value2 interface{}, options
 	result := mapping[fmt.Sprintf("%v", value)]
 	if result == nil {
 		result = mapping[fmt.Sprintf("%v", value2)]
+	}
+	if result == nil {
+		return ""
 	}
 	if isCurrentBlockHelper(options, "map2") {
 		return options.FnWith(result)

@@ -44,3 +44,23 @@ func TestMapHelperBlockUsesMappedValueAsContext(t *testing.T) {
 	}
 }
 
+func TestMapHelperMissingKeyRendersEmptyString(t *testing.T) {
+	Init(t.TempDir(), nil, nil, nil)
+	customMaps = []map[string]any{
+		{
+			"name":     "timeEmoji",
+			"language": "en",
+			"map": map[string]any{
+				"1": "🕐",
+			},
+		},
+	}
+
+	out, err := RenderHandlebars("A{{map 'timeEmoji' 2}}B", map[string]any{}, map[string]any{"language": "en"})
+	if err != nil {
+		t.Fatalf("RenderHandlebars returned error: %v", err)
+	}
+	if out != "AB" {
+		t.Fatalf("unexpected output: %q", out)
+	}
+}
