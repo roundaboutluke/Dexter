@@ -96,3 +96,7 @@ This DB is ignored by git (by design). If you don’t provide it, PoracleGo will
 ## Related Projects
 
 - PoracleJS (original): https://github.com/KartulUdus/PoracleJS
+
+## Special Thanks
+
+- The Unown# team: https://github.com/UnownHash
