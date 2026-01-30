@@ -73,7 +73,6 @@ func Init(root string, cfgIn *config.Config, dataIn *data.GameData, i18nFactory 
 		raymond.RegisterHelper("toLowerCase", lowercaseHelper)
 		raymond.RegisterHelper("capitalize", capitalizeHelper)
 		raymond.RegisterHelper("pvpSlug", pvpSlugHelper)
-		raymond.RegisterHelper("pvpIvsMon", pvpIvsMonHelper)
 		raymond.RegisterHelper("ex", exHelper)
 		raymond.RegisterHelper("numberFormat", numberFormatHelper)
 		raymond.RegisterHelper("pad0", pad0Helper)
@@ -721,11 +720,39 @@ func pvpSlugHelper(value interface{}) string {
 	return pvpSlug(fmt.Sprintf("%v", value))
 }
 
-func pvpIvsMonHelper(value interface{}) string {
-	return pvpIvsMon(fmt.Sprintf("%v", value))
+func pvpSlug(value string) string {
+	slugLower := pvpSlugLower(value)
+	if slugLower == "" {
+		return ""
+	}
+	return titleCaseUnderscore(slugLower)
 }
 
-func pvpSlug(value string) string {
+func titleCaseUnderscore(slug string) string {
+	slug = strings.Trim(slug, "_")
+	if slug == "" {
+		return ""
+	}
+	var out strings.Builder
+	out.Grow(len(slug))
+	startWord := true
+	for _, r := range slug {
+		if r == '_' {
+			out.WriteRune(r)
+			startWord = true
+			continue
+		}
+		if startWord {
+			out.WriteRune(unicode.ToUpper(r))
+			startWord = false
+		} else {
+			out.WriteRune(unicode.ToLower(r))
+		}
+	}
+	return strings.Trim(out.String(), "_")
+}
+
+func pvpSlugLower(value string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return ""
@@ -764,7 +791,6 @@ func pvpSlug(value string) string {
 			writeUnderscore()
 			continue
 		case '.', '\'', '’', '·':
-			// Drop punctuation commonly found in Pokémon names (Mr. Mime, Farfetch'd, etc.).
 			continue
 		default:
 			if unicode.IsLetter(r) || unicode.IsDigit(r) {
@@ -772,37 +798,15 @@ func pvpSlug(value string) string {
 				lastUnderscore = false
 				continue
 			}
-			// For any other symbol, treat it as a separator.
 			writeUnderscore()
 		}
 	}
 
 	slug := strings.Trim(out.String(), "_")
-	slug = strings.ReplaceAll(slug, "__", "_")
 	for strings.Contains(slug, "__") {
 		slug = strings.ReplaceAll(slug, "__", "_")
 	}
 	return slug
-}
-
-func pvpIvsMon(value string) string {
-	slug := pvpSlug(value)
-	if slug == "" {
-		return ""
-	}
-	parts := strings.Split(slug, "_")
-	for i, part := range parts {
-		if part == "" {
-			continue
-		}
-		runes := []rune(part)
-		runes[0] = unicode.ToUpper(runes[0])
-		for j := 1; j < len(runes); j++ {
-			runes[j] = unicode.ToLower(runes[j])
-		}
-		parts[i] = string(runes)
-	}
-	return strings.Join(parts, "_")
 }
 
 func capitalizeHelper(value interface{}) string {

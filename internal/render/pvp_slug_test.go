@@ -6,16 +6,16 @@ func TestPvpSlugHelper_CommonPokemonNames(t *testing.T) {
 	Init(t.TempDir(), nil, nil, nil)
 
 	cases := map[string]string{
-		"Mr. Mime":    "mr_mime",
-		"Mime Jr.":    "mime_jr",
-		"Ho-Oh":       "ho_oh",
-		"Farfetch'd":  "farfetchd",
-		"Nidoran♀":    "nidoran_female",
-		"Nidoran♂":    "nidoran_male",
-		"Porygon-Z":   "porygon_z",
-		"Tapu Koko":   "tapu_koko",
-		"Mr Rime":     "mr_rime",
-		"  Mr. Mime ": "mr_mime",
+		"Mr. Mime":    "Mr_Mime",
+		"Mime Jr.":    "Mime_Jr",
+		"Ho-Oh":       "Ho_Oh",
+		"Farfetch'd":  "Farfetchd",
+		"Nidoran♀":    "Nidoran_Female",
+		"Nidoran♂":    "Nidoran_Male",
+		"Porygon-Z":   "Porygon_Z",
+		"Tapu Koko":   "Tapu_Koko",
+		"Mr Rime":     "Mr_Rime",
+		"  Mr. Mime ": "Mr_Mime",
 	}
 
 	for input, want := range cases {
@@ -29,26 +29,14 @@ func TestPvpSlugHelper_CommonPokemonNames(t *testing.T) {
 	}
 }
 
-func TestPvpIvsMonHelper_TitleCasesUnderscoreSlug(t *testing.T) {
+func TestPvpSlugHelper_LowercaseSubexpressionSupportsPvpoke(t *testing.T) {
 	Init(t.TempDir(), nil, nil, nil)
 
-	cases := map[string]string{
-		"Mr. Mime":   "Mr_Mime",
-		"Mime Jr.":   "Mime_Jr",
-		"Ho-Oh":      "Ho_Oh",
-		"Farfetch'd": "Farfetchd",
-		"Nidoran♀":   "Nidoran_Female",
-		"Nidoran♂":   "Nidoran_Male",
-		"Porygon-Z":  "Porygon_Z",
+	out, err := RenderHandlebars("{{lowercase (pvpSlug name)}}", map[string]any{"name": "Mr. Mime"}, map[string]any{"language": "en"})
+	if err != nil {
+		t.Fatalf("RenderHandlebars error: %v", err)
 	}
-
-	for input, want := range cases {
-		out, err := RenderHandlebars("{{pvpIvsMon name}}", map[string]any{"name": input}, map[string]any{"language": "en"})
-		if err != nil {
-			t.Fatalf("RenderHandlebars error for %q: %v", input, err)
-		}
-		if out != want {
-			t.Fatalf("pvpIvsMon(%q)=%q, want %q", input, out, want)
-		}
+	if out != "mr_mime" {
+		t.Fatalf("unexpected output: %q", out)
 	}
 }
