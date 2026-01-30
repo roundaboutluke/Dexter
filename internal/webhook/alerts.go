@@ -2388,9 +2388,7 @@ func buildRenderData(p *Processor, hook *Hook, match alertMatch) map[string]any 
 								layout = momentFormatToGoLayout(format)
 							}
 							weatherChangeTime := formatUnixInHookLocation(p, hook, changeTime, layout)
-							if len(weatherChangeTime) >= 8 {
-								weatherChangeTime = weatherChangeTime[:len(weatherChangeTime)-3]
-							}
+							weatherChangeTime = trimWeatherChangeTime(weatherChangeTime)
 							if (weatherID > 0 && !pokemonWillBeBoosted) || (weatherID == 0 && pokemonWillBeBoosted) {
 								if weatherID > 0 {
 									weatherCurrent = weatherID
@@ -2452,9 +2450,7 @@ func buildRenderData(p *Processor, hook *Hook, match alertMatch) map[string]any 
 								layout = momentFormatToGoLayout(format)
 							}
 							weatherChangeTime := formatUnixInHookLocation(p, hook, changeTime, layout)
-							if len(weatherChangeTime) >= 8 {
-								weatherChangeTime = weatherChangeTime[:len(weatherChangeTime)-3]
-							}
+							weatherChangeTime = trimWeatherChangeTime(weatherChangeTime)
 							if (weatherID > 0 && !pokemonWillBeBoosted) || (weatherID == 0 && pokemonWillBeBoosted) {
 								if weatherID > 0 {
 									weatherCurrent = weatherID
@@ -3491,6 +3487,21 @@ func momentFormatToGoLayout(format string) string {
 	layout = strings.ReplaceAll(layout, "ss", "05")
 	layout = strings.ReplaceAll(layout, "s", "05")
 	return layout
+}
+
+// trimWeatherChangeTime mirrors PoracleJS behavior: it always removes the last 3 characters of the
+// formatted time string.
+//
+// Examples (with en-gb defaults):
+// - LTS (HH:mm:ss) -> HH:mm
+// - LT (HH:mm)     -> HH
+//
+// This is mainly used with customMaps like timeEmoji which are often keyed by hour.
+func trimWeatherChangeTime(value string) string {
+	if len(value) < 3 {
+		return ""
+	}
+	return value[:len(value)-3]
 }
 
 func hookTTH(hook *Hook) (int, int, int) {
