@@ -64,6 +64,7 @@ Templates (DTS):
 
 - `config/dts.json` is created on first start from `config/defaults/dts.json`.
 - Edit `config/dts.json` to change alert formatting, embeds, maps, etc.
+- If you are reusing PoracleJS DTS templates verbatim, you may need **minor formatting tweaks**: PoracleGo uses a different Handlebars engine and whitespace/newline handling around block helpers can differ slightly.
 
 ## Building for Production
 
