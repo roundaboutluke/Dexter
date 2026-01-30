@@ -12,6 +12,7 @@ tools/
 # Local runtime caches
 .cache/
 .gocache/
+.gomodcache/
 
 # Go build/test artifacts
 *.test
