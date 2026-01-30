@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"unicode"
 	"unsafe"
 
 	"github.com/aymerick/raymond"
@@ -71,6 +72,7 @@ func Init(root string, cfgIn *config.Config, dataIn *data.GameData, i18nFactory 
 		raymond.RegisterHelper("toUpperCase", uppercaseHelper)
 		raymond.RegisterHelper("toLowerCase", lowercaseHelper)
 		raymond.RegisterHelper("capitalize", capitalizeHelper)
+		raymond.RegisterHelper("pvpSlug", pvpSlugHelper)
 		raymond.RegisterHelper("ex", exHelper)
 		raymond.RegisterHelper("numberFormat", numberFormatHelper)
 		raymond.RegisterHelper("pad0", pad0Helper)
@@ -712,6 +714,70 @@ func uppercaseHelper(value interface{}) string {
 
 func lowercaseHelper(value interface{}) string {
 	return strings.ToLower(fmt.Sprintf("%v", value))
+}
+
+func pvpSlugHelper(value interface{}) string {
+	return pvpSlug(fmt.Sprintf("%v", value))
+}
+
+func pvpSlug(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	value = strings.ToLower(value)
+
+	var out strings.Builder
+	out.Grow(len(value))
+	lastUnderscore := false
+
+	writeUnderscore := func() {
+		if out.Len() == 0 || lastUnderscore {
+			return
+		}
+		out.WriteByte('_')
+		lastUnderscore = true
+	}
+
+	for _, r := range value {
+		switch r {
+		case '♀':
+			if out.Len() > 0 && !lastUnderscore {
+				out.WriteByte('_')
+			}
+			out.WriteString("female")
+			lastUnderscore = false
+			continue
+		case '♂':
+			if out.Len() > 0 && !lastUnderscore {
+				out.WriteByte('_')
+			}
+			out.WriteString("male")
+			lastUnderscore = false
+			continue
+		case ' ', '-', '–', '—', '/', '\\', ':':
+			writeUnderscore()
+			continue
+		case '.', '\'', '’', '·':
+			// Drop punctuation commonly found in Pokémon names (Mr. Mime, Farfetch'd, etc.).
+			continue
+		default:
+			if unicode.IsLetter(r) || unicode.IsDigit(r) {
+				out.WriteRune(r)
+				lastUnderscore = false
+				continue
+			}
+			// For any other symbol, treat it as a separator.
+			writeUnderscore()
+		}
+	}
+
+	slug := strings.Trim(out.String(), "_")
+	slug = strings.ReplaceAll(slug, "__", "_")
+	for strings.Contains(slug, "__") {
+		slug = strings.ReplaceAll(slug, "__", "_")
+	}
+	return slug
 }
 
 func capitalizeHelper(value interface{}) string {
