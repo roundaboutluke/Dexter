@@ -1,0 +1,2 @@
+ALTER TABLE humans
+  ADD COLUMN schedule_disabled TINYINT(1) NOT NULL DEFAULT 0;

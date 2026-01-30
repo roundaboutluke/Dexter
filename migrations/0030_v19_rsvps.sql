@@ -1,0 +1,2 @@
+ALTER TABLE raid
+  ADD COLUMN rsvp_changes TINYINT(1) NOT NULL DEFAULT 0;

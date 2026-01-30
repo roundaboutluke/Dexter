@@ -1,0 +1,2 @@
+ALTER TABLE profiles
+  MODIFY COLUMN active_hours VARCHAR(4096) NOT NULL DEFAULT '[]';

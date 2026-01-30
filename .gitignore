@@ -1,0 +1,69 @@
+# Local instance config (do not commit)
+config/local.json
+config/dts.json
+config/partials.json
+
+# Local-only docs
+docs/parity/
+
+# Dev-only parity tools
+tools/
+
+# Local runtime caches
+.cache/
+.gocache/
+
+# Go build/test artifacts
+*.test
+*.out
+*.prof
+*.pprof
+*.trace
+cover*.out
+
+# Keep folders but ignore contents
+config/customMaps/*
+!config/customMaps/.gitkeep
+
+config/dts/*
+!config/dts/.gitkeep
+
+logs/*
+!logs/.gitkeep
+
+# Generated masterdata (run poraclego-generate after clone)
+util/*.json
+util/locale/*
+!util/.gitkeep
+!util/locale/.gitkeep
+
+# Optional timezone DB (needed only if scanning outside server timezone)
+internal/tz/timezone*
+
+# Go workspace files (local-only)
+go.work
+go.work.sum
+
+# Local certs/keys (never commit)
+*.pem
+*.key
+*.crt
+
+# Misc local scratch
+*.log
+*.pid
+*.swp
+*.swo
+*.tmp
+__pycache__/
+
+# OS/editor/tooling noise
+.DS_Store
+.idea/
+.vscode/
+*.heapsnapshot
+.env
+
+# Built binaries
+poraclego
+poraclego-*

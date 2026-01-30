@@ -1,0 +1,13 @@
+CREATE TABLE IF NOT EXISTS nests (
+  uid INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  id VARCHAR(255) NOT NULL,
+  profile_no INT NOT NULL DEFAULT 1,
+  ping VARCHAR(255) NOT NULL,
+  clean TINYINT(1) NOT NULL DEFAULT 0,
+  distance INT NOT NULL,
+  template INT NOT NULL,
+  pokemon_id INT NOT NULL,
+  min_spawn_avg INT NOT NULL,
+  form INT NOT NULL,
+  CONSTRAINT nests_id_foreign FOREIGN KEY (id) REFERENCES humans(id) ON DELETE CASCADE
+) ENGINE=InnoDB;

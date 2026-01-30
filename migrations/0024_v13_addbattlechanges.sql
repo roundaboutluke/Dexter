@@ -1,0 +1,2 @@
+ALTER TABLE gym
+  ADD COLUMN battle_changes TINYINT(1) NOT NULL DEFAULT 0;
