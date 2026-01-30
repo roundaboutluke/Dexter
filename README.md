@@ -10,6 +10,10 @@ PoracleGo is designed to be as close to a “drop-in” as possible. In many dep
 
 That said, always take a backup first and do a test boot: differences in migrations/schema/history between environments can require minor manual adjustments.
 
+## Versioning
+
+PoracleGo keeps **PoracleJS-compatible version numbering** to maintain compatibility with ecosystem tooling (notably ReactMap).
+
 ## What’s Different vs PoracleJS
 
 In addition to parity with the core tracking/matching logic, PoracleGo adds:
