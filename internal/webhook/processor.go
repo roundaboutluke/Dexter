@@ -1394,9 +1394,6 @@ func (p *Processor) dedupeRaid(hook *Hook) bool {
 		seen = false
 	}
 	if seen {
-		if len(newEntries) == 0 {
-			return false
-		}
 		oldEntries := raidDecodeEntries(oldEntry.Signature)
 		if !raidHasRsvpDifference(oldEntries, newEntries) {
 			return false
@@ -1500,12 +1497,19 @@ func raidDecodeEntries(signature string) []raidRsvpEntry {
 }
 
 func raidHasRsvpDifference(oldEntries, newEntries []raidRsvpEntry) bool {
-	if len(newEntries) == 0 {
+	if len(oldEntries) == 0 && len(newEntries) == 0 {
 		return false
 	}
 	oldMap := map[string]raidRsvpEntry{}
 	for _, entry := range oldEntries {
 		oldMap[entry.Time] = entry
+	}
+	newMap := map[string]raidRsvpEntry{}
+	for _, entry := range newEntries {
+		newMap[entry.Time] = entry
+	}
+	if len(oldMap) != len(newMap) {
+		return true
 	}
 	for _, entry := range newEntries {
 		prev, ok := oldMap[entry.Time]

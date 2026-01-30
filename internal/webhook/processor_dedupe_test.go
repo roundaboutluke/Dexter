@@ -83,3 +83,63 @@ func TestDedupeMaxBattle_MissingBattleEndFallsBackTo90m(t *testing.T) {
 		t.Fatalf("dedupeMaxBattle TTL=%s, want about 90m", remaining)
 	}
 }
+
+func TestDedupeRaid_RsvpRemovalTriggersUpdate(t *testing.T) {
+	p := &Processor{raidSeen: map[string]raidSeenEntry{}}
+	hook := &Hook{
+		Type: "raid",
+		Message: map[string]any{
+			"gym_id":     "gym1",
+			"end":        "123",
+			"pokemon_id": "25",
+			"rsvps": []any{
+				map[string]any{"timeslot": "1000", "going_count": 1, "maybe_count": 0},
+			},
+		},
+	}
+	if !p.dedupeRaid(hook) {
+		t.Fatalf("dedupeRaid=false, want true on first call")
+	}
+	if got := getBool(hook.Message["firstNotification"]); !got {
+		t.Fatalf("firstNotification=%v, want true on first call", got)
+	}
+
+	// Same raid, RSVPs removed: should still be treated as a change and allow dispatch.
+	hook2 := &Hook{
+		Type: "raid",
+		Message: map[string]any{
+			"gym_id":     "gym1",
+			"end":        "123",
+			"pokemon_id": "25",
+			"rsvps":      []any{},
+		},
+	}
+	if !p.dedupeRaid(hook2) {
+		t.Fatalf("dedupeRaid=false, want true when RSVPs removed")
+	}
+	if got := getBool(hook2.Message["firstNotification"]); got {
+		t.Fatalf("firstNotification=%v, want false on update", got)
+	}
+}
+
+func TestRaidHasRsvpDifference_DetectsRemovedTimeSlots(t *testing.T) {
+	old := []raidRsvpEntry{
+		{Time: "1000", Going: 1, Maybe: 0},
+		{Time: "2000", Going: 0, Maybe: 1},
+	}
+	newer := []raidRsvpEntry{
+		{Time: "1000", Going: 1, Maybe: 0},
+	}
+	if !raidHasRsvpDifference(old, newer) {
+		t.Fatalf("raidHasRsvpDifference=false, want true when a timeslot is removed")
+	}
+	if !raidHasRsvpDifference(old, nil) {
+		t.Fatalf("raidHasRsvpDifference=false, want true when all RSVPs are removed")
+	}
+	if raidHasRsvpDifference(nil, nil) {
+		t.Fatalf("raidHasRsvpDifference=true, want false when both empty")
+	}
+	if raidHasRsvpDifference(old, old) {
+		t.Fatalf("raidHasRsvpDifference=true, want false when unchanged")
+	}
+}
