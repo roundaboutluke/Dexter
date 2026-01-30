@@ -73,6 +73,7 @@ func Init(root string, cfgIn *config.Config, dataIn *data.GameData, i18nFactory 
 		raymond.RegisterHelper("toLowerCase", lowercaseHelper)
 		raymond.RegisterHelper("capitalize", capitalizeHelper)
 		raymond.RegisterHelper("pvpSlug", pvpSlugHelper)
+		raymond.RegisterHelper("pvpIvsMon", pvpIvsMonHelper)
 		raymond.RegisterHelper("ex", exHelper)
 		raymond.RegisterHelper("numberFormat", numberFormatHelper)
 		raymond.RegisterHelper("pad0", pad0Helper)
@@ -720,6 +721,10 @@ func pvpSlugHelper(value interface{}) string {
 	return pvpSlug(fmt.Sprintf("%v", value))
 }
 
+func pvpIvsMonHelper(value interface{}) string {
+	return pvpIvsMon(fmt.Sprintf("%v", value))
+}
+
 func pvpSlug(value string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
@@ -778,6 +783,26 @@ func pvpSlug(value string) string {
 		slug = strings.ReplaceAll(slug, "__", "_")
 	}
 	return slug
+}
+
+func pvpIvsMon(value string) string {
+	slug := pvpSlug(value)
+	if slug == "" {
+		return ""
+	}
+	parts := strings.Split(slug, "_")
+	for i, part := range parts {
+		if part == "" {
+			continue
+		}
+		runes := []rune(part)
+		runes[0] = unicode.ToUpper(runes[0])
+		for j := 1; j < len(runes); j++ {
+			runes[j] = unicode.ToLower(runes[j])
+		}
+		parts[i] = string(runes)
+	}
+	return strings.Join(parts, "_")
 }
 
 func capitalizeHelper(value interface{}) string {
