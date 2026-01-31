@@ -2931,18 +2931,28 @@ func (d *Discord) handleSlashRemove(s *discordgo.Session, i *discordgo.Interacti
 
 	userID, _ := slashUser(i)
 	profileNo := d.userProfileNo(userID)
-	uidValue := parseUID(uid)
-	removed, err := d.manager.query.DeleteQuery(table, map[string]any{
+	where := map[string]any{
 		"id":         userID,
 		"profile_no": profileNo,
-		"uid":        uidValue,
-	})
+	}
+	if !strings.EqualFold(uid, "all") && !strings.EqualFold(uid, "everything") {
+		where["uid"] = parseUID(uid)
+	}
+	removed, err := d.manager.query.DeleteQuery(table, where)
 	if err != nil {
 		d.respondEphemeral(s, i, err.Error())
 		return
 	}
 	if removed == 0 {
+		if strings.EqualFold(uid, "all") || strings.EqualFold(uid, "everything") {
+			d.respondEphemeral(s, i, "No tracking entries found.")
+			return
+		}
 		d.respondEphemeral(s, i, "Tracking not found.")
+		return
+	}
+	if strings.EqualFold(uid, "all") || strings.EqualFold(uid, "everything") {
+		d.respondEphemeral(s, i, fmt.Sprintf("Removed %d tracking entries.", removed))
 		return
 	}
 	d.respondEphemeral(s, i, "Tracking removed.")
@@ -5185,6 +5195,9 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 
 	switch strings.ToLower(trackingType) {
 	case "pokemon":
+		if query == "" {
+			appendChoice("Everything (remove all)", "pokemon|all")
+		}
 		rows, err := d.manager.query.SelectAllQuery("monsters", map[string]any{"id": userID, "profile_no": profileNo})
 		if err != nil {
 			return nil
@@ -5201,6 +5214,9 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 			}
 		}
 	case "raid":
+		if query == "" {
+			appendChoice("Everything (remove all)", "raid|all")
+		}
 		rows, err := d.manager.query.SelectAllQuery("raid", map[string]any{"id": userID, "profile_no": profileNo})
 		if err != nil {
 			return nil
@@ -5217,6 +5233,9 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 			}
 		}
 	case "maxbattle":
+		if query == "" {
+			appendChoice("Everything (remove all)", "maxbattle|all")
+		}
 		rows, err := d.manager.query.SelectAllQuery("maxbattle", map[string]any{"id": userID, "profile_no": profileNo})
 		if err != nil {
 			return nil
@@ -5233,6 +5252,9 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 			}
 		}
 	case "quest":
+		if query == "" {
+			appendChoice("Everything (remove all)", "quest|all")
+		}
 		rows, err := d.manager.query.SelectAllQuery("quest", map[string]any{"id": userID, "profile_no": profileNo})
 		if err != nil {
 			return nil
@@ -5249,6 +5271,9 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 			}
 		}
 	case "incident", "invasion":
+		if query == "" {
+			appendChoice("Everything (remove all)", "invasion|all")
+		}
 		rows, err := d.manager.query.SelectAllQuery("invasion", map[string]any{"id": userID, "profile_no": profileNo})
 		if err != nil {
 			return nil
@@ -5265,6 +5290,9 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 			}
 		}
 	case "lure":
+		if query == "" {
+			appendChoice("Everything (remove all)", "lure|all")
+		}
 		rows, err := d.manager.query.SelectAllQuery("lures", map[string]any{"id": userID, "profile_no": profileNo})
 		if err != nil {
 			return nil
@@ -5281,6 +5309,9 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 			}
 		}
 	case "weather":
+		if query == "" {
+			appendChoice("Everything (remove all)", "weather|all")
+		}
 		rows, err := d.manager.query.SelectAllQuery("weather", map[string]any{"id": userID, "profile_no": profileNo})
 		if err != nil {
 			return nil
@@ -5297,6 +5328,9 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 			}
 		}
 	case "gym":
+		if query == "" {
+			appendChoice("Everything (remove all)", "gym|all")
+		}
 		rows, err := d.manager.query.SelectAllQuery("gym", map[string]any{"id": userID, "profile_no": profileNo})
 		if err != nil {
 			return nil
@@ -5313,6 +5347,9 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 			}
 		}
 	case "nest":
+		if query == "" {
+			appendChoice("Everything (remove all)", "nest|all")
+		}
 		rows, err := d.manager.query.SelectAllQuery("nests", map[string]any{"id": userID, "profile_no": profileNo})
 		if err != nil {
 			return nil
@@ -5329,6 +5366,9 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 			}
 		}
 	case "fort":
+		if query == "" {
+			appendChoice("Everything (remove all)", "fort|all")
+		}
 		rows, err := d.manager.query.SelectAllQuery("forts", map[string]any{"id": userID, "profile_no": profileNo})
 		if err != nil {
 			return nil
