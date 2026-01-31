@@ -506,6 +506,7 @@
     "imgUrlEgg": "https://raw.githubusercontent.com/KartulUdus/PoracleJS/images/fallback/uni.png",
     "imgUrlGym": "https://raw.githubusercontent.com/KartulUdus/PoracleJS/images/fallback/gym.png",
     "imgUrlPokestop": "https://raw.githubusercontent.com/KartulUdus/PoracleJS/images/fallback/pokestop.png",
+    "imgUrlStation": "https://raw.githubusercontent.com/KartulUdus/PoracleJS/images/fallback/pokestop.png",
     // Used for pokestop urls in quests
     "pokestopUrl": "https://raw.githubusercontent.com/KartulUdus/PoracleJS/images/fallback/pokestop.png"
   },

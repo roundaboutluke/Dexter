@@ -3631,6 +3631,11 @@ func fallbackImageURL(cfg *config.Config, hookType string) string {
 		return getStringFromConfig(cfg, "fallbacks.imgUrlEgg", "")
 	case "gym", "gym_details":
 		return getStringFromConfig(cfg, "fallbacks.imgUrlGym", "")
+	case "max_battle":
+		if station := getStringFromConfig(cfg, "fallbacks.imgUrlStation", ""); station != "" {
+			return station
+		}
+		return getStringFromConfig(cfg, "fallbacks.imgUrl", "")
 	case "lure", "quest", "invasion", "pokestop", "fort_update":
 		return getStringFromConfig(cfg, "fallbacks.imgUrlPokestop", "")
 	default:

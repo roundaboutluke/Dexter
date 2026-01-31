@@ -329,11 +329,20 @@ func (p *Processor) handle(item any) {
 		if pokemonID := getInt(hook.Message["battle_pokemon_id"]); pokemonID > 0 && getInt(hook.Message["pokemon_id"]) == 0 {
 			hook.Message["pokemon_id"] = pokemonID
 		}
+		if pokemonID := getInt(hook.Message["pokemon_id"]); pokemonID > 0 && getInt(hook.Message["battle_pokemon_id"]) == 0 {
+			hook.Message["battle_pokemon_id"] = pokemonID
+		}
 		if form := getInt(hook.Message["battle_pokemon_form"]); form > 0 && getInt(hook.Message["form"]) == 0 {
 			hook.Message["form"] = form
 		}
+		if form := getInt(hook.Message["form"]); form > 0 && getInt(hook.Message["battle_pokemon_form"]) == 0 {
+			hook.Message["battle_pokemon_form"] = form
+		}
 		if level := getInt(hook.Message["battle_level"]); level > 0 && getInt(hook.Message["level"]) == 0 {
 			hook.Message["level"] = level
+		}
+		if level := getInt(hook.Message["level"]); level > 0 && getInt(hook.Message["battle_level"]) == 0 {
+			hook.Message["battle_level"] = level
 		}
 		if move1 := getInt(hook.Message["battle_pokemon_move_1"]); move1 > 0 && getInt(hook.Message["move_1"]) == 0 {
 			hook.Message["move_1"] = move1
