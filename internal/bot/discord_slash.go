@@ -243,7 +243,7 @@ func (d *Discord) handleSlashAutocomplete(s *discordgo.Session, i *discordgo.Int
 		}
 	case "info":
 		if focused.Name == "pokemon" {
-			choices = d.autocompletePokemonChoices(query)
+			choices = d.autocompleteInfoPokemonChoices(query)
 		}
 	case "remove":
 		if focused.Name == "tracking" {
@@ -2999,6 +2999,10 @@ func (d *Discord) handleSlashInfo(s *discordgo.Session, i *discordgo.Interaction
 			d.respondEphemeral(s, i, "Please pick a Pokemon.")
 			return
 		}
+		if strings.EqualFold(pokemon, "everything") {
+			d.respondEphemeral(s, i, "Please pick a specific Pokemon (\"Everything\" is not supported here).")
+			return
+		}
 		d.executeSlashLineDeferred(s, i, "info "+pokemon)
 	case "moves", "items", "rarity", "shiny":
 		d.executeSlashLineDeferred(s, i, "info "+infoType)
@@ -3266,6 +3270,52 @@ func (d *Discord) autocompletePokemonChoices(query string) []*discordgo.Applicat
 	} else if len(candidates) > 25 {
 		candidates = candidates[:25]
 	}
+	for _, mon := range candidates {
+		label := fmt.Sprintf("%s (#%d)", d.titleCase(mon.Name), mon.ID)
+		choices = append(choices, &discordgo.ApplicationCommandOptionChoice{
+			Name:  label,
+			Value: fmt.Sprintf("%d", mon.ID),
+		})
+	}
+	return choices
+}
+
+func (d *Discord) autocompleteInfoPokemonChoices(query string) []*discordgo.ApplicationCommandOptionChoice {
+	if d.manager == nil || d.manager.data == nil {
+		return nil
+	}
+	query = strings.ToLower(strings.TrimSpace(query))
+	type candidate struct {
+		ID   int
+		Name string
+	}
+	candidates := []candidate{}
+	for _, raw := range d.manager.data.Monsters {
+		mon, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		form, _ := mon["form"].(map[string]any)
+		if toInt(form["id"], 0) != 0 {
+			continue
+		}
+		name := strings.ToLower(fmt.Sprintf("%v", mon["name"]))
+		id := toInt(mon["id"], 0)
+		if name == "" || id == 0 {
+			continue
+		}
+		if query == "" || name == query || fmt.Sprintf("%d", id) == query || strings.HasPrefix(name, query) || strings.Contains(name, query) {
+			candidates = append(candidates, candidate{ID: id, Name: name})
+		}
+	}
+	if len(candidates) == 0 && query != "" {
+		return nil
+	}
+	sort.Slice(candidates, func(i, j int) bool { return candidates[i].Name < candidates[j].Name })
+	if len(candidates) > 25 {
+		candidates = candidates[:25]
+	}
+	choices := make([]*discordgo.ApplicationCommandOptionChoice, 0, len(candidates))
 	for _, mon := range candidates {
 		label := fmt.Sprintf("%s (#%d)", d.titleCase(mon.Name), mon.ID)
 		choices = append(choices, &discordgo.ApplicationCommandOptionChoice{
