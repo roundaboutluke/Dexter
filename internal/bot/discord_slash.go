@@ -2039,9 +2039,6 @@ func (d *Discord) handleSlashGym(s *discordgo.Session, i *discordgo.InteractionC
 		return
 	}
 	args := []string{strings.ToLower(strings.TrimSpace(team))}
-	if value, ok := optionBool(options, "remove"); ok && value {
-		args = append(args, "remove")
-	}
 	if value, ok := optionBool(options, "slot_changes"); ok && value {
 		args = append(args, "slot_changes")
 	}
@@ -5299,6 +5296,22 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 				break
 			}
 		}
+	case "gym":
+		rows, err := d.manager.query.SelectAllQuery("gym", map[string]any{"id": userID, "profile_no": profileNo})
+		if err != nil {
+			return nil
+		}
+		for _, row := range rows {
+			uid := strings.TrimSpace(fmt.Sprintf("%v", row["uid"]))
+			if uid == "" {
+				continue
+			}
+			label := tracking.GymRowText(d.manager.cfg, tr, d.manager.data, row, d.manager.scanner)
+			appendChoice(label, "gym|"+uid)
+			if len(choices) >= 25 {
+				break
+			}
+		}
 	case "nest":
 		rows, err := d.manager.query.SelectAllQuery("nests", map[string]any{"id": userID, "profile_no": profileNo})
 		if err != nil {
@@ -5678,7 +5691,6 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 				{Name: "Normal", Value: "normal"},
 			},
 		},
-		{Type: discordgo.ApplicationCommandOptionBoolean, Name: "remove", Description: "Remove instead of add"},
 		{Type: discordgo.ApplicationCommandOptionBoolean, Name: "slot_changes", Description: "Alert on slot changes"},
 		{Type: discordgo.ApplicationCommandOptionString, Name: "gym", Description: "Optional gym", Autocomplete: true},
 		distanceOption(),
@@ -5914,6 +5926,7 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 						{Name: "maxbattle", Value: "maxbattle"},
 						{Name: "invasion", Value: "invasion"},
 						{Name: "quest", Value: "quest"},
+						{Name: "gym", Value: "gym"},
 						{Name: "weather", Value: "weather"},
 						{Name: "lure", Value: "lure"},
 						{Name: "nest", Value: "nest"},
