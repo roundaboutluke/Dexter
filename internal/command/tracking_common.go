@@ -13,7 +13,7 @@ func defaultTemplateName(ctx *Context) string {
 	return "1"
 }
 
-func applyDistanceDefaults(ctx *Context, tr *i18n.Translator, distance int, result TargetResult, remove bool) (int, string, string) {
+func applyDistanceDefaults(ctx *Context, tr *i18n.Translator, distance int, result TargetResult, remove bool, allowZeroWithoutArea bool) (int, string, string) {
 	if remove {
 		return distance, "", ""
 	}
@@ -22,7 +22,10 @@ func applyDistanceDefaults(ctx *Context, tr *i18n.Translator, distance int, resu
 		defaultDistance = def
 	}
 	if distance == 0 {
-		if defaultDistance > 0 && !ctx.IsAdmin {
+		if allowZeroWithoutArea {
+			// Keep distance disabled (0) when tracking is narrowed by a specific entity
+			// (e.g. a specific gym/station), even if the user has no location/area set.
+		} else if defaultDistance > 0 && !ctx.IsAdmin {
 			distance = defaultDistance
 		}
 	}
@@ -37,6 +40,9 @@ func applyDistanceDefaults(ctx *Context, tr *i18n.Translator, distance int, resu
 		return distance, "", fmt.Sprintf("%s `%shelp`", text, ctx.Prefix)
 	}
 	if distance == 0 && !result.UserHasArea && !ctx.IsAdmin {
+		if allowZeroWithoutArea {
+			return distance, "", ""
+		}
 		text := "Oops, no distance was set in command and no area is defined for your tracking - check the"
 		if tr != nil {
 			return distance, "", fmt.Sprintf("%s `%s%s`", tr.Translate(text, false), ctx.Prefix, tr.Translate("help", true))
@@ -44,6 +50,9 @@ func applyDistanceDefaults(ctx *Context, tr *i18n.Translator, distance int, resu
 		return distance, "", fmt.Sprintf("%s `%shelp`", text, ctx.Prefix)
 	}
 	if distance == 0 && !result.UserHasArea && ctx.IsAdmin {
+		if allowZeroWithoutArea {
+			return distance, "", ""
+		}
 		distance = defaultDistance
 		warnText := "Warning: Admin command detected without distance set - using default distance"
 		if tr != nil {

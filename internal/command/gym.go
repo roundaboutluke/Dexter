@@ -57,7 +57,10 @@ func (c *GymCommand) Handle(ctx *Context, args []string) (string, error) {
 	if template == "" {
 		template = defaultTemplateName(ctx)
 	}
-	distance, warning, errMsg := applyDistanceDefaults(ctx, tr, distance, result, remove)
+
+	gymID := parseGymID(args)
+	allowZeroWithoutArea := strings.TrimSpace(gymID) != ""
+	distance, warning, errMsg := applyDistanceDefaults(ctx, tr, distance, result, remove, allowZeroWithoutArea)
 	if errMsg != "" {
 		return errMsg, nil
 	}
@@ -65,7 +68,6 @@ func (c *GymCommand) Handle(ctx *Context, args []string) (string, error) {
 	teams := parseGymTeams(args)
 	slotChanges := boolToInt(containsPhrase(args, "slot changes") || containsWord(args, "slot_changes"))
 	battleChanges := boolToInt(containsPhrase(args, "battle changes") || containsWord(args, "battle_changes"))
-	gymID := parseGymID(args)
 
 	if len(teams) == 0 {
 		return prependWarning(warning, tr.Translate("404 No team types found", false)), nil
@@ -207,7 +209,7 @@ func parseGymTeams(args []string) []int {
 		case "harmony", "gray", "grey", "uncontested":
 			teams = append(teams, 0)
 		case "everything":
-			teams = append(teams, 0, 1, 2, 3)
+			teams = append(teams, 4)
 		}
 	}
 	return uniqueInts(teams)

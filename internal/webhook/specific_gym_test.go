@@ -85,3 +85,23 @@ func TestPassesLocationFilterSpecificGymStillRespectsStrictRestrictions(t *testi
 		t.Fatalf("expected strict area restriction to block specific gym match")
 	}
 }
+
+func TestPassesLocationFilterSpecificGymMismatchDoesNotFallBackToDistance(t *testing.T) {
+	hook := &Hook{
+		Type: "raid",
+		Message: map[string]any{
+			"gym_id":    "gymB",
+			"latitude":  0.5,
+			"longitude": 0.5,
+		},
+	}
+	row := map[string]any{
+		"gym_id":   "gymA",
+		"distance": 5000, // would match by distance if we incorrectly fell back
+	}
+	location := locationInfo{Lat: 0.5, Lon: 0.5}
+
+	if passesLocationFilter(nil, nil, location, hook, row) {
+		t.Fatalf("expected specific gym mismatch to fail regardless of distance")
+	}
+}

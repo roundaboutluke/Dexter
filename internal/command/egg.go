@@ -34,13 +34,15 @@ func (c *EggCommand) Handle(ctx *Context, args []string) (string, error) {
 
 	remove := containsWord(args, "remove")
 	commandEverything := containsWord(args, "everything")
+	gymID := strings.TrimSpace(parseGymID(args))
+	allowZeroWithoutArea := gymID != ""
 	distance, args := parseDistance(args, re)
 	template, args := parseTemplate(args, re)
 	clean, args := parseClean(args)
 	if template == "" {
 		template = defaultTemplateName(ctx)
 	}
-	distance, warning, errMsg := applyDistanceDefaults(ctx, tr, distance, result, remove)
+	distance, warning, errMsg := applyDistanceDefaults(ctx, tr, distance, result, remove, allowZeroWithoutArea)
 	if errMsg != "" {
 		return errMsg, nil
 	}
@@ -53,7 +55,6 @@ func (c *EggCommand) Handle(ctx *Context, args []string) (string, error) {
 	team := parseTeam(args)
 	exclusive := boolToInt(containsWord(args, "ex"))
 	rsvpChanges := parseRSVP(args)
-	gymID := strings.TrimSpace(parseGymID(args))
 	var gymValue any
 	if gymID != "" {
 		gymValue = gymID

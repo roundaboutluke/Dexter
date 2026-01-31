@@ -40,7 +40,7 @@ func (c *InvasionCommand) Handle(ctx *Context, args []string) (string, error) {
 	if template == "" {
 		template = defaultTemplateName(ctx)
 	}
-	distance, warning, errMsg := applyDistanceDefaults(ctx, tr, distance, result, remove)
+	distance, warning, errMsg := applyDistanceDefaults(ctx, tr, distance, result, remove, false)
 	if errMsg != "" {
 		return errMsg, nil
 	}

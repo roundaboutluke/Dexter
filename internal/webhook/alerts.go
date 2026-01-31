@@ -799,9 +799,11 @@ func passesLocationFilter(fences *geofence.Store, cfg *config.Config, location l
 			if hookGymID == "" {
 				hookGymID = getString(hook.Message["id"])
 			}
-			if rowGymID == hookGymID {
-				specificGymMatch = true
+			// Match PoracleJS behavior: when a row is tied to a specific gym, it should only ever match that gym.
+			if hookGymID == "" || rowGymID != hookGymID {
+				return false
 			}
+			specificGymMatch = true
 		}
 	}
 

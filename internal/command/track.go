@@ -71,7 +71,7 @@ func (c *TrackCommand) Handle(ctx *Context, args []string) (string, error) {
 		return fmt.Sprintf("%s `%s%s`", tr.Translate("Oops, more than one league PVP parameters were set in command! - check the", false), ctx.Prefix, tr.Translate("help", true)), nil
 	}
 
-	distance, warning, errMsg := applyDistanceDefaults(ctx, tr, distance, result, false)
+	distance, warning, errMsg := applyDistanceDefaults(ctx, tr, distance, result, false, false)
 	if errMsg != "" && result.Target.Type != "webhook" {
 		return errMsg, nil
 	}
