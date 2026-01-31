@@ -834,6 +834,8 @@ func passesLocationFilter(fences *geofence.Store, cfg *config.Config, location l
 	case distance > 0:
 		if location.Lat != 0 || location.Lon != 0 {
 			computed := distanceMeters(location.Lat, location.Lon, lat, lon)
+			// Cache the computed distance so downstream render code can reuse it without re-calculating.
+			row["__computed_distance_m"] = computed
 			locationMatched = computed < distance
 		}
 	case hasDistance && distance == 0 && fences != nil && len(location.Areas) > 0:
@@ -1288,11 +1290,25 @@ func buildRenderData(p *Processor, hook *Hook, match alertMatch) map[string]any 
 	}
 	data["weather"] = weatherID
 	if hook.Type == "pokemon" {
+		trackDistanceRaw, hasTrackDistance := match.Row["distance"]
+		trackDistance := getInt(trackDistanceRaw)
+		data["trackDistanceM"] = trackDistance
+		data["isDistanceTrack"] = trackDistance > 0
+		data["isAreaTrack"] = hasTrackDistance && trackDistance == 0
+
 		var distance any = ""
+		hasUserDistance := false
+		userDistanceM := 0
 		bearing := ""
 		bearingEmoji := ""
 		if match.Target.Lat != 0 || match.Target.Lon != 0 {
-			distance = distanceMeters(match.Target.Lat, match.Target.Lon, lat, lon)
+			hasUserDistance = true
+			if cached, ok := numberFromAny(match.Row["__computed_distance_m"]); ok {
+				userDistanceM = cached
+			} else {
+				userDistanceM = distanceMeters(match.Target.Lat, match.Target.Lon, lat, lon)
+			}
+			distance = userDistanceM
 			brng := bearingDegrees(match.Target.Lat, match.Target.Lon, lat, lon)
 			bearing = fmt.Sprintf("%.0f", brng)
 			if emojiKey := bearingEmojiKey(brng); emojiKey != "" {
@@ -1300,6 +1316,8 @@ func buildRenderData(p *Processor, hook *Hook, match alertMatch) map[string]any 
 			}
 		}
 		data["distance"] = distance
+		data["hasUserDistance"] = hasUserDistance
+		data["userDistanceM"] = userDistanceM
 		data["bearing"] = bearing
 		data["bearingEmoji"] = bearingEmoji
 
