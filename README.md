@@ -84,6 +84,10 @@ go build -trimpath -ldflags "-s -w" -o poraclego ./cmd/poraclego
 
 Run it under your process manager of choice (systemd, pm2, etc.).
 
+## Tileservercache Templates
+
+If you use `tileservercache` for static maps, reference templates are included in `tileservercache_templates/` (mirrors the PoracleJS set, including `poracle-maxbattle.json`).
+
 ## Optional: Timezone DB (Per-Location Timezones)
 
 PoracleGo can optionally use a timezone lookup database for converting times based on alert location (useful if you scan outside your server’s local timezone).
