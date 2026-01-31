@@ -51,7 +51,7 @@ func (q *Query) SelectWhereInQuery(table string, values []any, valuesColumn stri
 	}
 	placeholders := strings.Repeat("?,", len(values))
 	placeholders = strings.TrimSuffix(placeholders, ",")
-	query := fmt.Sprintf("SELECT * FROM %s WHERE %s IN (%s)", table, valuesColumn, placeholders)
+	query := fmt.Sprintf("SELECT * FROM %s WHERE %s IN (%s)", table, quoteIdent(valuesColumn), placeholders)
 	rows, err := q.db.Query(query, values...)
 	if err != nil {
 		return nil, fmt.Errorf("selectWhereInQuery: %w", err)
@@ -67,7 +67,7 @@ func (q *Query) SelectWhereInLikeQuery(table, likeColumn, likeValue, inColumn st
 	}
 	placeholders := strings.Repeat("?,", len(inValues))
 	placeholders = strings.TrimSuffix(placeholders, ",")
-	query := fmt.Sprintf("SELECT * FROM %s WHERE %s LIKE ? AND %s IN (%s)", table, likeColumn, inColumn, placeholders)
+	query := fmt.Sprintf("SELECT * FROM %s WHERE %s LIKE ? AND %s IN (%s)", table, quoteIdent(likeColumn), quoteIdent(inColumn), placeholders)
 	args := make([]any, 0, len(inValues)+1)
 	args = append(args, "%"+likeValue+"%")
 	args = append(args, inValues...)
@@ -200,7 +200,7 @@ func (q *Query) DeleteWhereInQuery(table string, id any, values []any, valuesCol
 		whereSQL = " AND " + strings.TrimPrefix(whereSQL, " WHERE ")
 	}
 
-	query := fmt.Sprintf("DELETE FROM %s WHERE %s IN (%s)%s", table, valuesColumn, placeholders, whereSQL)
+	query := fmt.Sprintf("DELETE FROM %s WHERE %s IN (%s)%s", table, quoteIdent(valuesColumn), placeholders, whereSQL)
 	res, err := q.db.Exec(query, args...)
 	if err != nil {
 		return 0, fmt.Errorf("deleteWhereInQuery: %w", err)
@@ -247,7 +247,7 @@ func buildWhere(conditions map[string]any) (string, []any) {
 	parts := make([]string, 0, len(keys))
 	args := make([]any, 0, len(keys))
 	for _, key := range keys {
-		parts = append(parts, fmt.Sprintf("%s = ?", key))
+		parts = append(parts, fmt.Sprintf("%s = ?", quoteIdent(key)))
 		args = append(args, conditions[key])
 	}
 	return " WHERE " + strings.Join(parts, " AND "), args
@@ -258,10 +258,23 @@ func buildSet(values map[string]any) (string, []any) {
 	parts := make([]string, 0, len(keys))
 	args := make([]any, 0, len(keys))
 	for _, key := range keys {
-		parts = append(parts, fmt.Sprintf("%s = ?", key))
+		parts = append(parts, fmt.Sprintf("%s = ?", quoteIdent(key)))
 		args = append(args, values[key])
 	}
 	return " SET " + strings.Join(parts, ", "), args
+}
+
+func quoteIdent(key string) string {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return key
+	}
+	for _, r := range key {
+		if !(r == '_' || (r >= '0' && r <= '9') || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')) {
+			return key
+		}
+	}
+	return fmt.Sprintf("`%s`", key)
 }
 
 func sortedKeys(values map[string]any) []string {
