@@ -1,6 +1,8 @@
 package i18n
 
 import (
+	"sync"
+
 	"poraclego/internal/config"
 )
 
@@ -8,6 +10,7 @@ import (
 type Factory struct {
 	root      string
 	config    *config.Config
+	mu        sync.Mutex
 	cache     map[string]*Translator
 	cmdCache  []*Translator
 }
@@ -37,9 +40,13 @@ func (f *Factory) AltTranslator() *Translator {
 
 // CommandTranslators returns command translators for available languages.
 func (f *Factory) CommandTranslators() []*Translator {
+	f.mu.Lock()
 	if f.cmdCache != nil {
-		return f.cmdCache
+		result := f.cmdCache
+		f.mu.Unlock()
+		return result
 	}
+	f.mu.Unlock()
 
 	langs := f.availableLanguages()
 	result := make([]*Translator, 0, len(langs)+2)
@@ -53,8 +60,14 @@ func (f *Factory) CommandTranslators() []*Translator {
 	if defaultLocale != "" && !contains(langs, defaultLocale) && defaultLocale != "en" {
 		result = append(result, f.Translator(defaultLocale))
 	}
-	f.cmdCache = result
-	return result
+
+	f.mu.Lock()
+	if f.cmdCache == nil {
+		f.cmdCache = result
+	}
+	cached := f.cmdCache
+	f.mu.Unlock()
+	return cached
 }
 
 // ReverseTranslateCommand maps a command from translated to base.
@@ -84,14 +97,26 @@ func (f *Factory) TranslateCommand(key string) []string {
 
 // Translator returns a locale translator.
 func (f *Factory) Translator(locale string) *Translator {
+	f.mu.Lock()
 	if tr, ok := f.cache[locale]; ok {
+		f.mu.Unlock()
 		return tr
 	}
+	f.mu.Unlock()
+
 	tr, err := NewTranslator(f.root, locale)
 	if err != nil {
 		tr = &Translator{data: map[string]string{}}
 	}
+
+	f.mu.Lock()
+	// Double-check in case another goroutine created it while we were loading from disk.
+	if existing, ok := f.cache[locale]; ok {
+		f.mu.Unlock()
+		return existing
+	}
 	f.cache[locale] = tr
+	f.mu.Unlock()
 	return tr
 }
 
