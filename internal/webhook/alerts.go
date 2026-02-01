@@ -834,8 +834,6 @@ func passesLocationFilter(fences *geofence.Store, cfg *config.Config, location l
 	case distance > 0:
 		if location.Lat != 0 || location.Lon != 0 {
 			computed := distanceMeters(location.Lat, location.Lon, lat, lon)
-			// Cache the computed distance so downstream render code can reuse it without re-calculating.
-			row["__computed_distance_m"] = computed
 			locationMatched = computed < distance
 		}
 	case hasDistance && distance == 0 && fences != nil && len(location.Areas) > 0:
@@ -1303,11 +1301,7 @@ func buildRenderData(p *Processor, hook *Hook, match alertMatch) map[string]any 
 		bearingEmoji := ""
 		if match.Target.Lat != 0 || match.Target.Lon != 0 {
 			hasUserDistance = true
-			if cached, ok := numberFromAny(match.Row["__computed_distance_m"]); ok {
-				userDistanceM = cached
-			} else {
-				userDistanceM = distanceMeters(match.Target.Lat, match.Target.Lon, lat, lon)
-			}
+			userDistanceM = distanceMeters(match.Target.Lat, match.Target.Lon, lat, lon)
 			distance = userDistanceM
 			brng := bearingDegrees(match.Target.Lat, match.Target.Lon, lat, lon)
 			bearing = fmt.Sprintf("%.0f", brng)

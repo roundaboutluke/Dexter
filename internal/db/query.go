@@ -97,7 +97,8 @@ func (q *Query) UpdateQuery(table string, values map[string]any, conditions map[
 // IncrementQuery increments a numeric column by value for matching rows.
 func (q *Query) IncrementQuery(table string, where map[string]any, target string, value int64) (int64, error) {
 	whereSQL, whereArgs := buildWhere(where)
-	query := fmt.Sprintf("UPDATE %s SET %s = %s + ?%s", table, target, target, whereSQL)
+	targetIdent := quoteIdent(target)
+	query := fmt.Sprintf("UPDATE %s SET %s = %s + ?%s", table, targetIdent, targetIdent, whereSQL)
 	args := append([]any{value}, whereArgs...)
 	res, err := q.db.Exec(query, args...)
 	if err != nil {
@@ -134,6 +135,10 @@ func (q *Query) InsertQuery(table string, values any) (int64, error) {
 		}
 	}
 	columns := sortedKeys(rows[0])
+	quotedColumns := make([]string, 0, len(columns))
+	for _, column := range columns {
+		quotedColumns = append(quotedColumns, quoteIdent(column))
+	}
 	placeholders := make([]string, len(columns))
 	for i := range placeholders {
 		placeholders[i] = "?"
@@ -146,7 +151,7 @@ func (q *Query) InsertQuery(table string, values any) (int64, error) {
 			args = append(args, row[key])
 		}
 	}
-	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES %s", table, strings.Join(columns, ","), strings.Join(valueGroups, ","))
+	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES %s", table, strings.Join(quotedColumns, ","), strings.Join(valueGroups, ","))
 	res, err := q.db.Exec(query, args...)
 	if err != nil {
 		return 0, fmt.Errorf("insertQuery: %w", err)
