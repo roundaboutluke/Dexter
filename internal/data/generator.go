@@ -26,6 +26,24 @@ const (
 //go:embed fallback/util.json
 var fallbackUtilJSON []byte
 
+func ensureUtilJSON(utilDir string) error {
+	path := filepath.Join(utilDir, "util.json")
+	if _, err := os.Stat(path); err == nil {
+		return nil
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("stat util.json: %w", err)
+	}
+
+	var utilData any
+	if err := json.Unmarshal(fallbackUtilJSON, &utilData); err != nil {
+		return fmt.Errorf("unmarshal embedded util.json: %w", err)
+	}
+	if _, err := writeJSON(path, utilData); err != nil {
+		return fmt.Errorf("write util.json: %w", err)
+	}
+	return nil
+}
+
 // Generate downloads game data and writes it to the util folder.
 func Generate(root string, latest bool, logger func(string, ...any)) error {
 	if logger == nil {
@@ -36,6 +54,9 @@ func Generate(root string, latest bool, logger func(string, ...any)) error {
 	if err := os.MkdirAll(localeDir, 0o755); err != nil {
 		return fmt.Errorf("create util dir: %w", err)
 	}
+	if err := ensureUtilJSON(utilDir); err != nil {
+		return err
+	}
 
 	client := &http.Client{Timeout: 20 * time.Second}
 	logger("Fetching latest Game Master...")
@@ -45,29 +66,14 @@ func Generate(root string, latest bool, logger func(string, ...any)) error {
 	}
 	logger("Writing Game Master files...")
 	updated := 0
-	wroteUtil := false
 	for key, value := range gameMaster {
+		if key == "util" {
+			continue
+		}
 		path := filepath.Join(utilDir, fmt.Sprintf("%s.json", key))
 		changed, err := writeJSON(path, value)
 		if err != nil {
 			return fmt.Errorf("write %s: %w", key, err)
-		}
-		if changed {
-			updated++
-		}
-		if key == "util" {
-			wroteUtil = true
-		}
-	}
-	if !wroteUtil {
-		logger("Game Master did not include util.json, using embedded fallback util.json...")
-		var utilData any
-		if err := json.Unmarshal(fallbackUtilJSON, &utilData); err != nil {
-			return fmt.Errorf("unmarshal embedded util.json: %w", err)
-		}
-		changed, err := writeJSON(filepath.Join(utilDir, "util.json"), utilData)
-		if err != nil {
-			return fmt.Errorf("write util.json: %w", err)
 		}
 		if changed {
 			updated++
@@ -130,6 +136,10 @@ func GenerateBestEffort(root string, latest bool, logger func(string, ...any)) {
 		logger("Data generation failed: %v", err)
 		return
 	}
+	if err := ensureUtilJSON(utilDir); err != nil {
+		logger("Data generation failed: %v", err)
+		return
+	}
 
 	client := &http.Client{Timeout: 20 * time.Second}
 	logger("Fetching latest Game Master...")
@@ -139,8 +149,10 @@ func GenerateBestEffort(root string, latest bool, logger func(string, ...any)) {
 		logger("Could not fetch latest GM, using existing...")
 	} else {
 		logger("Writing Game Master files...")
-		wroteUtil := false
 		for key, value := range gameMaster {
+			if key == "util" {
+				continue
+			}
 			path := filepath.Join(utilDir, fmt.Sprintf("%s.json", key))
 			changed, err := writeJSON(path, value)
 			if err != nil {
@@ -148,20 +160,6 @@ func GenerateBestEffort(root string, latest bool, logger func(string, ...any)) {
 				continue
 			}
 			if changed {
-				updated++
-			}
-			if key == "util" {
-				wroteUtil = true
-			}
-		}
-		if !wroteUtil {
-			logger("Game Master did not include util.json, using embedded fallback util.json...")
-			var utilData any
-			if err := json.Unmarshal(fallbackUtilJSON, &utilData); err != nil {
-				logger("Could not load embedded util.json, using existing...")
-			} else if changed, err := writeJSON(filepath.Join(utilDir, "util.json"), utilData); err != nil {
-				logger("Could not write util.json: %v", err)
-			} else if changed {
 				updated++
 			}
 		}
