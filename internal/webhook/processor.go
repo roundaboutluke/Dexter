@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -182,6 +183,15 @@ func (p *Processor) workerLoop(concurrency int) {
 		sem <- struct{}{}
 		go func(it any) {
 			defer func() { <-sem }()
+			defer func() {
+				if r := recover(); r != nil {
+					if logger := logging.Get().Webhooks; logger != nil {
+						logger.Errorf("panic in webhook worker: %v\n%s", r, string(debug.Stack()))
+					} else {
+						fmt.Fprintf(os.Stderr, "panic in webhook worker: %v\n%s\n", r, string(debug.Stack()))
+					}
+				}
+			}()
 			p.handle(it)
 		}(item)
 	}
