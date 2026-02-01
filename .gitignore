@@ -66,5 +66,5 @@ __pycache__/
 .env
 
 # Built binaries
-poraclego
-poraclego-*
+/poraclego
+/poraclego-*
