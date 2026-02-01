@@ -34,6 +34,7 @@ logs/*
 
 # Generated masterdata (run poraclego-generate after clone)
 util/*.json
+!util/util.json
 util/locale/*
 !util/.gitkeep
 !util/locale/.gitkeep

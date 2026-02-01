@@ -9,8 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"time"
-
-	_ "embed"
 )
 
 const (
@@ -19,30 +17,6 @@ const (
 	localesIndex  = "https://raw.githubusercontent.com/WatWowMap/pogo-translations/master/index.json"
 	localesBase   = "https://raw.githubusercontent.com/WatWowMap/pogo-translations/master/static/enRefMerged/"
 )
-
-// util.json is required by Poracle for weather names, emojis, power-up costs, etc.
-// It used to be part of the Masterfile-Generator payload, but can be missing from the v2 JSON.
-//
-//go:embed fallback/util.json
-var fallbackUtilJSON []byte
-
-func ensureUtilJSON(utilDir string) error {
-	path := filepath.Join(utilDir, "util.json")
-	if _, err := os.Stat(path); err == nil {
-		return nil
-	} else if !os.IsNotExist(err) {
-		return fmt.Errorf("stat util.json: %w", err)
-	}
-
-	var utilData any
-	if err := json.Unmarshal(fallbackUtilJSON, &utilData); err != nil {
-		return fmt.Errorf("unmarshal embedded util.json: %w", err)
-	}
-	if _, err := writeJSON(path, utilData); err != nil {
-		return fmt.Errorf("write util.json: %w", err)
-	}
-	return nil
-}
 
 // Generate downloads game data and writes it to the util folder.
 func Generate(root string, latest bool, logger func(string, ...any)) error {
@@ -54,9 +28,6 @@ func Generate(root string, latest bool, logger func(string, ...any)) error {
 	if err := os.MkdirAll(localeDir, 0o755); err != nil {
 		return fmt.Errorf("create util dir: %w", err)
 	}
-	if err := ensureUtilJSON(utilDir); err != nil {
-		return err
-	}
 
 	client := &http.Client{Timeout: 20 * time.Second}
 	logger("Fetching latest Game Master...")
@@ -67,9 +38,6 @@ func Generate(root string, latest bool, logger func(string, ...any)) error {
 	logger("Writing Game Master files...")
 	updated := 0
 	for key, value := range gameMaster {
-		if key == "util" {
-			continue
-		}
 		path := filepath.Join(utilDir, fmt.Sprintf("%s.json", key))
 		changed, err := writeJSON(path, value)
 		if err != nil {
@@ -136,10 +104,6 @@ func GenerateBestEffort(root string, latest bool, logger func(string, ...any)) {
 		logger("Data generation failed: %v", err)
 		return
 	}
-	if err := ensureUtilJSON(utilDir); err != nil {
-		logger("Data generation failed: %v", err)
-		return
-	}
 
 	client := &http.Client{Timeout: 20 * time.Second}
 	logger("Fetching latest Game Master...")
@@ -150,9 +114,6 @@ func GenerateBestEffort(root string, latest bool, logger func(string, ...any)) {
 	} else {
 		logger("Writing Game Master files...")
 		for key, value := range gameMaster {
-			if key == "util" {
-				continue
-			}
 			path := filepath.Join(utilDir, fmt.Sprintf("%s.json", key))
 			changed, err := writeJSON(path, value)
 			if err != nil {
