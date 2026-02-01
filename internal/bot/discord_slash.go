@@ -5203,10 +5203,27 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 		fetchLimit = 5000
 	}
 
+	truncateChoiceLabel := func(value string) string {
+		const max = 100 // Discord limit for choice name
+		value = strings.TrimSpace(value)
+		if value == "" {
+			return value
+		}
+		r := []rune(value)
+		if len(r) <= max {
+			return value
+		}
+		if max <= 3 {
+			return string(r[:max])
+		}
+		return string(r[:max-3]) + "..."
+	}
+
 	appendChoice := func(label, value string) {
 		if label == "" || value == "" {
 			return
 		}
+		label = truncateChoiceLabel(label)
 		if query != "" && !strings.Contains(strings.ToLower(label), query) {
 			return
 		}
