@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	_ "embed"
 )
 
 const (
@@ -16,11 +18,13 @@ const (
 	gruntsURL     = "https://raw.githubusercontent.com/WatWowMap/event-info/main/grunts/formatted.json"
 	localesIndex  = "https://raw.githubusercontent.com/WatWowMap/pogo-translations/master/index.json"
 	localesBase   = "https://raw.githubusercontent.com/WatWowMap/pogo-translations/master/static/enRefMerged/"
-	// util.json is required by Poracle for weather names, emojis, power-up costs, etc.
-	// It used to be part of the Masterfile-Generator payload, but some deployments now
-	// observe it missing from the v2 JSON. Fall back to PoracleJS's published util.json.
-	utilDataURL = "https://raw.githubusercontent.com/KartulUdus/PoracleJS/master/src/util/util.json"
 )
+
+// util.json is required by Poracle for weather names, emojis, power-up costs, etc.
+// It used to be part of the Masterfile-Generator payload, but can be missing from the v2 JSON.
+//
+//go:embed fallback/util.json
+var fallbackUtilJSON []byte
 
 // Generate downloads game data and writes it to the util folder.
 func Generate(root string, latest bool, logger func(string, ...any)) error {
@@ -56,10 +60,10 @@ func Generate(root string, latest bool, logger func(string, ...any)) error {
 		}
 	}
 	if !wroteUtil {
-		logger("Game Master did not include util.json, fetching fallback util.json...")
+		logger("Game Master did not include util.json, using embedded fallback util.json...")
 		var utilData any
-		if err := fetchJSON(client, utilDataURL, &utilData); err != nil {
-			return fmt.Errorf("fetch util.json: %w", err)
+		if err := json.Unmarshal(fallbackUtilJSON, &utilData); err != nil {
+			return fmt.Errorf("unmarshal embedded util.json: %w", err)
 		}
 		changed, err := writeJSON(filepath.Join(utilDir, "util.json"), utilData)
 		if err != nil {
@@ -151,17 +155,14 @@ func GenerateBestEffort(root string, latest bool, logger func(string, ...any)) {
 			}
 		}
 		if !wroteUtil {
-			logger("Game Master did not include util.json, fetching fallback util.json...")
+			logger("Game Master did not include util.json, using embedded fallback util.json...")
 			var utilData any
-			if err := fetchJSON(client, utilDataURL, &utilData); err != nil {
-				logger("Could not fetch util.json, using existing...")
-			} else {
-				changed, err := writeJSON(filepath.Join(utilDir, "util.json"), utilData)
-				if err != nil {
-					logger("Could not write util.json: %v", err)
-				} else if changed {
-					updated++
-				}
+			if err := json.Unmarshal(fallbackUtilJSON, &utilData); err != nil {
+				logger("Could not load embedded util.json, using existing...")
+			} else if changed, err := writeJSON(filepath.Join(utilDir, "util.json"), utilData); err != nil {
+				logger("Could not write util.json: %v", err)
+			} else if changed {
+				updated++
 			}
 		}
 	}
