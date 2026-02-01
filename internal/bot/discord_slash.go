@@ -2930,11 +2930,9 @@ func (d *Discord) handleSlashRemove(s *discordgo.Session, i *discordgo.Interacti
 	}
 
 	userID, _ := slashUser(i)
-	profileNo := d.userProfileNo(userID)
-	where := map[string]any{
-		"id":         userID,
-		"profile_no": profileNo,
-	}
+	// Do not scope removals to current_profile_no: scheduler-driven quiet hours can set
+	// current_profile_no=0, which would otherwise prevent users from removing their trackings.
+	where := map[string]any{"id": userID}
 	if !strings.EqualFold(uid, "all") && !strings.EqualFold(uid, "everything") {
 		where["uid"] = parseUID(uid)
 	}
@@ -3073,6 +3071,8 @@ func removeTrackingTable(trackingType string) string {
 		return "monsters"
 	case "raid":
 		return "raid"
+	case "gym":
+		return "gym"
 	case "maxbattle":
 		return "maxbattle"
 	case "incident", "invasion":
@@ -5193,12 +5193,29 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 		})
 	}
 
+	labelWithProfile := func(row map[string]any, label string) string {
+		rowProfile := toInt(row["profile_no"], 0)
+		if rowProfile <= 0 {
+			return label
+		}
+		if profileNo == 0 || (profileNo > 0 && rowProfile != profileNo) {
+			return fmt.Sprintf("P%d: %s", rowProfile, label)
+		}
+		return label
+	}
+
+	whereByUser := func() map[string]any {
+		// Do not scope to profile_no here: if the scheduler set current_profile_no=0 for
+		// quiet hours, we'd return no rows and autocomplete would look broken.
+		return map[string]any{"id": userID}
+	}
+
 	switch strings.ToLower(trackingType) {
 	case "pokemon":
 		if query == "" {
 			appendChoice("Everything (remove all)", "pokemon|all")
 		}
-		rows, err := d.manager.query.SelectAllQuery("monsters", map[string]any{"id": userID, "profile_no": profileNo})
+		rows, err := d.manager.query.SelectAllQuery("monsters", whereByUser())
 		if err != nil {
 			return nil
 		}
@@ -5207,7 +5224,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 			if uid == "" {
 				continue
 			}
-			label := tracking.MonsterRowText(d.manager.cfg, tr, d.manager.data, row)
+			label := labelWithProfile(row, tracking.MonsterRowText(d.manager.cfg, tr, d.manager.data, row))
 			appendChoice(label, "pokemon|"+uid)
 			if len(choices) >= 25 {
 				break
@@ -5217,7 +5234,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 		if query == "" {
 			appendChoice("Everything (remove all)", "raid|all")
 		}
-		rows, err := d.manager.query.SelectAllQuery("raid", map[string]any{"id": userID, "profile_no": profileNo})
+		rows, err := d.manager.query.SelectAllQuery("raid", whereByUser())
 		if err != nil {
 			return nil
 		}
@@ -5226,7 +5243,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 			if uid == "" {
 				continue
 			}
-			label := tracking.RaidRowText(d.manager.cfg, tr, d.manager.data, row, d.manager.scanner)
+			label := labelWithProfile(row, tracking.RaidRowText(d.manager.cfg, tr, d.manager.data, row, d.manager.scanner))
 			appendChoice(label, "raid|"+uid)
 			if len(choices) >= 25 {
 				break
@@ -5236,7 +5253,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 		if query == "" {
 			appendChoice("Everything (remove all)", "maxbattle|all")
 		}
-		rows, err := d.manager.query.SelectAllQuery("maxbattle", map[string]any{"id": userID, "profile_no": profileNo})
+		rows, err := d.manager.query.SelectAllQuery("maxbattle", whereByUser())
 		if err != nil {
 			return nil
 		}
@@ -5245,7 +5262,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 			if uid == "" {
 				continue
 			}
-			label := tracking.MaxbattleRowText(d.manager.cfg, tr, d.manager.data, row)
+			label := labelWithProfile(row, tracking.MaxbattleRowText(d.manager.cfg, tr, d.manager.data, row))
 			appendChoice(label, "maxbattle|"+uid)
 			if len(choices) >= 25 {
 				break
@@ -5255,7 +5272,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 		if query == "" {
 			appendChoice("Everything (remove all)", "quest|all")
 		}
-		rows, err := d.manager.query.SelectAllQuery("quest", map[string]any{"id": userID, "profile_no": profileNo})
+		rows, err := d.manager.query.SelectAllQuery("quest", whereByUser())
 		if err != nil {
 			return nil
 		}
@@ -5264,7 +5281,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 			if uid == "" {
 				continue
 			}
-			label := tracking.QuestRowText(d.manager.cfg, tr, d.manager.data, row)
+			label := labelWithProfile(row, tracking.QuestRowText(d.manager.cfg, tr, d.manager.data, row))
 			appendChoice(label, "quest|"+uid)
 			if len(choices) >= 25 {
 				break
@@ -5274,7 +5291,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 		if query == "" {
 			appendChoice("Everything (remove all)", "invasion|all")
 		}
-		rows, err := d.manager.query.SelectAllQuery("invasion", map[string]any{"id": userID, "profile_no": profileNo})
+		rows, err := d.manager.query.SelectAllQuery("invasion", whereByUser())
 		if err != nil {
 			return nil
 		}
@@ -5283,7 +5300,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 			if uid == "" {
 				continue
 			}
-			label := tracking.InvasionRowText(d.manager.cfg, tr, d.manager.data, row)
+			label := labelWithProfile(row, tracking.InvasionRowText(d.manager.cfg, tr, d.manager.data, row))
 			appendChoice(label, "invasion|"+uid)
 			if len(choices) >= 25 {
 				break
@@ -5293,7 +5310,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 		if query == "" {
 			appendChoice("Everything (remove all)", "lure|all")
 		}
-		rows, err := d.manager.query.SelectAllQuery("lures", map[string]any{"id": userID, "profile_no": profileNo})
+		rows, err := d.manager.query.SelectAllQuery("lures", whereByUser())
 		if err != nil {
 			return nil
 		}
@@ -5302,7 +5319,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 			if uid == "" {
 				continue
 			}
-			label := tracking.LureRowText(d.manager.cfg, tr, d.manager.data, row)
+			label := labelWithProfile(row, tracking.LureRowText(d.manager.cfg, tr, d.manager.data, row))
 			appendChoice(label, "lure|"+uid)
 			if len(choices) >= 25 {
 				break
@@ -5312,7 +5329,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 		if query == "" {
 			appendChoice("Everything (remove all)", "weather|all")
 		}
-		rows, err := d.manager.query.SelectAllQuery("weather", map[string]any{"id": userID, "profile_no": profileNo})
+		rows, err := d.manager.query.SelectAllQuery("weather", whereByUser())
 		if err != nil {
 			return nil
 		}
@@ -5321,7 +5338,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 			if uid == "" {
 				continue
 			}
-			label := tracking.WeatherRowText(tr, d.manager.data, row)
+			label := labelWithProfile(row, tracking.WeatherRowText(tr, d.manager.data, row))
 			appendChoice(label, "weather|"+uid)
 			if len(choices) >= 25 {
 				break
@@ -5331,7 +5348,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 		if query == "" {
 			appendChoice("Everything (remove all)", "gym|all")
 		}
-		rows, err := d.manager.query.SelectAllQuery("gym", map[string]any{"id": userID, "profile_no": profileNo})
+		rows, err := d.manager.query.SelectAllQuery("gym", whereByUser())
 		if err != nil {
 			return nil
 		}
@@ -5340,7 +5357,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 			if uid == "" {
 				continue
 			}
-			label := tracking.GymRowText(d.manager.cfg, tr, d.manager.data, row, d.manager.scanner)
+			label := labelWithProfile(row, tracking.GymRowText(d.manager.cfg, tr, d.manager.data, row, d.manager.scanner))
 			appendChoice(label, "gym|"+uid)
 			if len(choices) >= 25 {
 				break
@@ -5350,7 +5367,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 		if query == "" {
 			appendChoice("Everything (remove all)", "nest|all")
 		}
-		rows, err := d.manager.query.SelectAllQuery("nests", map[string]any{"id": userID, "profile_no": profileNo})
+		rows, err := d.manager.query.SelectAllQuery("nests", whereByUser())
 		if err != nil {
 			return nil
 		}
@@ -5359,7 +5376,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 			if uid == "" {
 				continue
 			}
-			label := tracking.NestRowText(d.manager.cfg, tr, d.manager.data, row)
+			label := labelWithProfile(row, tracking.NestRowText(d.manager.cfg, tr, d.manager.data, row))
 			appendChoice(label, "nest|"+uid)
 			if len(choices) >= 25 {
 				break
@@ -5369,7 +5386,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 		if query == "" {
 			appendChoice("Everything (remove all)", "fort|all")
 		}
-		rows, err := d.manager.query.SelectAllQuery("forts", map[string]any{"id": userID, "profile_no": profileNo})
+		rows, err := d.manager.query.SelectAllQuery("forts", whereByUser())
 		if err != nil {
 			return nil
 		}
@@ -5378,7 +5395,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 			if uid == "" {
 				continue
 			}
-			label := tracking.FortUpdateRowText(d.manager.cfg, tr, d.manager.data, row)
+			label := labelWithProfile(row, tracking.FortUpdateRowText(d.manager.cfg, tr, d.manager.data, row))
 			appendChoice(label, "fort|"+uid)
 			if len(choices) >= 25 {
 				break
