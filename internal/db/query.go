@@ -44,6 +44,26 @@ func (q *Query) SelectAllQuery(table string, conditions map[string]any) ([]map[s
 	return rowsToMaps(rows)
 }
 
+// SelectAllQueryLimit returns up to limit rows matching conditions.
+// A non-positive limit behaves like SelectAllQuery.
+func (q *Query) SelectAllQueryLimit(table string, conditions map[string]any, limit int) ([]map[string]any, error) {
+	if limit <= 0 {
+		return q.SelectAllQuery(table, conditions)
+	}
+	if q == nil || q.db == nil {
+		return nil, fmt.Errorf("selectAllQueryLimit: database not initialized")
+	}
+	whereSQL, args := buildWhere(conditions)
+	query := fmt.Sprintf("SELECT * FROM %s%s LIMIT ?", table, whereSQL)
+	args = append(args, limit)
+	rows, err := q.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("selectAllQueryLimit: %w", err)
+	}
+	defer rows.Close()
+	return rowsToMaps(rows)
+}
+
 // SelectWhereInQuery returns rows where column IN (values).
 func (q *Query) SelectWhereInQuery(table string, values []any, valuesColumn string) ([]map[string]any, error) {
 	if len(values) == 0 {

@@ -2923,6 +2923,16 @@ func (d *Discord) handleSlashRemove(s *discordgo.Session, i *discordgo.Interacti
 		d.respondEphemeral(s, i, "That tracking entry could not be parsed.")
 		return
 	}
+	if strings.Contains(value, "|") {
+		expected := strings.ToLower(strings.TrimSpace(trackType))
+		if expected == "incident" {
+			expected = "invasion"
+		}
+		if expected != "" && trackingType != expected {
+			d.respondEphemeral(s, i, "Tracking type changed; please clear the tracking selection and pick again.")
+			return
+		}
+	}
 	table := removeTrackingTable(trackingType)
 	if table == "" || d.manager == nil || d.manager.query == nil {
 		d.respondEphemeral(s, i, "That tracking entry could not be removed.")
@@ -5177,8 +5187,21 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 	}
 	profileNo := d.userProfileNo(userID)
 	tr := d.manager.i18n.Translator(d.userLanguage(userID))
-	query = strings.ToLower(strings.TrimSpace(query))
+
+	// Discord may send the previously-selected choice value back as the focused query.
+	// Those values look like "type|uid" and should not be used to filter results,
+	// especially when the user switches the "type" option.
+	query = strings.TrimSpace(query)
+	if strings.Contains(query, "|") {
+		query = ""
+	}
+	query = strings.ToLower(query)
 	choices := []*discordgo.ApplicationCommandOptionChoice{}
+
+	fetchLimit := 200
+	if query != "" {
+		fetchLimit = 5000
+	}
 
 	appendChoice := func(label, value string) {
 		if label == "" || value == "" {
@@ -5215,7 +5238,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 		if query == "" {
 			appendChoice("Everything (remove all)", "pokemon|all")
 		}
-		rows, err := d.manager.query.SelectAllQuery("monsters", whereByUser())
+		rows, err := d.manager.query.SelectAllQueryLimit("monsters", whereByUser(), fetchLimit)
 		if err != nil {
 			return nil
 		}
@@ -5234,7 +5257,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 		if query == "" {
 			appendChoice("Everything (remove all)", "raid|all")
 		}
-		rows, err := d.manager.query.SelectAllQuery("raid", whereByUser())
+		rows, err := d.manager.query.SelectAllQueryLimit("raid", whereByUser(), fetchLimit)
 		if err != nil {
 			return nil
 		}
@@ -5253,7 +5276,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 		if query == "" {
 			appendChoice("Everything (remove all)", "maxbattle|all")
 		}
-		rows, err := d.manager.query.SelectAllQuery("maxbattle", whereByUser())
+		rows, err := d.manager.query.SelectAllQueryLimit("maxbattle", whereByUser(), fetchLimit)
 		if err != nil {
 			return nil
 		}
@@ -5272,7 +5295,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 		if query == "" {
 			appendChoice("Everything (remove all)", "quest|all")
 		}
-		rows, err := d.manager.query.SelectAllQuery("quest", whereByUser())
+		rows, err := d.manager.query.SelectAllQueryLimit("quest", whereByUser(), fetchLimit)
 		if err != nil {
 			return nil
 		}
@@ -5291,7 +5314,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 		if query == "" {
 			appendChoice("Everything (remove all)", "invasion|all")
 		}
-		rows, err := d.manager.query.SelectAllQuery("invasion", whereByUser())
+		rows, err := d.manager.query.SelectAllQueryLimit("invasion", whereByUser(), fetchLimit)
 		if err != nil {
 			return nil
 		}
@@ -5310,7 +5333,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 		if query == "" {
 			appendChoice("Everything (remove all)", "lure|all")
 		}
-		rows, err := d.manager.query.SelectAllQuery("lures", whereByUser())
+		rows, err := d.manager.query.SelectAllQueryLimit("lures", whereByUser(), fetchLimit)
 		if err != nil {
 			return nil
 		}
@@ -5329,7 +5352,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 		if query == "" {
 			appendChoice("Everything (remove all)", "weather|all")
 		}
-		rows, err := d.manager.query.SelectAllQuery("weather", whereByUser())
+		rows, err := d.manager.query.SelectAllQueryLimit("weather", whereByUser(), fetchLimit)
 		if err != nil {
 			return nil
 		}
@@ -5348,7 +5371,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 		if query == "" {
 			appendChoice("Everything (remove all)", "gym|all")
 		}
-		rows, err := d.manager.query.SelectAllQuery("gym", whereByUser())
+		rows, err := d.manager.query.SelectAllQueryLimit("gym", whereByUser(), fetchLimit)
 		if err != nil {
 			return nil
 		}
@@ -5367,7 +5390,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 		if query == "" {
 			appendChoice("Everything (remove all)", "nest|all")
 		}
-		rows, err := d.manager.query.SelectAllQuery("nests", whereByUser())
+		rows, err := d.manager.query.SelectAllQueryLimit("nests", whereByUser(), fetchLimit)
 		if err != nil {
 			return nil
 		}
@@ -5386,7 +5409,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 		if query == "" {
 			appendChoice("Everything (remove all)", "fort|all")
 		}
-		rows, err := d.manager.query.SelectAllQuery("forts", whereByUser())
+		rows, err := d.manager.query.SelectAllQueryLimit("forts", whereByUser(), fetchLimit)
 		if err != nil {
 			return nil
 		}
