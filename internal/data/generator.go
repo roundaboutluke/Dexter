@@ -16,6 +16,10 @@ const (
 	gruntsURL     = "https://raw.githubusercontent.com/WatWowMap/event-info/main/grunts/formatted.json"
 	localesIndex  = "https://raw.githubusercontent.com/WatWowMap/pogo-translations/master/index.json"
 	localesBase   = "https://raw.githubusercontent.com/WatWowMap/pogo-translations/master/static/enRefMerged/"
+	// util.json is required by Poracle for weather names, emojis, power-up costs, etc.
+	// It used to be part of the Masterfile-Generator payload, but some deployments now
+	// observe it missing from the v2 JSON. Fall back to PoracleJS's published util.json.
+	utilDataURL = "https://raw.githubusercontent.com/KartulUdus/PoracleJS/master/src/util/util.json"
 )
 
 // Generate downloads game data and writes it to the util folder.
@@ -37,11 +41,29 @@ func Generate(root string, latest bool, logger func(string, ...any)) error {
 	}
 	logger("Writing Game Master files...")
 	updated := 0
+	wroteUtil := false
 	for key, value := range gameMaster {
 		path := filepath.Join(utilDir, fmt.Sprintf("%s.json", key))
 		changed, err := writeJSON(path, value)
 		if err != nil {
 			return fmt.Errorf("write %s: %w", key, err)
+		}
+		if changed {
+			updated++
+		}
+		if key == "util" {
+			wroteUtil = true
+		}
+	}
+	if !wroteUtil {
+		logger("Game Master did not include util.json, fetching fallback util.json...")
+		var utilData any
+		if err := fetchJSON(client, utilDataURL, &utilData); err != nil {
+			return fmt.Errorf("fetch util.json: %w", err)
+		}
+		changed, err := writeJSON(filepath.Join(utilDir, "util.json"), utilData)
+		if err != nil {
+			return fmt.Errorf("write util.json: %w", err)
 		}
 		if changed {
 			updated++
@@ -113,6 +135,7 @@ func GenerateBestEffort(root string, latest bool, logger func(string, ...any)) {
 		logger("Could not fetch latest GM, using existing...")
 	} else {
 		logger("Writing Game Master files...")
+		wroteUtil := false
 		for key, value := range gameMaster {
 			path := filepath.Join(utilDir, fmt.Sprintf("%s.json", key))
 			changed, err := writeJSON(path, value)
@@ -122,6 +145,23 @@ func GenerateBestEffort(root string, latest bool, logger func(string, ...any)) {
 			}
 			if changed {
 				updated++
+			}
+			if key == "util" {
+				wroteUtil = true
+			}
+		}
+		if !wroteUtil {
+			logger("Game Master did not include util.json, fetching fallback util.json...")
+			var utilData any
+			if err := fetchJSON(client, utilDataURL, &utilData); err != nil {
+				logger("Could not fetch util.json, using existing...")
+			} else {
+				changed, err := writeJSON(filepath.Join(utilDir, "util.json"), utilData)
+				if err != nil {
+					logger("Could not write util.json: %v", err)
+				} else if changed {
+					updated++
+				}
 			}
 		}
 	}
