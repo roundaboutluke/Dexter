@@ -3081,6 +3081,8 @@ func removeTrackingTable(trackingType string) string {
 		return "monsters"
 	case "raid":
 		return "raid"
+	case "egg":
+		return "egg"
 	case "gym":
 		return "gym"
 	case "maxbattle":
@@ -5289,6 +5291,25 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 				break
 			}
 		}
+	case "egg":
+		if query == "" {
+			appendChoice("Everything (remove all)", "egg|all")
+		}
+		rows, err := d.manager.query.SelectAllQueryLimit("egg", whereByUser(), fetchLimit)
+		if err != nil {
+			return nil
+		}
+		for _, row := range rows {
+			uid := strings.TrimSpace(fmt.Sprintf("%v", row["uid"]))
+			if uid == "" {
+				continue
+			}
+			label := labelWithProfile(row, tracking.EggRowText(d.manager.cfg, tr, d.manager.data, row, d.manager.scanner))
+			appendChoice(label, "egg|"+uid)
+			if len(choices) >= 25 {
+				break
+			}
+		}
 	case "maxbattle":
 		if query == "" {
 			appendChoice("Everything (remove all)", "maxbattle|all")
@@ -6020,6 +6041,7 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 					Choices: []*discordgo.ApplicationCommandOptionChoice{
 						{Name: "pokemon", Value: "pokemon"},
 						{Name: "raid", Value: "raid"},
+						{Name: "egg", Value: "egg"},
 						{Name: "maxbattle", Value: "maxbattle"},
 						{Name: "invasion", Value: "invasion"},
 						{Name: "quest", Value: "quest"},
