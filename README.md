@@ -76,6 +76,12 @@ PvP links (DTS helper):
 - Use `{{pvpSlug nameEng}}` for PvPIVs-style URLs (e.g. `Mr_Mime`).
 - Use `{{lowercase (pvpSlug nameEng)}}` for PvPoke-style URLs (e.g. `mr_mime`).
 
+Geocoding providers:
+
+- `geocoding.provider` can be `none`, `nominatim`, `pelias`, or `google`.
+- `nominatim`: set `geocoding.providerURL` to your Nominatim base URL.
+- `pelias`: set `geocoding.providerURL` to your Pelias API base URL (e.g. `http://localhost:4000`). If your Pelias endpoint requires an API key, set `geocoding.providerKey` (sent as `api_key` query param).
+
 ## Building for Production
 
 ```bash

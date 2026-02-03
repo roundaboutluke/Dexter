@@ -20,11 +20,11 @@ func CheckConfig(cfg *config.Config, logger func(string, ...any)) {
 
 	provider, _ := cfg.GetString("geocoding.provider")
 	switch strings.ToLower(provider) {
-	case "none", "nominatim", "google", "openstreetmap":
+	case "none", "nominatim", "pelias", "google", "openstreetmap":
 	default:
-		logger("Config Check: geocoding/provider is not one of none,nominatim,google,openstreetmap")
+		logger("Config Check: geocoding/provider is not one of none,nominatim,pelias,google,openstreetmap")
 	}
-	if strings.EqualFold(provider, "nominatim") {
+	if strings.EqualFold(provider, "nominatim") || strings.EqualFold(provider, "pelias") {
 		if url, _ := cfg.GetString("geocoding.providerURL"); url != "" && !strings.HasPrefix(url, "http") {
 			logger("Config Check: geocoding/providerURL does not start with http")
 		}

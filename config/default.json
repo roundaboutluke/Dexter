@@ -452,9 +452,11 @@
   "geocoding": {
     //  provider, providerURL - these are used for address lookups. Can be 'none',
     //   'nominatim' for a local nominatim installation (recommended) https://github.com/mediagis/nominatim-docker
+    //   'pelias' for a Pelias geocoding service (https://github.com/pelias/pelias) - set providerURL to your Pelias API base (e.g. http://localhost:4000)
     //   or google (geocoding key provides an array of google API keys)
       "provider": "none",
       "providerURL": "",
+      "providerKey": "", // Optional provider API key (e.g. Pelias api_key query param)
       "forwardOnly": false, // When true, disable reverse geocoding lookup
       "cacheDetail": 3,     // number of decimal places of lon/lat to use while caching geocoding (default 3 - or use 4 for 100x more detail)
       "dayStyle": "", // Names of styles you want to use for different times of day using tileservercache

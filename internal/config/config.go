@@ -15,6 +15,14 @@ type Config struct {
 	data map[string]any
 }
 
+// New creates a Config from a map. Primarily used for tests and tooling.
+func New(data map[string]any) *Config {
+	if data == nil {
+		data = map[string]any{}
+	}
+	return &Config{data: data}
+}
+
 // Load reads default config, environment overrides, and local config.
 func Load(root string) (*Config, error) {
 	base := filepath.Join(root, "config")

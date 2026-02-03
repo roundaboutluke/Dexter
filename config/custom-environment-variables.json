@@ -116,6 +116,7 @@
     "geocoding": {
       "provider": "GEOCODING_PROVIDER",
       "providerURL": "GEOCODING_PROVIDER_URL",
+      "providerKey": "GEOCODING_PROVIDER_KEY",
       "staticProvider": "STATIC_PROVIDER",
       "staticProviderURL": "STATIC_PROVIDER_URL",
       "geocodingKey":{
