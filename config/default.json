@@ -84,6 +84,7 @@
     // additional Shortlinks to Pogo Maps in DTS - supported RDM, Reactmap, RocketMAD
       "rdmURL": "",                // https://myRDM.com/
       "reactMapURL": "",           // https://myReactMap.com/
+      "diademURL": "",             // https://myDiadem.com/ (base URL, do not include /map)
       "rocketMadURL": ""           // https://myRocketMAD.com/
   },
   //

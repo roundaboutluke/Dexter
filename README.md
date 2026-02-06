@@ -76,6 +76,12 @@ PvP links (DTS helper):
 - Use `{{pvpSlug nameEng}}` for PvPIVs-style URLs (e.g. `Mr_Mime`).
 - Use `{{lowercase (pvpSlug nameEng)}}` for PvPoke-style URLs (e.g. `mr_mime`).
 
+Map frontend links (DTS):
+
+- PoracleGo exposes optional “map URLs” into DTS. For example:
+  - `reactMapUrl` (set `general.reactMapURL`)
+  - `diademUrl` (set `general.diademURL` to your Diadem base URL; do not include `/map`)
+
 Geocoding providers:
 
 - `geocoding.provider` can be `none`, `nominatim`, `pelias`, or `google`.

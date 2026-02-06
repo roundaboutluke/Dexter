@@ -1688,6 +1688,7 @@ func buildRenderData(p *Processor, hook *Hook, match alertMatch) map[string]any 
 	}
 	if p != nil && p.cfg != nil {
 		data["reactMapUrl"] = reactMapURL(p.cfg, hook)
+		data["diademUrl"] = diademURL(p.cfg, hook)
 		data["nightTime"] = false
 		data["dawnTime"] = false
 		data["duskTime"] = false
@@ -3364,6 +3365,57 @@ func reactMapURL(cfg *config.Config, hook *Hook) string {
 		if fortType != "" {
 			if id := getString(hook.Message["id"]); id != "" {
 				return fmt.Sprintf("%sid/%ss/%s/18", base, fortType, id)
+			}
+		}
+	}
+	return ""
+}
+
+func diademURL(cfg *config.Config, hook *Hook) string {
+	if cfg == nil || hook == nil {
+		return ""
+	}
+	base := getStringFromConfig(cfg, "general.diademURL", "")
+	if base == "" {
+		return ""
+	}
+	if !strings.HasSuffix(base, "/") {
+		base += "/"
+	}
+	switch hook.Type {
+	case "pokemon":
+		if encounter := getString(hook.Message["encounter_id"]); encounter != "" {
+			return base + "pokemon/" + encounter
+		}
+	case "raid", "egg", "gym", "gym_details":
+		if gym := getString(hook.Message["gym_id"]); gym != "" {
+			return base + "gym/" + gym
+		}
+	case "max_battle":
+		stationID := getString(hook.Message["stationId"])
+		if stationID == "" {
+			stationID = getString(hook.Message["id"])
+		}
+		if stationID != "" {
+			return base + "station/" + stationID
+		}
+	case "quest", "invasion", "lure", "pokestop":
+		if stop := getString(hook.Message["pokestop_id"]); stop != "" {
+			return base + "pokestop/" + stop
+		}
+	case "nest":
+		if nest := getString(hook.Message["nest_id"]); nest != "" {
+			return base + "nest/" + nest
+		}
+	case "fort_update":
+		fortType := getString(hook.Message["fort_type"])
+		if fortType == "" {
+			fortType = getString(hook.Message["type"])
+		}
+		switch fortType {
+		case "gym", "pokestop", "station", "nest", "spawnpoint", "route", "tappable":
+			if id := getString(hook.Message["id"]); id != "" {
+				return base + fortType + "/" + id
 			}
 		}
 	}
