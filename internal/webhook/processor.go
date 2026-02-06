@@ -676,6 +676,29 @@ func (p *Processor) dispatch(hook *Hook) {
 		trackWeather, _ = p.cfg.GetBool("weather.weatherChangeAlert")
 	}
 	var cared *caredPokemon
+	trackWeatherCare := func(match alertMatch) {
+		if !trackWeather || p.weatherData == nil {
+			return
+		}
+		cellID := getString(hook.Message["s2_cell_id"])
+		if cellID == "" {
+			lat := getFloat(hook.Message["latitude"])
+			lon := getFloat(hook.Message["longitude"])
+			cellID = geo.WeatherCellID(lat, lon)
+		}
+		caresUntil := hookExpiryUnix(hook)
+		if cellID == "" || caresUntil <= 0 {
+			return
+		}
+		if cared == nil {
+			if hasNumeric(hook.Message["individual_attack"]) && hasNumeric(hook.Message["individual_defense"]) && hasNumeric(hook.Message["individual_stamina"]) {
+				cared = caredPokemonFromHook(p, hook)
+			}
+		}
+		clean := getBool(match.Row["clean"])
+		ping := getString(match.Row["ping"])
+		p.weatherData.TrackCare(cellID, match.Target, caresUntil, clean, ping, cared)
+	}
 	for _, match := range targets {
 		if hook.Type == "raid" || hook.Type == "egg" {
 			rsvpChanges := getInt(match.Row["rsvp_changes"])
@@ -686,25 +709,6 @@ func (p *Processor) dispatch(hook *Hook) {
 				if rsvps, ok := hook.Message["rsvps"].([]any); !ok || len(rsvps) == 0 {
 					continue
 				}
-			}
-		}
-		if trackWeather {
-			cellID := getString(hook.Message["s2_cell_id"])
-			if cellID == "" {
-				lat := getFloat(hook.Message["latitude"])
-				lon := getFloat(hook.Message["longitude"])
-				cellID = geo.WeatherCellID(lat, lon)
-			}
-			caresUntil := hookExpiryUnix(hook)
-			if cellID != "" && caresUntil > 0 {
-				if cared == nil {
-					if hasNumeric(hook.Message["individual_attack"]) && hasNumeric(hook.Message["individual_defense"]) && hasNumeric(hook.Message["individual_stamina"]) {
-						cared = caredPokemonFromHook(p, hook)
-					}
-				}
-				clean := getBool(match.Row["clean"])
-				ping := getString(match.Row["ping"])
-				p.weatherData.TrackCare(cellID, match.Target, caresUntil, clean, ping, cared)
 			}
 		}
 		payload, message := p.formatPayload(hook, match)
@@ -739,6 +743,7 @@ func (p *Processor) dispatch(hook *Hook) {
 			UpdateExisting: updateExisting,
 		}
 		if p.rateChecker == nil || job.AlwaysSend {
+			trackWeatherCare(match)
 			if hook.Type == "pokemon" && p.monsterChange != nil && updateKey != "" {
 				encounterID := getString(hook.Message["encounter_id"])
 				caresUntil := hookExpiryUnix(hook)
@@ -754,6 +759,7 @@ func (p *Processor) dispatch(hook *Hook) {
 			p.enqueue(extra)
 		}
 		if sendOriginal {
+			trackWeatherCare(match)
 			if hook.Type == "pokemon" && p.monsterChange != nil && updateKey != "" {
 				encounterID := getString(hook.Message["encounter_id"])
 				caresUntil := hookExpiryUnix(hook)
@@ -920,19 +926,19 @@ func (p *Processor) dispatchMonsterChange(hook *Hook) {
 		}
 		payload, message := p.formatPayload(changeHook, match)
 		job := dispatch.MessageJob{
-			Lat:            getFloat(changeHook.Message["latitude"]),
-			Lon:            getFloat(changeHook.Message["longitude"]),
-			Message:        message,
-			Payload:        payload,
-			Target:         target.ID,
-			Type:           target.Type,
-			Name:           target.Name,
-			TTH:            tth,
-			Clean:          care.Clean,
-			Emoji:          "",
-			LogReference:   "MonsterChange",
-			Language:       target.Language,
-			UpdateKey:      care.UpdateKey,
+			Lat:          getFloat(changeHook.Message["latitude"]),
+			Lon:          getFloat(changeHook.Message["longitude"]),
+			Message:      message,
+			Payload:      payload,
+			Target:       target.ID,
+			Type:         target.Type,
+			Name:         target.Name,
+			TTH:          tth,
+			Clean:        care.Clean,
+			Emoji:        "",
+			LogReference: "MonsterChange",
+			Language:     target.Language,
+			UpdateKey:    care.UpdateKey,
 			// Changed spawn alerts should be posted as their own message so they produce a notification.
 			// If the original tracker had clean enabled, the sender will remove the previous message.
 			UpdateExisting: false,
