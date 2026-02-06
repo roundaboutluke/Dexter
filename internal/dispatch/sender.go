@@ -319,7 +319,7 @@ func (s *Sender) sendTelegram(chatID string, job MessageJob) error {
 	hasText := containsString(sendOrder, "text")
 	for _, entry := range sendOrder {
 		switch entry {
-			case "sticker":
+		case "sticker":
 			sticker := stringFromAny(job.Payload, "sticker")
 			if strings.TrimSpace(sticker) == "" {
 				continue
@@ -330,14 +330,14 @@ func (s *Sender) sendTelegram(chatID string, job MessageJob) error {
 				"sticker":              sticker,
 				"disable_notification": true,
 			}
-				if id, err := s.postTelegramWithResponse(endpoint, payload); err == nil && id > 0 {
-					messageIDs = append(messageIDs, id)
-				} else if err != nil {
-					if logger := logging.Get().Telegram; logger != nil {
-						logger.Infof("telegram sticker send failed (%s): %v", chatID, err)
-					}
+			if id, err := s.postTelegramWithResponse(endpoint, payload); err == nil && id > 0 {
+				messageIDs = append(messageIDs, id)
+			} else if err != nil {
+				if logger := logging.Get().Telegram; logger != nil {
+					logger.Infof("telegram sticker send failed (%s): %v", chatID, err)
 				}
-			case "photo":
+			}
+		case "photo":
 			photo := stringFromAny(job.Payload, "photo")
 			if strings.TrimSpace(photo) == "" {
 				continue
@@ -348,13 +348,13 @@ func (s *Sender) sendTelegram(chatID string, job MessageJob) error {
 				"photo":                photo,
 				"disable_notification": true,
 			}
-				if id, err := s.postTelegramWithResponse(endpoint, payload); err == nil && id > 0 {
-					messageIDs = append(messageIDs, id)
-				} else if err != nil {
-					if logger := logging.Get().Telegram; logger != nil {
-						logger.Errorf("telegram photo send failed (%s): %v", chatID, err)
-					}
+			if id, err := s.postTelegramWithResponse(endpoint, payload); err == nil && id > 0 {
+				messageIDs = append(messageIDs, id)
+			} else if err != nil {
+				if logger := logging.Get().Telegram; logger != nil {
+					logger.Errorf("telegram photo send failed (%s): %v", chatID, err)
 				}
+			}
 		case "text":
 			if strings.TrimSpace(job.Message) == "" {
 				continue
@@ -381,7 +381,7 @@ func (s *Sender) sendTelegram(chatID string, job MessageJob) error {
 			if id > 0 {
 				messageIDs = append(messageIDs, id)
 			}
-			case "location":
+		case "location":
 			locationFlag, _ := boolFromAny(job.Payload, "location")
 			if !locationFlag || (job.Lat == 0 && job.Lon == 0) {
 				continue
@@ -393,14 +393,14 @@ func (s *Sender) sendTelegram(chatID string, job MessageJob) error {
 				"longitude":            job.Lon,
 				"disable_notification": true,
 			}
-				if id, err := s.postTelegramWithResponse(endpoint, payload); err == nil && id > 0 {
-					messageIDs = append(messageIDs, id)
-				} else if err != nil {
-					if logger := logging.Get().Telegram; logger != nil {
-						logger.Errorf("telegram location send failed (%s): %v", chatID, err)
-					}
+			if id, err := s.postTelegramWithResponse(endpoint, payload); err == nil && id > 0 {
+				messageIDs = append(messageIDs, id)
+			} else if err != nil {
+				if logger := logging.Get().Telegram; logger != nil {
+					logger.Errorf("telegram location send failed (%s): %v", chatID, err)
 				}
-			case "venue":
+			}
+		case "venue":
 			venue := mapStringAnyFromAny(job.Payload["venue"])
 			if venue == nil || (job.Lat == 0 && job.Lon == 0) {
 				continue
@@ -419,15 +419,15 @@ func (s *Sender) sendTelegram(chatID string, job MessageJob) error {
 				"address":              address,
 				"disable_notification": !hasText,
 			}
-				if id, err := s.postTelegramWithResponse(endpoint, payload); err == nil && id > 0 {
-					messageIDs = append(messageIDs, id)
-				} else if err != nil {
-					if logger := logging.Get().Telegram; logger != nil {
-						logger.Errorf("telegram venue send failed (%s): %v", chatID, err)
-					}
+			if id, err := s.postTelegramWithResponse(endpoint, payload); err == nil && id > 0 {
+				messageIDs = append(messageIDs, id)
+			} else if err != nil {
+				if logger := logging.Get().Telegram; logger != nil {
+					logger.Errorf("telegram venue send failed (%s): %v", chatID, err)
 				}
 			}
 		}
+	}
 	if job.Clean && len(messageIDs) > 0 {
 		delay := deletionDelay(job.TTH, 0)
 		deleteAt := time.Now().Add(delay)
@@ -901,10 +901,16 @@ func sanitizeEmbedColor(embed map[string]any) {
 			return
 		}
 		hexCandidate := strings.TrimPrefix(value, "#")
-		if len(hexCandidate) == 8 {
-			hexCandidate = hexCandidate[2:]
+		isHex := strings.HasPrefix(value, "#") || looksLikeHexColor(hexCandidate)
+		// Avoid treating 8-digit *decimal* colors (e.g. "13369344") as ARGB hex.
+		// These are commonly produced by templates like `"color": "{{color}}"` where `color` is an int.
+		if !strings.HasPrefix(value, "#") && len(hexCandidate) == 8 && isAllDigits(hexCandidate) {
+			isHex = false
 		}
-		if strings.HasPrefix(value, "#") || looksLikeHexColor(hexCandidate) {
+		if isHex {
+			if len(hexCandidate) == 8 {
+				hexCandidate = hexCandidate[2:]
+			}
 			parsed, err := strconv.ParseInt(hexCandidate, 16, 32)
 			if err != nil {
 				delete(embed, "color")
@@ -946,6 +952,18 @@ func sanitizeEmbedColor(embed map[string]any) {
 			delete(embed, "color")
 		}
 	}
+}
+
+func isAllDigits(value string) bool {
+	if value == "" {
+		return false
+	}
+	for _, r := range value {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func normalizeEmbedColor(value int64) (int64, bool) {
