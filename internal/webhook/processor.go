@@ -1054,8 +1054,26 @@ func (p *Processor) dispatchWeatherChange(hook *Hook) bool {
 		}
 		payload, message := p.formatPayload(weatherHook, match)
 		tth := dispatch.TimeToHide{Hours: 1, Minutes: 0, Seconds: 0}
-		if entry.CaresUntil > 0 {
-			tth = buildTTHFromUnix(entry.CaresUntil)
+		caresUntil := entry.CaresUntil
+		// When altered-pokemon overlays are enabled, align the weather-change alert lifetime with
+		// the last pokemon that is actually affected by the weather change (and therefore can be shown).
+		if p.cfg != nil {
+			if showAltered, _ := p.cfg.GetBool("weather.showAlteredPokemon"); showAltered && p.weatherData != nil {
+				if active := p.weatherData.ActivePokemons(cellID, id, weatherID, 0); len(active) > 0 {
+					latest := int64(0)
+					for _, mon := range active {
+						if mon.DisappearTime > latest {
+							latest = mon.DisappearTime
+						}
+					}
+					if latest > 0 {
+						caresUntil = latest
+					}
+				}
+			}
+		}
+		if caresUntil > 0 {
+			tth = buildTTHFromUnix(caresUntil)
 		}
 		job := dispatch.MessageJob{
 			Lat:          getFloat(weatherHook.Message["latitude"]),
