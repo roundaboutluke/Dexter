@@ -87,6 +87,10 @@
         "__name": "LIMIT_MESSAGES",
         "__format": "json"
       },
+      "disableCommandResponses": {
+        "__name": "DISCORD_DISABLE_COMMAND_RESPONSES",
+        "__format": "json"
+      },
       "slash": {
         "disabled": {
           "__name": "DISCORD_SLASH_DISABLED",

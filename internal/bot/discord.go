@@ -186,6 +186,10 @@ func (d *Discord) onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 	ctx.Ping = buildDiscordPings(m)
 	lines := parseCommandLines(m.Content, prefix, d.manager.i18n)
 	recognized := false
+	disableCommandResponses := false
+	if value, ok := ctx.Config.GetBool("discord.disableCommandResponses"); ok {
+		disableCommandResponses = value
+	}
 	for _, line := range lines {
 		if line == "" {
 			continue
@@ -205,10 +209,15 @@ func (d *Discord) onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 		reply, err := d.manager.Registry().Execute(ctx, line)
 		if err != nil {
-			_, _ = s.ChannelMessageSend(m.ChannelID, err.Error())
+			if !disableCommandResponses {
+				_, _ = s.ChannelMessageSend(m.ChannelID, err.Error())
+			}
 			continue
 		}
 		if reply == "" {
+			continue
+		}
+		if disableCommandResponses {
 			continue
 		}
 		if handled := d.sendSpecialReply(s, m.ChannelID, reply); handled {
@@ -236,6 +245,9 @@ func (d *Discord) onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 		_ = sendText(m.ChannelID, reply)
 	}
 	if isDM && !recognized {
+		if disableCommandResponses {
+			return
+		}
 		if msg, ok := d.manager.cfg.GetString("discord.unrecognisedCommandMessage"); ok && msg != "" {
 			_, _ = s.ChannelMessageSend(m.ChannelID, msg)
 		}
