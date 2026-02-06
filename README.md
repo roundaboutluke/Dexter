@@ -81,6 +81,33 @@ Geocoding providers:
 - `geocoding.provider` can be `none`, `nominatim`, `pelias`, or `google`.
 - `nominatim`: set `geocoding.providerURL` to your Nominatim base URL.
 - `pelias`: set `geocoding.providerURL` to your Pelias API base URL (e.g. `http://localhost:4000`). If your Pelias endpoint requires an API key, set `geocoding.providerKey` (sent as `api_key` query param).
+- Pelias advanced options:
+  - `geocoding.peliasLayers`: CSV list of layers to request (e.g. `venue,address,street`).
+  - `geocoding.peliasPreferredLayer`: if set, PoracleGo will prefer the first result whose `properties.layer` matches this value.
+  - `geocoding.peliasResultSize`: number of results to request from Pelias (helps ensure the preferred layer exists in the returned set).
+  - `geocoding.peliasBoundaryCountry`: optional country filter (e.g. `GB`).
+
+Pelias note: Pelias commonly returns much more detailed labels/POI names than Nominatim, so you may want to be more deliberate about how you construct `{{addr}}`.
+
+Reverse geocoding cache:
+
+- PoracleGo caches geocoding results both in-memory and on disk at `.cache/geocoderCache.json`.
+- If you change geocoding provider settings (e.g. switching Nominatim → Pelias, changing Pelias layers, etc), stop PoracleGo and remove `.cache/geocoderCache.json` before restarting to ensure results reflect the new settings.
+
+Recommended `addressFormat` examples:
+
+- Nominatim-style (simple):
+  - `{{streetNumber}} {{{streetName}}}`
+- Pelias-style (prefer POI name, then number+street, then street, else Unknown):
+  - `{{#if shop}}{{{shop}}}, {{/if}}{{#if streetName}}{{#if streetNumber}}{{streetNumber}} {{/if}}{{{streetName}}}{{else}}Unknown{{/if}}`
+
+Pelias debugging examples:
+
+```bash
+# Reverse geocode: show candidate matches with distance/layer
+curl -s 'http://localhost:4000/v1/reverse?point.lat=51.878058&point.lon=-0.508682&layers=venue,address,street&boundary.country=GB&size=5' \
+  | jq '.features[].properties | {layer,name,label,distance,street,housenumber,locality}'
+```
 
 ## Building for Production
 

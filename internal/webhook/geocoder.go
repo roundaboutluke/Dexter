@@ -1,6 +1,7 @@
 package webhook
 
 import (
+	"crypto/sha1"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -251,6 +252,56 @@ func (g *Geocoder) peliasAPIKey() string {
 	return strings.TrimSpace(key)
 }
 
+func normalizeCSVLower(value string) string {
+	parts := strings.Split(value, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		item := strings.ToLower(strings.TrimSpace(part))
+		if item == "" {
+			continue
+		}
+		out = append(out, item)
+	}
+	return strings.Join(out, ",")
+}
+
+func geocodeCacheScope(cfg *config.Config) string {
+	if cfg == nil {
+		return ""
+	}
+
+	provider, _ := cfg.GetString("geocoding.provider")
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	if provider == "" {
+		provider = "unknown"
+	}
+
+	parts := []string{provider}
+	if base, _ := cfg.GetString("geocoding.providerURL"); strings.TrimSpace(base) != "" {
+		parts = append(parts, strings.TrimSpace(base))
+	}
+
+	switch provider {
+	case "pelias":
+		if layers, _ := cfg.GetString("geocoding.peliasLayers"); strings.TrimSpace(layers) != "" {
+			parts = append(parts, "layers="+normalizeCSVLower(layers))
+		}
+		if preferred, _ := cfg.GetString("geocoding.peliasPreferredLayer"); strings.TrimSpace(preferred) != "" {
+			parts = append(parts, "preferred="+strings.ToLower(strings.TrimSpace(preferred)))
+		}
+		if country, _ := cfg.GetString("geocoding.peliasBoundaryCountry"); strings.TrimSpace(country) != "" {
+			parts = append(parts, "country="+strings.ToUpper(strings.TrimSpace(country)))
+		}
+		if size, ok := cfg.GetInt("geocoding.peliasResultSize"); ok && size > 0 {
+			parts = append(parts, fmt.Sprintf("size=%d", size))
+		}
+	}
+
+	raw := strings.Join(parts, "|")
+	sum := sha1.Sum([]byte(raw))
+	return fmt.Sprintf("%s:%x", provider, sum[:8])
+}
+
 func geocodeCacheKey(cfg *config.Config, lat, lon float64) string {
 	if cfg == nil {
 		return fmt.Sprintf("%.4f,%.4f", lat, lon)
@@ -266,7 +317,11 @@ func geocodeCacheKey(cfg *config.Config, lat, lon float64) string {
 		precision = 0
 	}
 	format := fmt.Sprintf("%%.%df,%%.%df", precision, precision)
-	return fmt.Sprintf(format, lat, lon)
+	coords := fmt.Sprintf(format, lat, lon)
+	if scope := geocodeCacheScope(cfg); scope != "" {
+		return scope + ":" + coords
+	}
+	return coords
 }
 
 // Intersection returns a nearby intersection or "No Intersection" if unavailable.
@@ -594,7 +649,23 @@ func (g *Geocoder) reversePeliasDetails(lat, lon float64) *ReverseResult {
 	values := url.Values{}
 	values.Set("point.lat", fmt.Sprintf("%f", lat))
 	values.Set("point.lon", fmt.Sprintf("%f", lon))
-	values.Set("size", "1")
+	size := 1
+	if v, ok := g.cfg.GetInt("geocoding.peliasResultSize"); ok {
+		size = v
+	}
+	if size <= 0 {
+		size = 1
+	}
+	if size > 10 {
+		size = 10
+	}
+	values.Set("size", fmt.Sprintf("%d", size))
+	if layers, _ := g.cfg.GetString("geocoding.peliasLayers"); strings.TrimSpace(layers) != "" {
+		values.Set("layers", normalizeCSVLower(layers))
+	}
+	if country, _ := g.cfg.GetString("geocoding.peliasBoundaryCountry"); strings.TrimSpace(country) != "" {
+		values.Set("boundary.country", strings.ToUpper(strings.TrimSpace(country)))
+	}
 	if key := g.peliasAPIKey(); key != "" {
 		values.Set("api_key", key)
 	}
@@ -611,6 +682,8 @@ func (g *Geocoder) reversePeliasDetails(lat, lon float64) *ReverseResult {
 	var payload struct {
 		Features []struct {
 			Properties struct {
+				Layer         string `json:"layer"`
+				Name          string `json:"name"`
 				Label         string `json:"label"`
 				Street        string `json:"street"`
 				HouseNumber   string `json:"housenumber"`
@@ -632,7 +705,25 @@ func (g *Geocoder) reversePeliasDetails(lat, lon float64) *ReverseResult {
 		return nil
 	}
 
+	preferred, _ := g.cfg.GetString("geocoding.peliasPreferredLayer")
+	preferred = strings.ToLower(strings.TrimSpace(preferred))
+	if preferred == "" {
+		preferred = "address"
+	}
+
 	props := payload.Features[0].Properties
+	venueName := ""
+	for _, feature := range payload.Features {
+		layer := strings.ToLower(strings.TrimSpace(feature.Properties.Layer))
+		if venueName == "" && layer == "venue" && strings.TrimSpace(feature.Properties.Name) != "" {
+			venueName = strings.TrimSpace(feature.Properties.Name)
+		}
+		if layer == preferred {
+			props = feature.Properties
+			break
+		}
+	}
+
 	address := strings.TrimSpace(props.Label)
 	if address == "" {
 		parts := []string{}
@@ -660,10 +751,17 @@ func (g *Geocoder) reversePeliasDetails(lat, lon float64) *ReverseResult {
 	}
 	countryCode := strings.ToUpper(strings.TrimSpace(props.CountryCode))
 
+	streetName := strings.TrimSpace(props.Street)
+	streetNumber := strings.TrimSpace(props.HouseNumber)
+	if strings.EqualFold(strings.TrimSpace(props.Layer), "street") && streetName == "" {
+		streetName = strings.TrimSpace(props.Name)
+		streetNumber = ""
+	}
+
 	return &ReverseResult{
 		FormattedAddress: address,
-		StreetName:       strings.TrimSpace(props.Street),
-		StreetNumber:     strings.TrimSpace(props.HouseNumber),
+		StreetName:       streetName,
+		StreetNumber:     streetNumber,
 		City:             city,
 		Country:          strings.TrimSpace(props.Country),
 		State:            strings.TrimSpace(props.Region),
@@ -673,6 +771,7 @@ func (g *Geocoder) reversePeliasDetails(lat, lon float64) *ReverseResult {
 		Suburb:           strings.TrimSpace(props.Borough),
 		Town:             strings.TrimSpace(props.Locality),
 		Village:          strings.TrimSpace(props.LocalAdmin),
+		Shop:             venueName,
 	}
 }
 

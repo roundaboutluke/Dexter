@@ -296,18 +296,24 @@ func notHelper(value interface{}, options *raymond.Options) string {
 	return boolHelper(!truthy(value), options, "not")
 }
 
-func containsHelper(params ...interface{}) string {
-	value, needle, options := unpackArgs(params)
+func containsHelper(value interface{}, needle interface{}, options *raymond.Options) string {
+	if value == nil || needle == nil {
+		return boolHelper(false, options, "contains")
+	}
 	return boolHelper(containsValue(value, needle), options, "contains")
 }
 
-func startsWithHelper(params ...interface{}) string {
-	value, needle, options := unpackArgs(params)
+func startsWithHelper(value interface{}, needle interface{}, options *raymond.Options) string {
+	if value == nil || needle == nil {
+		return boolHelper(false, options, "startsWith")
+	}
 	return boolHelper(strings.HasPrefix(fmt.Sprintf("%v", value), fmt.Sprintf("%v", needle)), options, "startsWith")
 }
 
-func endsWithHelper(params ...interface{}) string {
-	value, needle, options := unpackArgs(params)
+func endsWithHelper(value interface{}, needle interface{}, options *raymond.Options) string {
+	if value == nil || needle == nil {
+		return boolHelper(false, options, "endsWith")
+	}
 	return boolHelper(strings.HasSuffix(fmt.Sprintf("%v", value), fmt.Sprintf("%v", needle)), options, "endsWith")
 }
 
@@ -427,26 +433,6 @@ func boolHelper(match bool, options *raymond.Options, helperName string) string 
 	}
 	return options.Inverse()
 }
-
-func unpackArgs(params []interface{}) (interface{}, interface{}, *raymond.Options) {
-	if len(params) == 0 {
-		return nil, nil, nil
-	}
-	value := params[0]
-	var needle interface{}
-	var options *raymond.Options
-	if len(params) > 1 {
-		if opt, ok := params[len(params)-1].(*raymond.Options); ok {
-			options = opt
-			params = params[:len(params)-1]
-		}
-		if len(params) > 1 {
-			needle = params[1]
-		}
-	}
-	return value, needle, options
-}
-
 
 func eqHelper(a interface{}, b interface{}, options *raymond.Options) string {
 	equal := fmt.Sprintf("%v", a) == fmt.Sprintf("%v", b)
@@ -685,7 +671,7 @@ func forEachHelper(list interface{}, options *raymond.Options) string {
 				ctx[key] = value
 			}
 		} else {
-			ctx["this"] = item
+			ctx["value"] = item
 		}
 		out.WriteString(options.FnWith(ctx))
 	}
