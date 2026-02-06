@@ -83,8 +83,21 @@ type slashBuilderState struct {
 	OriginChannelID string
 }
 
+func (d *Discord) slashCommandsDisabled() bool {
+	if d == nil || d.manager == nil || d.manager.cfg == nil {
+		return false
+	}
+	disabled, ok := d.manager.cfg.GetBool("discord.slash.disabled")
+	return ok && disabled
+}
+
 func (d *Discord) onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	if i == nil || i.Interaction == nil {
+		return
+	}
+	if d.slashCommandsDisabled() {
+		// When disabled we intentionally do NOT respond to interactions, so another
+		// /command provider using the same bot token can handle them.
 		return
 	}
 	switch i.Type {
@@ -5636,6 +5649,7 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 	}
 	appID := s.State.User.ID
 	deregisterSlashCommands := false
+	slashCommandsDisabled := false
 	maxDistance := 0
 	pvpMaxRank := 0
 	gymBattleEnabled := false
@@ -5660,9 +5674,18 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 		if value, ok := d.manager.cfg.GetBool("discord.slash.deregisterOnStart"); ok {
 			deregisterSlashCommands = value
 		}
+		if value, ok := d.manager.cfg.GetBool("discord.slash.disabled"); ok {
+			slashCommandsDisabled = value
+		}
 	}
 	if pvpMaxRank <= 0 {
 		pvpMaxRank = 4096
+	}
+
+	if slashCommandsDisabled {
+		// Intentionally do nothing. This is to avoid interfering with other
+		// /command providers that use the same bot token / application.
+		return
 	}
 
 	if deregisterSlashCommands {

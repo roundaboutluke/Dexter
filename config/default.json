@@ -258,6 +258,7 @@
       "uploadEmbedImages": false,                     // whether Poracle will retrieve and upload images direct to discord CDN
       "hideTemplateOptions": true,                    // whether to hide the "template" option from Discord slash commands
       "slash": {
+        "disabled": false,                            // if true, do not register or handle Discord /commands (useful if another /command provider uses the same bot token)
         "deregisterOnStart": false                    // if true, deletes registered global /commands on startup (use for a clean reinstall)
       },
     // checkRole - whether to check all discord users for role membership (every _checkRoleInterval_
