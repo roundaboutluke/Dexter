@@ -157,7 +157,11 @@ func (s *Scheduler) check() {
 			current := toInt(human["current_profile_no"])
 			if len(active) == 0 {
 				if current != 0 {
-					if _, err := s.query.UpdateQuery("humans", map[string]any{"current_profile_no": 0}, map[string]any{"id": id}); err != nil {
+					update := map[string]any{"current_profile_no": 0}
+					if current > 0 {
+						update["preferred_profile_no"] = current
+					}
+					if _, err := s.query.UpdateQuery("humans", update, map[string]any{"id": id}); err != nil {
 						s.logf("profile schedule: clear failed for %s: %v", id, err)
 					} else {
 						s.notifyQuiet(human, rows)

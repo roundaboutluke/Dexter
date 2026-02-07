@@ -36,6 +36,9 @@ func (c *ProfileCommand) Handle(ctx *Context, args []string) (string, error) {
 	if len(args) == 0 {
 		profileName := currentProfileName(logic.Profiles(), result.ProfileNo)
 		lines := []string{}
+		if quietHoursActive(logic.Human()) {
+			lines = append(lines, "**Quiet Hours Enabled**")
+		}
 		if profileName == "" {
 			lines = append(lines, tr.Translate("You don't have a profile set", false))
 		} else {
@@ -136,6 +139,9 @@ func (c *ProfileCommand) Handle(ctx *Context, args []string) (string, error) {
 		if len(args) == 0 {
 			profileName := currentProfileName(logic.Profiles(), result.ProfileNo)
 			lines := []string{}
+			if quietHoursActive(logic.Human()) {
+				lines = append(lines, "**Quiet Hours Enabled**")
+			}
 			if profileName == "" {
 				lines = append(lines, tr.Translate("You don't have a profile set", false))
 			} else {
@@ -153,7 +159,10 @@ func (c *ProfileCommand) Handle(ctx *Context, args []string) (string, error) {
 			return tr.Translate("I can't find that profile", false), nil
 		}
 		selected := profileByNo(logic.Profiles(), profileNo)
-		update := map[string]any{"current_profile_no": profileNo}
+		update := map[string]any{"preferred_profile_no": profileNo}
+		if !quietHoursActive(logic.Human()) {
+			update["current_profile_no"] = profileNo
+		}
 		if selected != nil {
 			update["area"] = selected["area"]
 			update["latitude"] = selected["latitude"]
@@ -252,6 +261,13 @@ func parseProfileTimes(args []string, re *RegexSet) []map[string]any {
 	return out
 }
 
+func quietHoursActive(human map[string]any) bool {
+	if human == nil {
+		return false
+	}
+	return toInt(human["schedule_disabled"], 0) == 0 && toInt(human["current_profile_no"], 1) == 0
+}
+
 type profileScheduleRange struct {
 	Day      int
 	StartMin int
@@ -301,6 +317,9 @@ func handleProfileScheduleToggle(ctx *Context, tr *i18n.Translator, logic *profi
 				lowest = 1
 			}
 			update["current_profile_no"] = lowest
+			if toInt(human["preferred_profile_no"], 0) == 0 {
+				update["preferred_profile_no"] = lowest
+			}
 		}
 	}
 	if _, err := ctx.Query.UpdateQuery("humans", update, map[string]any{"id": result.TargetID}); err != nil {

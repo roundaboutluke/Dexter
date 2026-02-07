@@ -146,22 +146,42 @@ func (l *Logic) DeleteProfile(profileNo int) error {
 	}
 
 	currentProfile := toInt(l.human["current_profile_no"])
-	if currentProfile == profileNo {
-		lowest := findLowestProfile(l.profiles, profileNo)
-		if lowest == nil {
-			_, err = l.query.UpdateQuery("humans", map[string]any{"current_profile_no": 1}, map[string]any{"id": l.id})
-			return err
+	preferredProfile := toInt(l.human["preferred_profile_no"])
+	if currentProfile != profileNo && preferredProfile != profileNo {
+		return nil
+	}
+
+	lowest := findLowestProfile(l.profiles, profileNo)
+	update := map[string]any{}
+	if lowest == nil {
+		if currentProfile == profileNo {
+			update["current_profile_no"] = 1
 		}
-		update := map[string]any{
-			"current_profile_no": toInt(lowest["profile_no"]),
-			"area":               lowest["area"],
-			"latitude":           lowest["latitude"],
-			"longitude":          lowest["longitude"],
+		if preferredProfile == profileNo {
+			update["preferred_profile_no"] = 1
+		}
+		if len(update) == 0 {
+			return nil
 		}
 		_, err = l.query.UpdateQuery("humans", update, map[string]any{"id": l.id})
 		return err
 	}
-	return nil
+
+	lowestNo := toInt(lowest["profile_no"])
+	if currentProfile == profileNo {
+		update["current_profile_no"] = lowestNo
+		update["area"] = lowest["area"]
+		update["latitude"] = lowest["latitude"]
+		update["longitude"] = lowest["longitude"]
+	}
+	if preferredProfile == profileNo {
+		update["preferred_profile_no"] = lowestNo
+	}
+	if len(update) == 0 {
+		return nil
+	}
+	_, err = l.query.UpdateQuery("humans", update, map[string]any{"id": l.id})
+	return err
 }
 
 func normalizeJSON(value any) string {

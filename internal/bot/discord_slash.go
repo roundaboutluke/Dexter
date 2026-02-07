@@ -1686,6 +1686,39 @@ func optionBool(options []*discordgo.ApplicationCommandInteractionDataOption, na
 	return false, false
 }
 
+func optionEnabled(options []*discordgo.ApplicationCommandInteractionDataOption, name string) bool {
+	for _, opt := range options {
+		if opt.Name != name {
+			continue
+		}
+		switch value := opt.Value.(type) {
+		case bool:
+			return value
+		case string:
+			flag := strings.ToLower(strings.TrimSpace(value))
+			if flag == "" {
+				return false
+			}
+			switch flag {
+			case "0", "false", "no", "off", "none":
+				return false
+			default:
+				return true
+			}
+		case int:
+			return value != 0
+		case int64:
+			return value != 0
+		case float64:
+			return value != 0
+		default:
+			// Unknown payload types are treated as enabled when present.
+			return true
+		}
+	}
+	return false
+}
+
 func appendRangeArg(args []string, prefix, maxPrefix string, minVal, maxVal *int) []string {
 	if minVal == nil && maxVal == nil {
 		return args
@@ -1863,7 +1896,7 @@ func (d *Discord) handleSlashTrack(s *discordgo.Session, i *discordgo.Interactio
 			}
 		}
 	}
-	if value, ok := optionBool(options, "clean"); ok && value {
+	if optionEnabled(options, "clean") {
 		args = append(args, "clean")
 	}
 	if value, ok := optionString(options, "template"); ok && strings.TrimSpace(value) != "" {
@@ -1913,7 +1946,7 @@ func (d *Discord) handleSlashRaid(s *discordgo.Session, i *discordgo.Interaction
 	if value, ok := optionInt(options, "distance"); ok && value > 0 {
 		args = append(args, fmt.Sprintf("d%d", value))
 	}
-	if value, ok := optionBool(options, "clean"); ok && value {
+	if optionEnabled(options, "clean") {
 		args = append(args, "clean")
 	}
 	if value, ok := optionString(options, "template"); ok && strings.TrimSpace(value) != "" {
@@ -1939,7 +1972,7 @@ func (d *Discord) handleSlashMaxbattle(s *discordgo.Session, i *discordgo.Intera
 	if value, ok := optionInt(options, "distance"); ok && value > 0 {
 		args = append(args, fmt.Sprintf("d%d", value))
 	}
-	if value, ok := optionBool(options, "clean"); ok && value {
+	if optionEnabled(options, "clean") {
 		args = append(args, "clean")
 	}
 	if value, ok := optionString(options, "template"); ok && strings.TrimSpace(value) != "" {
@@ -1981,7 +2014,7 @@ func (d *Discord) handleSlashEgg(s *discordgo.Session, i *discordgo.InteractionC
 	if value, ok := optionInt(options, "distance"); ok && value > 0 {
 		args = append(args, fmt.Sprintf("d%d", value))
 	}
-	if value, ok := optionBool(options, "clean"); ok && value {
+	if optionEnabled(options, "clean") {
 		args = append(args, "clean")
 	}
 	if value, ok := optionString(options, "template"); ok && strings.TrimSpace(value) != "" {
@@ -2015,7 +2048,7 @@ func (d *Discord) handleSlashQuest(s *discordgo.Session, i *discordgo.Interactio
 	if value, ok := optionInt(options, "distance"); ok && value > 0 {
 		args = append(args, fmt.Sprintf("d%d", value))
 	}
-	if value, ok := optionBool(options, "clean"); ok && value {
+	if optionEnabled(options, "clean") {
 		args = append(args, "clean")
 	}
 	if value, ok := optionString(options, "template"); ok && strings.TrimSpace(value) != "" {
@@ -2035,7 +2068,7 @@ func (d *Discord) handleSlashIncident(s *discordgo.Session, i *discordgo.Interac
 	if value, ok := optionInt(options, "distance"); ok && value > 0 {
 		args = append(args, fmt.Sprintf("d%d", value))
 	}
-	if value, ok := optionBool(options, "clean"); ok && value {
+	if optionEnabled(options, "clean") {
 		args = append(args, "clean")
 	}
 	if value, ok := optionString(options, "template"); ok && strings.TrimSpace(value) != "" {
@@ -2064,7 +2097,7 @@ func (d *Discord) handleSlashGym(s *discordgo.Session, i *discordgo.InteractionC
 	if value, ok := optionInt(options, "distance"); ok && value > 0 {
 		args = append(args, fmt.Sprintf("d%d", value))
 	}
-	if value, ok := optionBool(options, "clean"); ok && value {
+	if optionEnabled(options, "clean") {
 		args = append(args, "clean")
 	}
 	if value, ok := optionString(options, "template"); ok && strings.TrimSpace(value) != "" {
@@ -2120,7 +2153,7 @@ func (d *Discord) handleSlashNest(s *discordgo.Session, i *discordgo.Interaction
 	if value, ok := optionInt(options, "distance"); ok && value > 0 {
 		args = append(args, fmt.Sprintf("d%d", value))
 	}
-	if value, ok := optionBool(options, "clean"); ok && value {
+	if optionEnabled(options, "clean") {
 		args = append(args, "clean")
 	}
 	if value, ok := optionString(options, "template"); ok && strings.TrimSpace(value) != "" {
@@ -2170,7 +2203,7 @@ func (d *Discord) handleSlashWeather(s *discordgo.Session, i *discordgo.Interact
 	args := []string{}
 	args = append(args, strings.Fields(location)...)
 	args = append(args, "|", strings.TrimSpace(condition))
-	if value, ok := optionBool(options, "clean"); ok && value {
+	if optionEnabled(options, "clean") {
 		args = append(args, "clean")
 	}
 	if value, ok := optionString(options, "template"); ok && strings.TrimSpace(value) != "" {
@@ -2190,7 +2223,7 @@ func (d *Discord) handleSlashLure(s *discordgo.Session, i *discordgo.Interaction
 	if value, ok := optionInt(options, "distance"); ok && value > 0 {
 		args = append(args, fmt.Sprintf("d%d", value))
 	}
-	if value, ok := optionBool(options, "clean"); ok && value {
+	if optionEnabled(options, "clean") {
 		args = append(args, "clean")
 	}
 	if value, ok := optionString(options, "template"); ok && strings.TrimSpace(value) != "" {
@@ -2338,7 +2371,11 @@ func (d *Discord) handleProfileSet(s *discordgo.Session, i *discordgo.Interactio
 		return
 	}
 	profileNo := toInt(selected["profile_no"], 0)
-	update := map[string]any{"current_profile_no": profileNo}
+	quietHoursEnabled := toInt(human["schedule_disabled"], 0) == 0 && toInt(human["current_profile_no"], 1) == 0
+	update := map[string]any{"preferred_profile_no": profileNo}
+	if !quietHoursEnabled {
+		update["current_profile_no"] = profileNo
+	}
 	update["area"] = selected["area"]
 	update["latitude"] = selected["latitude"]
 	update["longitude"] = selected["longitude"]
@@ -2905,9 +2942,16 @@ func (d *Discord) handleProfileScheduleToggle(s *discordgo.Session, i *discordgo
 				sort.Slice(profiles, func(i, j int) bool {
 					return toInt(profiles[i]["profile_no"], 0) < toInt(profiles[j]["profile_no"], 0)
 				})
-				update["current_profile_no"] = toInt(profiles[0]["profile_no"], 1)
+				fallback := toInt(profiles[0]["profile_no"], 1)
+				update["current_profile_no"] = fallback
+				if toInt(human["preferred_profile_no"], 0) == 0 {
+					update["preferred_profile_no"] = fallback
+				}
 			} else {
 				update["current_profile_no"] = 1
+				if toInt(human["preferred_profile_no"], 0) == 0 {
+					update["preferred_profile_no"] = 1
+				}
 			}
 		}
 	}
@@ -3135,7 +3179,14 @@ func (d *Discord) userProfileNo(userID string) int {
 	if err != nil || row == nil {
 		return 1
 	}
-	return toInt(row["current_profile_no"], 1)
+	current := toInt(row["current_profile_no"], 1)
+	if current > 0 {
+		return current
+	}
+	if preferred := toInt(row["preferred_profile_no"], 0); preferred > 0 {
+		return preferred
+	}
+	return 1
 }
 
 func (d *Discord) userLanguage(userID string) string {
@@ -3889,15 +3940,27 @@ func (d *Discord) buildProfilePayload(i *discordgo.InteractionCreate, selected s
 		return nil, nil, "Unable to load profiles."
 	}
 	if len(profiles) == 0 {
-		return nil, nil, "You do not have any profiles."
+		embed, components := d.buildProfileEmptyPayload(human)
+		return embed, components, ""
 	}
 	sort.Slice(profiles, func(i, j int) bool {
 		return toInt(profiles[i]["profile_no"], 0) < toInt(profiles[j]["profile_no"], 0)
 	})
 	currentProfile := toInt(human["current_profile_no"], 1)
+	preferredProfile := toInt(human["preferred_profile_no"], 0)
+	if preferredProfile <= 0 {
+		preferredProfile = 1
+	}
+	quietHoursEnabled := toInt(human["schedule_disabled"], 0) == 0 && currentProfile == 0
 	selectedRow := profileRowByToken(profiles, selected)
 	if selectedRow == nil {
-		selectedRow = profileRowByToken(profiles, fmt.Sprintf("%d", currentProfile))
+		fallbackProfile := currentProfile
+		if quietHoursEnabled {
+			fallbackProfile = preferredProfile
+		}
+		if fallbackProfile > 0 {
+			selectedRow = profileRowByToken(profiles, fmt.Sprintf("%d", fallbackProfile))
+		}
 	}
 	if selectedRow == nil {
 		selectedRow = profiles[0]
@@ -3927,9 +3990,13 @@ func (d *Discord) buildProfilePayload(i *discordgo.InteractionCreate, selected s
 	if selectedNo == currentProfile {
 		title += " ✅"
 	}
+	description := "Schedules enable alerts only during the listed windows. Outside those windows, alerts are paused. If you have no schedules, alerts run all the time. End times are exclusive, so back-to-back periods can share the same minute. Times use your saved location timezone."
+	if quietHoursEnabled {
+		description = "**Quiet Hours Enabled**\nAlerts are currently paused outside your active schedule windows.\n\n" + description
+	}
 	embed := &discordgo.MessageEmbed{
 		Title:       title,
-		Description: "Schedules enable alerts only during the listed windows. Outside those windows, alerts are paused. If you have no schedules, alerts run all the time. End times are exclusive, so back-to-back periods can share the same minute. Times use your saved location timezone.",
+		Description: description,
 		Fields: []*discordgo.MessageEmbedField{
 			{Name: "Location", Value: locationText, Inline: false},
 			{Name: "Areas", Value: areaText, Inline: false},
@@ -3982,11 +4049,17 @@ func (d *Discord) buildProfilePayload(i *discordgo.InteractionCreate, selected s
 		MaxValues:   1,
 		MinValues:   &min,
 	}
+	setDisabled := selectedNo == currentProfile
+	setLabel := "Set Active"
+	if quietHoursEnabled {
+		setDisabled = selectedNo == preferredProfile
+		setLabel = "Set for Active Hours"
+	}
 	setButton := discordgo.Button{
 		CustomID: slashProfileSet + fmt.Sprintf("%d", selectedNo),
-		Label:    "Set Active",
+		Label:    setLabel,
 		Style:    discordgo.SuccessButton,
-		Disabled: selectedNo == currentProfile,
+		Disabled: setDisabled,
 	}
 	components := []discordgo.MessageComponent{
 		discordgo.ActionsRow{Components: []discordgo.MessageComponent{menu}},
@@ -4006,6 +4079,62 @@ func (d *Discord) buildProfilePayload(i *discordgo.InteractionCreate, selected s
 		discordgo.Button{CustomID: slashProfileScheduleOverview, Label: "Scheduler", Style: discordgo.PrimaryButton},
 	}})
 	return embed, components, ""
+}
+
+func (d *Discord) buildProfileEmptyPayload(human map[string]any) (*discordgo.MessageEmbed, []discordgo.MessageComponent) {
+	areas := parseAreaListFromHuman(human)
+	areaText := "None"
+	if len(areas) > 0 {
+		areaText = strings.Join(areas, ", ")
+	}
+	lat := toFloat(human["latitude"])
+	lon := toFloat(human["longitude"])
+	locationText := "Not set"
+	if lat != 0 || lon != 0 {
+		locationText = fmt.Sprintf("%s, %s", formatFloat(lat), formatFloat(lon))
+	}
+
+	embed := &discordgo.MessageEmbed{
+		Title:       "No profiles yet",
+		Description: "Create your first profile to manage alerts. You can still set location and areas now.",
+		Fields: []*discordgo.MessageEmbedField{
+			{Name: "Location", Value: locationText, Inline: false},
+			{Name: "Areas", Value: areaText, Inline: false},
+		},
+	}
+
+	if d.manager != nil && d.manager.cfg != nil {
+		if provider, _ := d.manager.cfg.GetString("geocoding.staticProvider"); strings.EqualFold(provider, "tileservercache") {
+			client := tileserver.NewClient(d.manager.cfg)
+			if lat != 0 || lon != 0 {
+				if staticMap, err := tileserver.GenerateConfiguredLocationTile(client, d.manager.cfg, lat, lon); err == nil && staticMap != "" {
+					embed.Image = &discordgo.MessageEmbedImage{URL: staticMap}
+				}
+			} else if len(areas) > 0 && d.manager.fences != nil {
+				if staticMap, err := tileserver.GenerateGeofenceTile(d.manager.fences.Fences, client, d.manager.cfg, areas[0]); err == nil && staticMap != "" {
+					embed.Image = &discordgo.MessageEmbedImage{URL: staticMap}
+				}
+			}
+		}
+	}
+	if embed.Image == nil && d.manager != nil && d.manager.cfg != nil {
+		if fallback := fallbackStaticMap(d.manager.cfg); fallback != "" {
+			embed.Image = &discordgo.MessageEmbedImage{URL: fallback}
+		}
+	}
+
+	clearDisabled := lat == 0 && lon == 0
+	components := []discordgo.MessageComponent{
+		discordgo.ActionsRow{Components: []discordgo.MessageComponent{
+			discordgo.Button{CustomID: slashProfileCreate, Label: "Create Profile", Style: discordgo.PrimaryButton},
+		}},
+		discordgo.ActionsRow{Components: []discordgo.MessageComponent{
+			discordgo.Button{CustomID: slashProfileLocation, Label: "Set Location", Style: discordgo.SecondaryButton},
+			discordgo.Button{CustomID: slashProfileArea, Label: "Manage Areas", Style: discordgo.SecondaryButton},
+			discordgo.Button{CustomID: slashProfileLocationClear, Label: "Clear Location", Style: discordgo.DangerButton, Disabled: clearDisabled},
+		}},
+	}
+	return embed, components
 }
 
 func (d *Discord) buildProfileDeletePayload(i *discordgo.InteractionCreate, selected string) (*discordgo.MessageEmbed, []discordgo.MessageComponent, string) {
@@ -5745,6 +5874,17 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 		}
 	}
 
+	cleanFlagOption := func(description string) *discordgo.ApplicationCommandOption {
+		return &discordgo.ApplicationCommandOption{
+			Type:        discordgo.ApplicationCommandOptionString,
+			Name:        "clean",
+			Description: description,
+			Choices: []*discordgo.ApplicationCommandOptionChoice{
+				{Name: "Enable", Value: "clean"},
+			},
+		}
+	}
+
 	trackOptions := []*discordgo.ApplicationCommandOption{
 		{
 			Type:         discordgo.ApplicationCommandOptionString,
@@ -5813,7 +5953,7 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 			MaxValue:    float64(pvpMaxRank),
 		},
 		{Type: discordgo.ApplicationCommandOptionInteger, Name: "min_time", Description: "Minimum time left in seconds", MinValue: floatPtr(0)},
-		{Type: discordgo.ApplicationCommandOptionBoolean, Name: "clean", Description: "Auto delete after despawn"},
+		cleanFlagOption("Auto delete after despawn"),
 	}
 	trackOptions = append(trackOptions, templateOptions()...)
 
@@ -5835,7 +5975,7 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 		{Type: discordgo.ApplicationCommandOptionBoolean, Name: "slot_changes", Description: "Alert on slot changes"},
 		{Type: discordgo.ApplicationCommandOptionString, Name: "gym", Description: "Optional gym", Autocomplete: true},
 		distanceOption(),
-		{Type: discordgo.ApplicationCommandOptionBoolean, Name: "clean", Description: "Auto delete after expiration"},
+		cleanFlagOption("Auto delete after expiration"),
 	}
 	gymOptions = append(gymOptions, templateOptions()...)
 	if gymBattleEnabled {
@@ -5877,7 +6017,7 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 		},
 		{Type: discordgo.ApplicationCommandOptionInteger, Name: "min_spawn", Description: "Optional minimum average spawns", MinValue: floatPtr(0)},
 		distanceOption(),
-		{Type: discordgo.ApplicationCommandOptionBoolean, Name: "clean", Description: "Auto delete after despawn"},
+		cleanFlagOption("Auto delete after despawn"),
 	}
 	nestOptions = append(nestOptions, templateOptions()...)
 
@@ -5890,7 +6030,7 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 			Autocomplete: true,
 		},
 		{Type: discordgo.ApplicationCommandOptionString, Name: "location", Description: "Optional location (address or lat,lon)"},
-		{Type: discordgo.ApplicationCommandOptionBoolean, Name: "clean", Description: "Auto delete after expiration"},
+		cleanFlagOption("Auto delete after expiration"),
 	}
 	weatherOptions = append(weatherOptions, templateOptions()...)
 
@@ -5924,7 +6064,7 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 					{Name: "only", Value: "only"},
 				}},
 				distanceOption(),
-				{Type: discordgo.ApplicationCommandOptionBoolean, Name: "clean", Description: "Auto delete after expiration"},
+				cleanFlagOption("Auto delete after expiration"),
 			}, templateOptions()...),
 		},
 		{
@@ -5951,7 +6091,7 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 					{Name: "only", Value: "only"},
 				}},
 				distanceOption(),
-				{Type: discordgo.ApplicationCommandOptionBoolean, Name: "clean", Description: "Auto delete after expiration"},
+				cleanFlagOption("Auto delete after expiration"),
 			}, templateOptions()...),
 		},
 		{
@@ -5962,7 +6102,7 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 				{Type: discordgo.ApplicationCommandOptionString, Name: "station", Description: "Optional station", Autocomplete: true},
 				{Type: discordgo.ApplicationCommandOptionBoolean, Name: "gmax_only", Description: "Only Gigantamax battles"},
 				distanceOption(),
-				{Type: discordgo.ApplicationCommandOptionBoolean, Name: "clean", Description: "Auto delete after expiration"},
+				cleanFlagOption("Auto delete after expiration"),
 			}, templateOptions()...),
 		},
 		{
@@ -5982,7 +6122,7 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 					},
 				},
 				distanceOption(),
-				{Type: discordgo.ApplicationCommandOptionBoolean, Name: "clean", Description: "Auto delete after expiration"},
+				cleanFlagOption("Auto delete after expiration"),
 			}, templateOptions()...),
 		},
 		{
@@ -5991,7 +6131,7 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 			Options: append([]*discordgo.ApplicationCommandOption{
 				{Type: discordgo.ApplicationCommandOptionString, Name: "type", Description: "Enter leader or grunt type", Required: true, Autocomplete: true},
 				distanceOption(),
-				{Type: discordgo.ApplicationCommandOptionBoolean, Name: "clean", Description: "Auto delete after expiration"},
+				cleanFlagOption("Auto delete after expiration"),
 			}, templateOptions()...),
 		},
 		{
@@ -6034,7 +6174,7 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 					},
 				},
 				distanceOption(),
-				{Type: discordgo.ApplicationCommandOptionBoolean, Name: "clean", Description: "Auto delete after expiration"},
+				cleanFlagOption("Auto delete after expiration"),
 			}, templateOptions()...),
 		},
 		{
