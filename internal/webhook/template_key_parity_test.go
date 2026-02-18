@@ -186,6 +186,28 @@ func TestSelectTemplatePayloadFortUpdateSupportsLegacyFortType(t *testing.T) {
 	}
 }
 
+func TestSelectTemplatePayloadTemplateIDCaseInsensitive(t *testing.T) {
+	p := &Processor{
+		templates: []dts.Template{
+			{
+				ID:       "standard",
+				Type:     "fort-update",
+				Language: ptrString("en"),
+				Default:  false,
+				Platform: "discord",
+				Template: map[string]any{"content": "case-insensitive id"},
+			},
+		},
+	}
+	hook := &Hook{Type: "fort_update", Message: map[string]any{}}
+	target := alertTarget{Platform: "discord", Language: "en", Template: "STANDARD"}
+
+	selected := selectTemplatePayload(p, target, hook)
+	if selected == nil {
+		t.Fatalf("expected template selection using case-insensitive id, got nil")
+	}
+}
+
 func TestWeatherAddsConditionAlias(t *testing.T) {
 	p := &Processor{}
 	hook := &Hook{

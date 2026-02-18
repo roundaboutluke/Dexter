@@ -634,12 +634,24 @@ func normalizeHookCoordinates(hook *Hook) {
 		if entry, ok := hook.Message["new"].(map[string]any); ok {
 			if value, ok := entry["type"].(string); ok && value != "" {
 				hook.Message["fort_type"] = value
-				return
 			}
 		}
 		if entry, ok := hook.Message["old"].(map[string]any); ok {
 			if value, ok := entry["type"].(string); ok && value != "" {
 				hook.Message["fort_type"] = value
+			}
+		}
+	}
+	if getString(hook.Message["id"]) == "" {
+		if entry, ok := hook.Message["new"].(map[string]any); ok {
+			if value := getString(entry["id"]); value != "" {
+				hook.Message["id"] = value
+				return
+			}
+		}
+		if entry, ok := hook.Message["old"].(map[string]any); ok {
+			if value := getString(entry["id"]); value != "" {
+				hook.Message["id"] = value
 			}
 		}
 	}

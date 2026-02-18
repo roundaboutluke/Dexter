@@ -1105,7 +1105,7 @@ func selectTemplatePayload(p *Processor, target alertTarget, hook *Hook) any {
 			if target.Language != "" && tpl.Language != nil && *tpl.Language != target.Language {
 				continue
 			}
-			if target.Template != "" && fmt.Sprintf("%v", tpl.ID) != target.Template {
+			if target.Template != "" && !strings.EqualFold(strings.TrimSpace(fmt.Sprintf("%v", tpl.ID)), strings.TrimSpace(target.Template)) {
 				continue
 			}
 			if target.Template != "" {
