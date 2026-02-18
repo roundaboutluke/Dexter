@@ -1096,35 +1096,76 @@ func selectTemplatePayload(p *Processor, target alertTarget, hook *Hook) any {
 	if p == nil {
 		return nil
 	}
-	templateType := templateTypeForHook(hook)
-	var fallback any
-	for _, tpl := range p.templates {
-		if tpl.Hidden || tpl.Platform != target.Platform || tpl.Type != templateType {
-			continue
+	for _, templateType := range templateTypeCandidates(hook) {
+		// 1) Exact id match with language preference.
+		for _, tpl := range p.templates {
+			if tpl.Hidden || tpl.Platform != target.Platform || tpl.Type != templateType {
+				continue
+			}
+			if target.Language != "" && tpl.Language != nil && *tpl.Language != target.Language {
+				continue
+			}
+			if target.Template != "" && fmt.Sprintf("%v", tpl.ID) != target.Template {
+				continue
+			}
+			if target.Template != "" {
+				return tpl.Template
+			}
 		}
-		if target.Language != "" && tpl.Language != nil && *tpl.Language != target.Language {
-			continue
+		// 2) Default template for this type/platform/language.
+		for _, tpl := range p.templates {
+			if tpl.Hidden || tpl.Platform != target.Platform || tpl.Type != templateType {
+				continue
+			}
+			if target.Language != "" && tpl.Language != nil && *tpl.Language != target.Language {
+				continue
+			}
+			if tpl.Default {
+				return tpl.Template
+			}
 		}
-		if target.Template != "" && fmt.Sprintf("%v", tpl.ID) != target.Template {
-			continue
+		// 3) Any default template for this type/platform.
+		for _, tpl := range p.templates {
+			if tpl.Hidden || tpl.Platform != target.Platform || tpl.Type != templateType {
+				continue
+			}
+			if tpl.Default {
+				return tpl.Template
+			}
 		}
-		fallback = tpl.Template
-		if tpl.Default || target.Template != "" {
+		// 4) Last-resort first matching template for this type/platform.
+		for _, tpl := range p.templates {
+			if tpl.Hidden || tpl.Platform != target.Platform || tpl.Type != templateType {
+				continue
+			}
+			if target.Language != "" && tpl.Language != nil && *tpl.Language != target.Language {
+				continue
+			}
 			return tpl.Template
 		}
-	}
-	if fallback != nil {
-		return fallback
-	}
-	for _, tpl := range p.templates {
-		if tpl.Hidden || tpl.Platform != target.Platform || tpl.Type != templateType {
-			continue
-		}
-		if tpl.Default {
+		for _, tpl := range p.templates {
+			if tpl.Hidden || tpl.Platform != target.Platform || tpl.Type != templateType {
+				continue
+			}
 			return tpl.Template
 		}
 	}
 	return nil
+}
+
+func templateTypeCandidates(hook *Hook) []string {
+	primary := templateTypeForHook(hook)
+	if hook == nil {
+		return []string{primary}
+	}
+	// Support both historical and current template keys for fort updates.
+	if hook.Type == "fort_update" {
+		if primary == "fort-update" {
+			return []string{"fort-update", "fort"}
+		}
+		return []string{primary, "fort-update"}
+	}
+	return []string{primary}
 }
 
 func templateTypeForHook(hook *Hook) string {

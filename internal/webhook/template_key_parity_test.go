@@ -1,10 +1,12 @@
 package webhook
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
 	"poraclego/internal/data"
+	"poraclego/internal/dts"
 )
 
 func TestNestAddsResetTimeAndDisappearDate(t *testing.T) {
@@ -80,6 +82,110 @@ func TestTemplateTypeForHookFortUpdateUsesFortUpdateTemplate(t *testing.T) {
 	}
 }
 
+func TestFormatPayloadFortUpdateUsesTemplateWhenTemplateIDMismatched(t *testing.T) {
+	rawTemplate := `{
+		"embed": {
+			"title": "{{#if isNew}}🆕{{/if}}{{#eq fortType 'pokestop'}}📍{{else}}🏟{{/eq}}",
+			"description": "{{#if isNew}}new{{/if}} 🗺 [Google]({{{googleMapUrl}}}) | [Apple]({{{appleMapUrl}}})"
+		}
+	}`
+	var template any
+	if err := json.Unmarshal([]byte(rawTemplate), &template); err != nil {
+		t.Fatalf("unable to decode template fixture: %v", err)
+	}
+
+	p := &Processor{
+		templates: []dts.Template{
+			{
+				ID:       "standard",
+				Type:     "fort-update",
+				Language: ptrString("en"),
+				Default:  true,
+				Platform: "discord",
+				Template: template,
+			},
+		},
+	}
+	hook := &Hook{
+		Type: "fort_update",
+		Message: map[string]any{
+			"change_type": "new",
+			"new": map[string]any{
+				"id":          "0b427e88a3254eeab442d425412e4505.16",
+				"type":        "pokestop",
+				"name":        nil,
+				"description": nil,
+				"image_url":   nil,
+				"location": map[string]any{
+					"lat": 50.982116,
+					"lon": 6.933164,
+				},
+			},
+			"latitude":  50.982116,
+			"longitude": 6.933164,
+		},
+	}
+	match := alertMatch{Target: alertTarget{
+		Platform: "discord",
+		Language: "en",
+		Template: "1", // does not match template id "standard"
+	}}
+
+	payload, message := p.formatPayload(hook, match)
+
+	embeds, ok := payload["embeds"].([]any)
+	if !ok || len(embeds) == 0 {
+		t.Fatalf("expected embeds payload, got %#v", payload)
+	}
+	if got := message; got == "" || got == "Fort update " || got == "Fort update" {
+		t.Fatalf("expected rendered fort-update message, got %q", got)
+	}
+}
+
+func TestSelectTemplatePayloadFallsBackToFirstMatchingTemplate(t *testing.T) {
+	p := &Processor{
+		templates: []dts.Template{
+			{
+				ID:       "standard",
+				Type:     "fort-update",
+				Language: ptrString("en"),
+				Default:  false,
+				Platform: "discord",
+				Template: map[string]any{"content": "fort template"},
+			},
+		},
+	}
+	hook := &Hook{Type: "fort_update", Message: map[string]any{}}
+	target := alertTarget{Platform: "discord", Language: "en", Template: "1"}
+
+	selected := selectTemplatePayload(p, target, hook)
+	if selected == nil {
+		t.Fatalf("expected fallback template selection, got nil")
+	}
+}
+
+func TestSelectTemplatePayloadFortUpdateSupportsLegacyFortType(t *testing.T) {
+	p := &Processor{
+		templates: []dts.Template{
+			{
+				ID:       "legacy",
+				Type:     "fort",
+				Language: ptrString("en"),
+				Default:  true,
+				Platform: "discord",
+				Template: map[string]any{"content": "legacy fort template"},
+			},
+		},
+	}
+	hook := &Hook{Type: "fort_update", Message: map[string]any{}}
+	target := alertTarget{Platform: "discord", Language: "en", Template: "1"}
+
+	selected := selectTemplatePayload(p, target, hook)
+	if selected == nil {
+		t.Fatalf("expected legacy fort template selection, got nil")
+	}
+}
+
 func TestWeatherAddsConditionAlias(t *testing.T) {
 	p := &Processor{}
 	hook := &Hook{
@@ -149,4 +255,8 @@ func TestRaidAddsGymNameTeamIDAndEvolutionName(t *testing.T) {
 	if got := getString(payload["evolutionName"]); got != "Mega" {
 		t.Fatalf("evolutionName=%q, want %q", got, "Mega")
 	}
+}
+
+func ptrString(value string) *string {
+	return &value
 }
