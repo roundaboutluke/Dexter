@@ -212,7 +212,13 @@ func (p *Processor) matchTargets(hook *Hook) ([]alertMatch, error) {
 						if stopKey != "" {
 							seenKey = stopKey + "|" + rewardKey
 						}
-						p.questDigests.Add(id, rowProfileNo, cycleKey, seenKey, stopText, rewardKey)
+						mode := "any"
+						if prefix == "With AR: " {
+							mode = "with"
+						} else if prefix == "No AR: " {
+							mode = "no"
+						}
+						p.questDigests.Add(id, rowProfileNo, cycleKey, seenKey, stopKey, stopText, mode, rewardKey)
 						logger := logging.Get().General
 						if logger != nil {
 							logger.Infof("quest digest add: user=%s profile=%d cycle=%s reward=%s stop=%s", id, rowProfileNo, cycleKey, rewardKey, stopText)

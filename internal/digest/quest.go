@@ -9,12 +9,13 @@ import (
 )
 
 type QuestDigest struct {
-	CycleKey string
-	Total    int
-	Rewards  map[string]int
-	Seen     map[string]bool
-	Stops    map[string]map[string]bool
-	Updated  time.Time
+	CycleKey         string
+	Total            int
+	Rewards          map[string]int
+	Seen             map[string]bool
+	Stops            map[string]map[string]bool
+	LatestByStopMode map[string]questStopModeState
+	Updated          time.Time
 }
 
 type QuestDigestSummary struct {
@@ -28,6 +29,11 @@ type Store struct {
 	mu         sync.Mutex
 	items      map[string]map[int]*QuestDigest
 	quietCycle map[string]string
+}
+
+type questStopModeState struct {
+	Reward   string
+	StopText string
 }
 
 func NewStore() *Store {
@@ -78,7 +84,7 @@ func (s *Store) CycleKeyFor(userID string, updated time.Time) string {
 	return CycleKey(updated)
 }
 
-func (s *Store) Add(userID string, profileNo int, cycleKey, seenKey, stopText, reward string) {
+func (s *Store) Add(userID string, profileNo int, cycleKey, seenKey, stopKey, stopText, rewardMode, reward string) {
 	if s == nil || userID == "" || profileNo <= 0 || cycleKey == "" || reward == "" {
 		return
 	}
@@ -92,29 +98,57 @@ func (s *Store) Add(userID string, profileNo int, cycleKey, seenKey, stopText, r
 	entry := profiles[profileNo]
 	if entry == nil || entry.CycleKey != cycleKey {
 		entry = &QuestDigest{
-			CycleKey: cycleKey,
-			Rewards:  map[string]int{},
-			Seen:     map[string]bool{},
-			Stops:    map[string]map[string]bool{},
+			CycleKey:         cycleKey,
+			Rewards:          map[string]int{},
+			Seen:             map[string]bool{},
+			Stops:            map[string]map[string]bool{},
+			LatestByStopMode: map[string]questStopModeState{},
 		}
 		profiles[profileNo] = entry
 	}
+	stopIdentity := strings.TrimSpace(stopKey)
+	if stopIdentity == "" {
+		stopIdentity = strings.TrimSpace(stopText)
+	}
+	mode := normalizeRewardMode(rewardMode, reward)
+	if stopIdentity != "" {
+		stopModeKey := stopIdentity + "|" + mode
+		prev := entry.LatestByStopMode[stopModeKey]
+		if prev.Reward == reward {
+			// Same latest reward: ignore duplicate rescans but keep stop text fresh if it changed.
+			if stopText != "" && stopText != prev.StopText {
+				removeStop(entry.Stops, prev.Reward, prev.StopText)
+				addStop(entry.Stops, reward, stopText)
+				prev.StopText = stopText
+				entry.LatestByStopMode[stopModeKey] = prev
+				entry.Updated = time.Now()
+			}
+			return
+		}
+		if prev.Reward != "" {
+			decReward(entry.Rewards, prev.Reward)
+			removeStop(entry.Stops, prev.Reward, prev.StopText)
+		}
+		entry.Rewards[reward]++
+		addStop(entry.Stops, reward, stopText)
+		entry.LatestByStopMode[stopModeKey] = questStopModeState{
+			Reward:   reward,
+			StopText: stopText,
+		}
+		entry.Total = rewardCountTotal(entry.Rewards)
+		entry.Updated = time.Now()
+		return
+	}
+
 	if seenKey != "" {
 		if entry.Seen[seenKey] {
 			return
 		}
 		entry.Seen[seenKey] = true
 	}
-	entry.Total++
 	entry.Rewards[reward]++
-	if stopText != "" {
-		stops := entry.Stops[reward]
-		if stops == nil {
-			stops = map[string]bool{}
-			entry.Stops[reward] = stops
-		}
-		stops[stopText] = true
-	}
+	addStop(entry.Stops, reward, stopText)
+	entry.Total = rewardCountTotal(entry.Rewards)
 	entry.Updated = time.Now()
 }
 
@@ -243,4 +277,70 @@ func itoa(value int) string {
 
 func CycleKey(t time.Time) string {
 	return t.Format("2006010215")
+}
+
+func normalizeRewardMode(mode, reward string) string {
+	normalized := strings.ToLower(strings.TrimSpace(mode))
+	switch normalized {
+	case "with", "ar", "with_ar", "withar":
+		return "with"
+	case "no", "no_ar", "noar":
+		return "no"
+	}
+	reward = strings.TrimSpace(reward)
+	if strings.HasPrefix(reward, "With AR: ") {
+		return "with"
+	}
+	if strings.HasPrefix(reward, "No AR: ") {
+		return "no"
+	}
+	return "any"
+}
+
+func addStop(stopsByReward map[string]map[string]bool, reward, stopText string) {
+	if stopsByReward == nil || strings.TrimSpace(stopText) == "" || reward == "" {
+		return
+	}
+	stops := stopsByReward[reward]
+	if stops == nil {
+		stops = map[string]bool{}
+		stopsByReward[reward] = stops
+	}
+	stops[stopText] = true
+}
+
+func removeStop(stopsByReward map[string]map[string]bool, reward, stopText string) {
+	if stopsByReward == nil || reward == "" || strings.TrimSpace(stopText) == "" {
+		return
+	}
+	stops := stopsByReward[reward]
+	if len(stops) == 0 {
+		return
+	}
+	delete(stops, stopText)
+	if len(stops) == 0 {
+		delete(stopsByReward, reward)
+	}
+}
+
+func decReward(rewards map[string]int, reward string) {
+	if rewards == nil || reward == "" {
+		return
+	}
+	count := rewards[reward]
+	if count <= 1 {
+		delete(rewards, reward)
+		return
+	}
+	rewards[reward] = count - 1
+}
+
+func rewardCountTotal(rewards map[string]int) int {
+	total := 0
+	for _, value := range rewards {
+		if value > 0 {
+			total += value
+		}
+	}
+	return total
 }
