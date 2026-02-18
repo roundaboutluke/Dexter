@@ -1150,7 +1150,7 @@ func templateTypeForHook(hook *Hook) string {
 	case "gym_details":
 		return "gym"
 	case "fort_update":
-		return "fort"
+		return "fort-update"
 	default:
 		return hook.Type
 	}

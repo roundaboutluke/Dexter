@@ -69,6 +69,17 @@ func TestFortUpdateAddsChangeTypeEditTypesResetTimeAndDisappearDate(t *testing.T
 	}
 }
 
+func TestTemplateTypeForHookFortUpdateUsesFortUpdateTemplate(t *testing.T) {
+	hook := &Hook{
+		Type:    "fort_update",
+		Message: map[string]any{},
+	}
+
+	if got := templateTypeForHook(hook); got != "fort-update" {
+		t.Fatalf("templateTypeForHook=%q, want %q", got, "fort-update")
+	}
+}
+
 func TestWeatherAddsConditionAlias(t *testing.T) {
 	p := &Processor{}
 	hook := &Hook{
