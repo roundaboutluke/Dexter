@@ -493,10 +493,10 @@ func (s *Scheduler) chunkQuestDigestJobs(targetType, targetID, name string, tr *
 	}
 
 	lines := []string{}
-	if stops := questDigestStops(summary); len(stops) > 0 {
+	if stops := questDigestStops(s.cfg, summary); len(stops) > 0 {
 		lines = questDigestStopLines(stops)
 	} else {
-		lines = digest.RewardsWithStops(summary.Rewards, summary.Stops)
+		lines = digest.RewardsWithStops(summary.Rewards, summary.Stops, summary.StopNames)
 	}
 
 	bodyPages := chunkLines(lines, bodyLimit)
@@ -591,11 +591,11 @@ func (s *Scheduler) questDigestMessage(tr *i18n.Translator, profileName string, 
 	lines := []string{
 		tr.TranslateFormat("Quest digest for {0}: {1} quests missed during quiet hours.", profileName, summary.Total),
 	}
-	stops := questDigestStops(summary)
+	stops := questDigestStops(s.cfg, summary)
 	if len(stops) > 0 {
 		lines = append(lines, questDigestStopLines(stops)...)
 	} else {
-		rewards := digest.RewardsWithStops(summary.Rewards, summary.Stops)
+		rewards := digest.RewardsWithStops(summary.Rewards, summary.Stops, summary.StopNames)
 		lines = append(lines, rewards...)
 	}
 	return strings.Join(lines, "\n")
@@ -610,8 +610,8 @@ func (s *Scheduler) renderQuestDigestTemplate(targetType, language, profileName 
 	if template == nil {
 		return nil, ""
 	}
-	rewards := digest.RewardsWithStops(summary.Rewards, summary.Stops)
-	stops := questDigestStops(summary)
+	rewards := digest.RewardsWithStops(summary.Rewards, summary.Stops, summary.StopNames)
+	stops := questDigestStops(s.cfg, summary)
 	data := map[string]any{
 		"profileName":  profileName,
 		"total":        summary.Total,
@@ -649,11 +649,13 @@ func (s *Scheduler) renderQuestDigestTemplate(targetType, language, profileName 
 	return nil, ""
 }
 
-func questDigestStops(summary *digest.QuestDigestSummary) []map[string]any {
+func questDigestStops(cfg *config.Config, summary *digest.QuestDigestSummary) []map[string]any {
 	if summary == nil || len(summary.Stops) == 0 {
 		return nil
 	}
 	type stopEntry struct {
+		Key    string
+		Name   string
 		NoAR   map[string]bool
 		WithAR map[string]bool
 	}
@@ -672,17 +674,22 @@ func questDigestStops(summary *digest.QuestDigestSummary) []map[string]any {
 			rewardText = strings.TrimPrefix(rewardKey, "No AR: ")
 		}
 		rewardText = strings.TrimSpace(rewardText)
-		for stop := range stops {
-			if strings.TrimSpace(stop) == "" {
+		for stopKey := range stops {
+			stopKey = strings.TrimSpace(stopKey)
+			if stopKey == "" {
 				continue
 			}
-			entry := byStop[stop]
+			entry := byStop[stopKey]
 			if entry == nil {
 				entry = &stopEntry{
+					Key:    stopKey,
+					Name:   questDigestStopName(summary, stopKey),
 					NoAR:   map[string]bool{},
 					WithAR: map[string]bool{},
 				}
-				byStop[stop] = entry
+				byStop[stopKey] = entry
+			} else if entry.Name == "" {
+				entry.Name = questDigestStopName(summary, stopKey)
 			}
 			switch mode {
 			case "with":
@@ -694,28 +701,126 @@ func questDigestStops(summary *digest.QuestDigestSummary) []map[string]any {
 			}
 		}
 	}
-	stopNames := make([]string, 0, len(byStop))
-	for stop := range byStop {
-		stopNames = append(stopNames, stop)
+	stopKeys := make([]string, 0, len(byStop))
+	for key := range byStop {
+		stopKeys = append(stopKeys, key)
 	}
-	sort.Strings(stopNames)
-	out := make([]map[string]any, 0, len(stopNames))
-	for _, stop := range stopNames {
-		entry := byStop[stop]
+	sort.Slice(stopKeys, func(i, j int) bool {
+		left := byStop[stopKeys[i]]
+		right := byStop[stopKeys[j]]
+		leftName := ""
+		rightName := ""
+		if left != nil {
+			leftName = left.Name
+		}
+		if right != nil {
+			rightName = right.Name
+		}
+		if leftName == rightName {
+			return stopKeys[i] < stopKeys[j]
+		}
+		return leftName < rightName
+	})
+	out := make([]map[string]any, 0, len(stopKeys))
+	for _, stopKey := range stopKeys {
+		entry := byStop[stopKey]
 		if entry == nil {
 			continue
 		}
 		noAR := mapKeysSorted(entry.NoAR)
 		withAR := mapKeysSorted(entry.WithAR)
+		reactMap := questDigestReactMapURL(cfg, entry.Key)
+		diadem := questDigestDiademURL(cfg, entry.Key)
+		mapURL := diadem
+		if mapURL == "" {
+			mapURL = reactMap
+		}
+		stopName := strings.TrimSpace(entry.Name)
+		if stopName == "" {
+			stopName = entry.Key
+		}
 		out = append(out, map[string]any{
-			"stop":        stop,
+			"stop":        stopName,
+			"stopKey":     entry.Key,
 			"noAR":        noAR,
 			"noARCount":   len(noAR),
 			"withAR":      withAR,
 			"withARCount": len(withAR),
+			"reactMapUrl": reactMap,
+			"diademUrl":   diadem,
+			"stopUrl":     mapURL,
 		})
 	}
 	return out
+}
+
+func questDigestStopName(summary *digest.QuestDigestSummary, stopKey string) string {
+	stopKey = strings.TrimSpace(stopKey)
+	if stopKey == "" || summary == nil {
+		return stopKey
+	}
+	if summary.StopNames != nil {
+		if stopName := strings.TrimSpace(summary.StopNames[stopKey]); stopName != "" {
+			return stopName
+		}
+	}
+	return stopKey
+}
+
+func questDigestReactMapURL(cfg *config.Config, stopKey string) string {
+	if cfg == nil {
+		return ""
+	}
+	stopID := questDigestStopID(stopKey)
+	if stopID == "" {
+		return ""
+	}
+	base, ok := cfg.GetString("general.reactMapURL")
+	if !ok {
+		return ""
+	}
+	base = strings.TrimSpace(base)
+	if base == "" {
+		return ""
+	}
+	if !strings.HasSuffix(base, "/") {
+		base += "/"
+	}
+	return base + "id/pokestops/" + stopID
+}
+
+func questDigestDiademURL(cfg *config.Config, stopKey string) string {
+	if cfg == nil {
+		return ""
+	}
+	stopID := questDigestStopID(stopKey)
+	if stopID == "" {
+		return ""
+	}
+	base, ok := cfg.GetString("general.diademURL")
+	if !ok {
+		return ""
+	}
+	base = strings.TrimSpace(base)
+	if base == "" {
+		return ""
+	}
+	if !strings.HasSuffix(base, "/") {
+		base += "/"
+	}
+	return base + "pokestop/" + stopID
+}
+
+func questDigestStopID(stopKey string) string {
+	stopKey = strings.TrimSpace(stopKey)
+	if stopKey == "" {
+		return ""
+	}
+	// Coordinate fallback keys ("lat,lon") cannot be converted to provider stop URLs.
+	if strings.Contains(stopKey, ",") {
+		return ""
+	}
+	return stopKey
 }
 
 func questDigestStopLines(stops []map[string]any) []string {

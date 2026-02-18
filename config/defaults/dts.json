@@ -601,7 +601,7 @@
     "template": {
       "embed": {
         "title": "Quest Digest",
-        "description": "Profile: **{{profileName}}**\n{{total}} quests missed during quiet hours.\n{{#if stops}}\n{{#each stops}}• {{#if withARCount}}With AR: {{#each withAR}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}{{/if}}{{#if noARCount}}{{#if withARCount}} | {{/if}}No AR: {{#each noAR}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}{{/if}} at {{stop}}\n{{/each}}{{else}}\n{{#if rewards}}\n{{#each rewards}}• {{this}}\n{{/each}}{{/if}}{{/if}}",
+        "description": "Profile: **{{profileName}}**\n{{total}} quests missed during quiet hours.\n{{#if stops}}\n{{#each stops}}• {{#if withARCount}}With AR: {{#each withAR}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}{{/if}}{{#if noARCount}}{{#if withARCount}} | {{/if}}No AR: {{#each noAR}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}{{/if}} at {{#if diademUrl}}[{{stop}}]({{{diademUrl}}}){{else}}{{#if reactMapUrl}}[{{stop}}]({{{reactMapUrl}}}){{else}}{{stop}}{{/if}}{{/if}}\n{{/each}}{{else}}\n{{#if rewards}}\n{{#each rewards}}• {{this}}\n{{/each}}{{/if}}{{/if}}",
         "timestamp": "{{nowISO}}"
       }
     }
@@ -613,7 +613,7 @@
     "default": true,
     "platform": "telegram",
     "template": {
-      "content": "Quest digest for {{profileName}}: {{total}} quests missed during quiet hours.\n{{#if stops}}\n{{#each stops}}- {{#if withARCount}}With AR: {{#each withAR}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}{{/if}}{{#if noARCount}}{{#if withARCount}} | {{/if}}No AR: {{#each noAR}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}{{/if}} at {{stop}}\n{{/each}}{{else}}\n{{#each rewards}}- {{this}}\n{{/each}}{{/if}}"
+      "content": "Quest digest for {{profileName}}: {{total}} quests missed during quiet hours.\n{{#if stops}}\n{{#each stops}}- {{#if withARCount}}With AR: {{#each withAR}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}{{/if}}{{#if noARCount}}{{#if withARCount}} | {{/if}}No AR: {{#each noAR}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}{{/if}} at {{#if diademUrl}}[{{stop}}]({{{diademUrl}}}){{else}}{{#if reactMapUrl}}[{{stop}}]({{{reactMapUrl}}}){{else}}{{stop}}{{/if}}{{/if}}\n{{/each}}{{else}}\n{{#each rewards}}- {{this}}\n{{/each}}{{/if}}"
     }
   },
   {

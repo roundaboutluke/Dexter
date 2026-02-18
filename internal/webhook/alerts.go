@@ -194,7 +194,7 @@ func (p *Processor) matchTargets(hook *Hook) ([]alertMatch, error) {
 					if cycleKey == "" {
 						cycleKey = digest.CycleKey(updated)
 					}
-					stopText := questDigestStopText(p, hook)
+					stopText := questDigestStopText(hook)
 					stopKey := questDigestKey(hook)
 					if stopKey == "" {
 						stopKey = stopText
@@ -639,22 +639,15 @@ func questDigestKey(hook *Hook) string {
 	return ""
 }
 
-func questDigestStopText(p *Processor, hook *Hook) string {
-	if p == nil || hook == nil {
+func questDigestStopText(hook *Hook) string {
+	if hook == nil {
 		return ""
 	}
 	name := getString(hook.Message["pokestop_name"])
 	if name == "" {
 		name = getString(hook.Message["name"])
 	}
-	if name == "" {
-		return ""
-	}
-	url := reactMapURL(p.cfg, hook)
-	if url == "" {
-		return name
-	}
-	return fmt.Sprintf("[%s](%s)", name, url)
+	return name
 }
 
 func trackingTable(hookType string) string {
