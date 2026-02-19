@@ -833,16 +833,17 @@ func (s *Sender) editTelegramMessage(token, chatID, messageID string, payload ma
 
 func (s *Sender) discordPayload(job MessageJob) map[string]any {
 	if job.Payload != nil {
-		if _, hasEmbeds := job.Payload["embeds"]; !hasEmbeds {
-			if content, ok := job.Payload["content"].(string); ok {
+		payload := sanitizeDiscordPayload(job.Payload)
+		if _, hasEmbeds := payload["embeds"]; !hasEmbeds {
+			if content, ok := payload["content"].(string); ok {
 				if content == "" {
-					job.Payload["content"] = job.Message
+					payload["content"] = job.Message
 				}
 			} else {
-				job.Payload["content"] = job.Message
+				payload["content"] = job.Message
 			}
 		}
-		return sanitizeDiscordPayload(job.Payload)
+		return payload
 	}
 	return map[string]any{"content": job.Message}
 }
@@ -851,8 +852,21 @@ func sanitizeDiscordPayload(payload map[string]any) map[string]any {
 	if payload == nil {
 		return payload
 	}
-	if embed, ok := payload["embed"].(map[string]any); ok {
-		sanitizeEmbedColor(embed)
+
+	// Normalize legacy single-embed payloads and malformed embeds objects so all callsites
+	// can rely on `embeds` being the canonical list shape.
+	if rawEmbed, ok := payload["embed"]; ok {
+		if _, hasEmbeds := payload["embeds"]; !hasEmbeds {
+			if embed, ok := rawEmbed.(map[string]any); ok {
+				payload["embeds"] = []any{embed}
+			}
+		}
+		delete(payload, "embed")
+	}
+	if rawEmbeds, ok := payload["embeds"]; ok {
+		if embed, ok := rawEmbeds.(map[string]any); ok {
+			payload["embeds"] = []any{embed}
+		}
 	}
 	if embeds, ok := payload["embeds"].([]any); ok {
 		for _, raw := range embeds {

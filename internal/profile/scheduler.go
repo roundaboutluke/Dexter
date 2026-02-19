@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"poraclego/internal/config"
@@ -28,6 +29,7 @@ type Scheduler struct {
 	discordQueue  *dispatch.Queue
 	telegramQueue *dispatch.Queue
 	questDigests  *digest.Store
+	templatesMu   sync.RWMutex
 	templates     []dts.Template
 }
 
@@ -43,6 +45,16 @@ func NewScheduler(cfg *config.Config, query *db.Query, i18nFactory *i18n.Factory
 		questDigests:  digestStore,
 		templates:     templates,
 	}
+}
+
+// UpdateTemplates refreshes DTS templates used by scheduler-driven quest digest rendering.
+func (s *Scheduler) UpdateTemplates(templates []dts.Template) {
+	if s == nil {
+		return
+	}
+	s.templatesMu.Lock()
+	s.templates = append([]dts.Template(nil), templates...)
+	s.templatesMu.Unlock()
 }
 
 // Start begins the periodic profile checks.
@@ -602,11 +614,17 @@ func (s *Scheduler) questDigestMessage(tr *i18n.Translator, profileName string, 
 }
 
 func (s *Scheduler) renderQuestDigestTemplate(targetType, language, profileName string, summary *digest.QuestDigestSummary) (map[string]any, string) {
-	if summary == nil || summary.Total == 0 || len(s.templates) == 0 {
+	if summary == nil || summary.Total == 0 {
+		return nil, ""
+	}
+	s.templatesMu.RLock()
+	templates := append([]dts.Template(nil), s.templates...)
+	s.templatesMu.RUnlock()
+	if len(templates) == 0 {
 		return nil, ""
 	}
 	platform := platformFromType(targetType)
-	template := selectTemplatePayload(s.templates, platform, "questdigest", language)
+	template := selectTemplatePayload(templates, platform, "questdigest", language)
 	if template == nil {
 		return nil, ""
 	}

@@ -49,6 +49,9 @@ func (a *App) watchDTS(ctx context.Context, root string, interval time.Duration)
 				if a.botManager != nil {
 					a.botManager.UpdateTemplates(templates)
 				}
+				if a.profileSchedule != nil {
+					a.profileSchedule.UpdateTemplates(templates)
+				}
 				logf("DTS reloaded")
 			}
 		}
