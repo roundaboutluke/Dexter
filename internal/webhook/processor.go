@@ -1645,7 +1645,8 @@ func (p *Processor) handlePokestop(hook *Hook) {
 func (p *Processor) dedupeQuest(hook *Hook) bool {
 	pokestopID := getString(hook.Message["pokestop_id"])
 	rewardsBytes, _ := json.Marshal(hook.Message["rewards"])
-	key := fmt.Sprintf("%s_%s", pokestopID, string(rewardsBytes))
+	withAR := getBool(hook.Message["with_ar"])
+	key := fmt.Sprintf("%s_%s_%t", pokestopID, string(rewardsBytes), withAR)
 	if p.cache.Get(key) {
 		return false
 	}
