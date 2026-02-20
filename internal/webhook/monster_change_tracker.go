@@ -22,7 +22,11 @@ type MonsterChangeTracker struct {
 
 type monsterChangeEncounter struct {
 	Signature string `json:"signature"`
-	Expires   int64  `json:"expires"`
+	// PreviousSignature stores the immediately prior monster signature for quick flap detection.
+	PreviousSignature string `json:"previous_signature,omitempty"`
+	// ABLocked suppresses additional A<->B flip alerts after the first flap edit.
+	ABLocked bool  `json:"ab_locked,omitempty"`
+	Expires  int64 `json:"expires"`
 
 	PokemonID int     `json:"pokemon_id"`
 	Form      int     `json:"form"`
@@ -169,13 +173,13 @@ type monsterChangeSnapshot struct {
 	Expires   int64
 }
 
-func (t *MonsterChangeTracker) DetectChange(encounterID string, hook *Hook, expires int64) (monsterChangeSnapshot, []monsterChangeCare, bool) {
+func (t *MonsterChangeTracker) DetectChange(encounterID string, hook *Hook, expires int64) (monsterChangeSnapshot, []monsterChangeCare, bool, bool) {
 	if t == nil || encounterID == "" || hook == nil {
-		return monsterChangeSnapshot{}, nil, false
+		return monsterChangeSnapshot{}, nil, false, false
 	}
 	now := time.Now().Unix()
 	if expires > 0 && expires <= now {
-		return monsterChangeSnapshot{}, nil, false
+		return monsterChangeSnapshot{}, nil, false, false
 	}
 
 	pokemonID := getInt(hook.Message["pokemon_id"])
@@ -194,21 +198,34 @@ func (t *MonsterChangeTracker) DetectChange(encounterID string, hook *Hook, expi
 	t.purgeExpiredLocked(now)
 	entry := t.encounters[encounterID]
 	if entry == nil {
-		return monsterChangeSnapshot{}, nil, false
+		return monsterChangeSnapshot{}, nil, false, false
 	}
 	if entry.Expires > 0 && entry.Expires <= now {
 		delete(t.encounters, encounterID)
-		return monsterChangeSnapshot{}, nil, false
+		return monsterChangeSnapshot{}, nil, false, false
 	}
 	if entry.Signature == "" || signature == "" {
-		return monsterChangeSnapshot{}, nil, false
+		return monsterChangeSnapshot{}, nil, false, false
 	}
 	if entry.Signature == signature {
 		if entry.Expires == 0 || (expires > 0 && expires > entry.Expires) {
 			entry.Expires = expires
 		}
-		return monsterChangeSnapshot{}, nil, false
+		return monsterChangeSnapshot{}, nil, false, false
 	}
+	if entry.ABLocked {
+		// Once a spawn is identified as a flapping A/B pair, suppress additional toggles
+		// between those same signatures to avoid unnecessary Discord updates.
+		if signature == entry.PreviousSignature {
+			if entry.Expires == 0 || (expires > 0 && expires > entry.Expires) {
+				entry.Expires = expires
+			}
+			return monsterChangeSnapshot{}, nil, false, false
+		}
+		// A third signature should behave as a fresh change sequence.
+		entry.ABLocked = false
+	}
+	flapping := entry.PreviousSignature != "" && signature == entry.PreviousSignature
 	old := monsterChangeSnapshot{
 		PokemonID: entry.PokemonID,
 		Form:      entry.Form,
@@ -218,6 +235,7 @@ func (t *MonsterChangeTracker) DetectChange(encounterID string, hook *Hook, expi
 		IV:        entry.IV,
 		Expires:   entry.Expires,
 	}
+	entry.PreviousSignature = entry.Signature
 	entry.Signature = signature
 	entry.PokemonID = pokemonID
 	entry.Form = form
@@ -228,6 +246,9 @@ func (t *MonsterChangeTracker) DetectChange(encounterID string, hook *Hook, expi
 	if entry.Expires == 0 || (expires > 0 && expires > entry.Expires) {
 		entry.Expires = expires
 	}
+	if flapping {
+		entry.ABLocked = true
+	}
 	cares := make([]monsterChangeCare, 0, len(entry.Cares))
 	for _, care := range entry.Cares {
 		if care == nil || care.TargetID == "" || care.UpdateKey == "" {
@@ -235,7 +256,7 @@ func (t *MonsterChangeTracker) DetectChange(encounterID string, hook *Hook, expi
 		}
 		cares = append(cares, *care)
 	}
-	return old, cares, true
+	return old, cares, true, flapping
 }
 
 func monsterChangeSignature(pokemonID, formID, costume, gender int) string {

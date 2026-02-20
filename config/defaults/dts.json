@@ -75,8 +75,8 @@
   "template": {
     "embed": {
       "color": "{{color}}",
-      "title": "🔄 A wild spawn has changed!",
-      "description": "• Old: {{oldFullName}} — IV: {{#if oldIvKnown}}{{round oldIv}}%{{else}}?{{/if}} — CP: {{oldCp}}\n• New: {{fullName}} — IV: {{round iv}}% — CP: {{cp}}\n• Despawn: in {{tthm}} minutes\n📍 Location: [Google]({{{googleMapUrl}}}) | [Apple]({{{appleMapUrl}}})",
+      "title": "{{#if abSpawn}}🔁 Potential A/B spawn detected{{else}}🔄 A wild spawn has changed!{{/if}}",
+      "description": "{{#if abSpawn}}⚠️ This spawn is flapping between two species.\n{{/if}}• Old: {{oldFullName}} — IV: {{#if oldIvKnown}}{{round oldIv}}%{{else}}?{{/if}} — CP: {{oldCp}}\n• New: {{fullName}} — IV: {{round iv}}% — CP: {{cp}}\n• Despawn: in {{tthm}} minutes\n📍 Location: [Google]({{{googleMapUrl}}}) | [Apple]({{{appleMapUrl}}})",
       "thumbnail": {
         "url": "{{{imgUrl}}}"
       },
@@ -109,8 +109,8 @@
   "template": {
     "embed": {
       "color": "{{color}}",
-      "title": "🔄 A wild spawn has changed!",
-      "description": "• Old: {{oldFullName}} — IV: {{#if oldIvKnown}}{{round oldIv}}%{{else}}?{{/if}} — CP: {{oldCp}}\n• New: {{fullName}}\n• Despawn: in {{tthm}} minutes\n📍 Location: [Google]({{{googleMapUrl}}}) | [Apple]({{{appleMapUrl}}})",
+      "title": "{{#if abSpawn}}🔁 Potential A/B spawn detected{{else}}🔄 A wild spawn has changed!{{/if}}",
+      "description": "{{#if abSpawn}}⚠️ This spawn is flapping between two species.\n{{/if}}• Old: {{oldFullName}} — IV: {{#if oldIvKnown}}{{round oldIv}}%{{else}}?{{/if}} — CP: {{oldCp}}\n• New: {{fullName}}\n• Despawn: in {{tthm}} minutes\n📍 Location: [Google]({{{googleMapUrl}}}) | [Apple]({{{appleMapUrl}}})",
       "thumbnail": {
         "url": "{{{imgUrl}}}"
       },

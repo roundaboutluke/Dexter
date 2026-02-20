@@ -881,6 +881,14 @@ func updateKeyForPokemon(hook *Hook, row map[string]any) string {
 	return fmt.Sprintf("pokemon:%s:%s", encounterID, uid)
 }
 
+func monsterChangeUpdateKey(base string) string {
+	base = strings.TrimSpace(base)
+	if base == "" {
+		return ""
+	}
+	return "monsterchange:" + base
+}
+
 func (p *Processor) dispatchMonsterChange(hook *Hook) {
 	if p == nil || hook == nil || hook.Type != "pokemon" || p.monsterChange == nil {
 		return
@@ -890,7 +898,7 @@ func (p *Processor) dispatchMonsterChange(hook *Hook) {
 		return
 	}
 	expires := hookExpiryUnix(hook)
-	old, cares, changed := p.monsterChange.DetectChange(encounterID, hook, expires)
+	old, cares, changed, flapping := p.monsterChange.DetectChange(encounterID, hook, expires)
 	if !changed || len(cares) == 0 || old.PokemonID == 0 {
 		return
 	}
@@ -907,6 +915,7 @@ func (p *Processor) dispatchMonsterChange(hook *Hook) {
 	changeHook.Message["oldCp"] = old.CP
 	changeHook.Message["oldIv"] = old.IV
 	changeHook.Message["oldIvKnown"] = old.IV >= 0
+	changeHook.Message["abSpawn"] = flapping
 
 	expireUnix := expires
 	if expireUnix <= 0 {
@@ -937,6 +946,7 @@ func (p *Processor) dispatchMonsterChange(hook *Hook) {
 			},
 		}
 		payload, message := p.formatPayload(changeHook, match)
+		changeUpdateKey := monsterChangeUpdateKey(care.UpdateKey)
 		job := dispatch.MessageJob{
 			Lat:          getFloat(changeHook.Message["latitude"]),
 			Lon:          getFloat(changeHook.Message["longitude"]),
@@ -950,10 +960,10 @@ func (p *Processor) dispatchMonsterChange(hook *Hook) {
 			Emoji:        "",
 			LogReference: "MonsterChange",
 			Language:     target.Language,
-			UpdateKey:    care.UpdateKey,
-			// Changed spawn alerts should be posted as their own message so they produce a notification.
-			// If the original tracker had clean enabled, the sender will remove the previous message.
-			UpdateExisting: false,
+			UpdateKey:    changeUpdateKey,
+			// First monster change should notify as a new message.
+			// On flap/revert, edit the existing monster-change alert to avoid a third post.
+			UpdateExisting: flapping && changeUpdateKey != "",
 		}
 		if p.rateChecker == nil || job.AlwaysSend {
 			p.enqueue(job)
