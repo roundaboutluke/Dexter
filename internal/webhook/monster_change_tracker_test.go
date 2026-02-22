@@ -165,3 +165,32 @@ func TestMonsterChangeLockIsEncounterScoped(t *testing.T) {
 		t.Fatalf("expected enc-2 first change unaffected by enc-1 lock, changed=%v flapping=%v", changed, flapping)
 	}
 }
+
+func TestMonsterChangeLockSuppressesFormVariantsWithinPair(t *testing.T) {
+	tracker := NewMonsterChangeTracker(nil, "")
+	expires := time.Now().Add(30 * time.Minute).Unix()
+	target := alertTarget{
+		ID:       "u1",
+		Type:     "discord:user",
+		Name:     "User 1",
+		Language: "en",
+		Template: "1",
+	}
+
+	hookA := &Hook{Type: "pokemon", Message: map[string]any{"encounter_id": "enc-form", "pokemon_id": 1, "form": 0, "costume": 0, "gender": 1, "cp": 100}}
+	hookB := &Hook{Type: "pokemon", Message: map[string]any{"encounter_id": "enc-form", "pokemon_id": 2, "form": 0, "costume": 0, "gender": 1, "cp": 120}}
+	hookAFlap := &Hook{Type: "pokemon", Message: map[string]any{"encounter_id": "enc-form", "pokemon_id": 1, "form": 0, "costume": 0, "gender": 1, "cp": 130}}
+	hookBFormVariant := &Hook{Type: "pokemon", Message: map[string]any{"encounter_id": "enc-form", "pokemon_id": 2, "form": 99, "costume": 0, "gender": 1, "cp": 140}}
+
+	tracker.TrackCare("enc-form", target, expires, false, "", "pokemon:enc-form:row-1", hookA)
+
+	if _, _, changed, _ := tracker.DetectChange("enc-form", hookB, expires); !changed {
+		t.Fatalf("expected first A->B change")
+	}
+	if _, _, changed, flapping := tracker.DetectChange("enc-form", hookAFlap, expires); !changed || !flapping {
+		t.Fatalf("expected B->A flap lock, changed=%v flapping=%v", changed, flapping)
+	}
+	if _, _, changed, flapping := tracker.DetectChange("enc-form", hookBFormVariant, expires); changed || flapping {
+		t.Fatalf("expected B form variant to be suppressed within A/B lock, changed=%v flapping=%v", changed, flapping)
+	}
+}

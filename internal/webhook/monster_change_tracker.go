@@ -298,10 +298,11 @@ func monsterChangeSignature(pokemonID, formID, costume, gender int) string {
 }
 
 func monsterChangeCoreSignature(pokemonID, formID int) string {
+	_ = formID // Form variants are intentionally ignored for A/B lock stability.
 	if pokemonID <= 0 {
 		return ""
 	}
-	return fmt.Sprintf("%d:%d", pokemonID, formID)
+	return fmt.Sprintf("%d", pokemonID)
 }
 
 func (t *MonsterChangeTracker) purgeExpiredLocked(now int64) {
