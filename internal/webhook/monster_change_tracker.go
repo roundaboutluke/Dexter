@@ -217,6 +217,7 @@ func (t *MonsterChangeTracker) DetectChange(encounterID string, hook *Hook, expi
 		if entry.Expires == 0 || (expires > 0 && expires > entry.Expires) {
 			entry.Expires = expires
 		}
+		entry.PreviousCoreSignature = currentCore
 		return monsterChangeSnapshot{}, nil, false, false
 	}
 	if entry.ABLocked {
@@ -288,6 +289,56 @@ func (t *MonsterChangeTracker) DetectChange(encounterID string, hook *Hook, expi
 		cares = append(cares, *care)
 	}
 	return old, cares, true, flapping
+}
+
+func (t *MonsterChangeTracker) ShouldSuppressStandardAlert(encounterID string, hook *Hook, expires int64) bool {
+	if t == nil || encounterID == "" || hook == nil {
+		return false
+	}
+	now := time.Now().Unix()
+	if expires > 0 && expires <= now {
+		return false
+	}
+	pokemonID := getInt(hook.Message["pokemon_id"])
+	if pokemonID == 0 {
+		pokemonID = getInt(hook.Message["pokemonId"])
+	}
+	form := getInt(hook.Message["form"])
+	core := monsterChangeCoreSignature(pokemonID, form)
+	if core == "" {
+		return false
+	}
+
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.purgeExpiredLocked(now)
+	entry := t.encounters[encounterID]
+	if entry == nil {
+		return false
+	}
+	if entry.Expires > 0 && entry.Expires <= now {
+		delete(t.encounters, encounterID)
+		return false
+	}
+	if !entry.ABLocked || entry.ABFirst == "" || entry.ABSecond == "" {
+		return false
+	}
+	if core != entry.ABFirst && core != entry.ABSecond {
+		return false
+	}
+	currentCore := monsterChangeCoreSignature(entry.PokemonID, entry.Form)
+	if currentCore == "" {
+		return false
+	}
+	// Suppress only pair flips. Same-species updates (for example weather/stat changes)
+	// should continue through normal dispatch.
+	if entry.PreviousCoreSignature == "" || entry.PreviousCoreSignature == currentCore {
+		return false
+	}
+	if entry.Expires == 0 || (expires > 0 && expires > entry.Expires) {
+		entry.Expires = expires
+	}
+	return true
 }
 
 func monsterChangeSignature(pokemonID, formID, costume, gender int) string {

@@ -427,6 +427,15 @@ func (p *Processor) handle(item any) {
 			}
 		}
 		p.dispatchMonsterChange(hook)
+		if p.monsterChange != nil {
+			encounterID := strings.TrimSpace(getString(hook.Message["encounter_id"]))
+			if encounterID != "" {
+				expires := hookExpiryUnix(hook)
+				if p.monsterChange.ShouldSuppressStandardAlert(encounterID, hook, expires) {
+					return
+				}
+			}
+		}
 		p.dispatch(hook)
 	case "raid", "egg":
 		if p.disabled("general.disableRaid") {

@@ -194,3 +194,55 @@ func TestMonsterChangeLockSuppressesFormVariantsWithinPair(t *testing.T) {
 		t.Fatalf("expected B form variant to be suppressed within A/B lock, changed=%v flapping=%v", changed, flapping)
 	}
 }
+
+func TestMonsterChangeShouldSuppressStandardAlertOnlyOnFlip(t *testing.T) {
+	tracker := NewMonsterChangeTracker(nil, "")
+	expires := time.Now().Add(30 * time.Minute).Unix()
+	target := alertTarget{
+		ID:       "u1",
+		Type:     "discord:user",
+		Name:     "User 1",
+		Language: "en",
+		Template: "1",
+	}
+
+	hookA := &Hook{Type: "pokemon", Message: map[string]any{"encounter_id": "enc-sup", "pokemon_id": 1, "form": 0, "costume": 0, "gender": 1, "cp": 100}}
+	hookB := &Hook{Type: "pokemon", Message: map[string]any{"encounter_id": "enc-sup", "pokemon_id": 2, "form": 0, "costume": 0, "gender": 1, "cp": 120}}
+	hookAFlap := &Hook{Type: "pokemon", Message: map[string]any{"encounter_id": "enc-sup", "pokemon_id": 1, "form": 0, "costume": 0, "gender": 1, "cp": 130}}
+	hookAStatUpdate := &Hook{Type: "pokemon", Message: map[string]any{"encounter_id": "enc-sup", "pokemon_id": 1, "form": 0, "costume": 0, "gender": 1, "cp": 140}}
+	hookBFormVariant := &Hook{Type: "pokemon", Message: map[string]any{"encounter_id": "enc-sup", "pokemon_id": 2, "form": 99, "costume": 0, "gender": 1, "cp": 150}}
+
+	tracker.TrackCare("enc-sup", target, expires, false, "", "pokemon:enc-sup:row-1", hookA)
+
+	// First change should not suppress standard monster dispatch.
+	if _, _, changed, _ := tracker.DetectChange("enc-sup", hookB, expires); !changed {
+		t.Fatalf("expected first A->B change")
+	}
+	if tracker.ShouldSuppressStandardAlert("enc-sup", hookB, expires) {
+		t.Fatalf("first A->B change should not suppress standard alert")
+	}
+
+	// Flap lock event should suppress standard monster dispatch.
+	if _, _, changed, flapping := tracker.DetectChange("enc-sup", hookAFlap, expires); !changed || !flapping {
+		t.Fatalf("expected B->A flap lock, changed=%v flapping=%v", changed, flapping)
+	}
+	if !tracker.ShouldSuppressStandardAlert("enc-sup", hookAFlap, expires) {
+		t.Fatalf("B->A flap lock event should suppress standard alert")
+	}
+
+	// Same-species update should still be allowed.
+	if _, _, changed, flapping := tracker.DetectChange("enc-sup", hookAStatUpdate, expires); changed || flapping {
+		t.Fatalf("expected same-species update not to be treated as change, changed=%v flapping=%v", changed, flapping)
+	}
+	if tracker.ShouldSuppressStandardAlert("enc-sup", hookAStatUpdate, expires) {
+		t.Fatalf("same-species update should not suppress standard alert")
+	}
+
+	// Pair flip while locked should suppress.
+	if _, _, changed, flapping := tracker.DetectChange("enc-sup", hookBFormVariant, expires); changed || flapping {
+		t.Fatalf("expected pair flip variant to be suppressed as change, changed=%v flapping=%v", changed, flapping)
+	}
+	if !tracker.ShouldSuppressStandardAlert("enc-sup", hookBFormVariant, expires) {
+		t.Fatalf("pair flip variant while locked should suppress standard alert")
+	}
+}
