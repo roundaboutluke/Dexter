@@ -142,14 +142,14 @@
   "platform": "discord",
   "template": {
     "embed": {
-      "title": "Raid against {{fullName}} has started at {{{gymName}}}! {{#ex}}(Ex){{/ex}}",
+      "title": "{{levelName}} raid against {{fullName}} has started at {{{gymName}}}! {{#ex}}(Ex){{/ex}}",
       "description": "CP: {{cp}}, quick: {{quickMoveName}}, charge: {{chargeMoveName}} \n Maps: [Google]({{{googleMapUrl}}}) | [Apple]({{{appleMapUrl}}})",
       "color": "{{gymColor}}",
       "thumbnail": {
         "url": "{{{imgUrl}}}"
       },
       "author": {
-        "name": "{{fullName}} {{levelName}} raid. End: {{time}} in {{tthm}}m {{tths}}s",
+        "name": "End: {{time}} in {{tthm}}m {{tths}}s",
         "icon_url": "{{{imgUrl}}}"
       },
       "image": {
@@ -180,7 +180,7 @@
   "platform": "discord",
   "template": {
     "embed": {
-      "title": "{{levelName}} raid Egg at {{{gymName}}} {{#ex}}(Ex){{/ex}}",
+      "title": "{{levelName}} egg at {{{gymName}}} {{#ex}}(Ex){{/ex}}",
       "description": "Maps: [Google]({{{googleMapUrl}}}) | [Apple]({{{appleMapUrl}}})",
       "color": "{{gymColor}}",
       "thumbnail": {
@@ -203,7 +203,7 @@
   "default": true,
   "platform": "telegram",
   "template": {
-    "content": "{{levelName}} raid Egg at {{{gymName}}} {{#ex}}(Ex){{/ex}}\nHatch at: {{time}} in {{tthm}}m {{tths}}s\nMaps: [Google]({{{googleMapUrl}}}) | [Apple]({{{appleMapUrl}}})",
+    "content": "{{levelName}} egg at {{{gymName}}} {{#ex}}(Ex){{/ex}}\nHatch at: {{time}} in {{tthm}}m {{tths}}s\nMaps: [Google]({{{googleMapUrl}}}) | [Apple]({{{appleMapUrl}}})",
     "sticker": "{{{stickerUrl}}}",
     "parse_mode": "Markdown",
     "location": true,
