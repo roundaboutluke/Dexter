@@ -669,28 +669,7 @@ func (s *Sender) scheduleDiscordDelete(channelID, messageID, token string, delet
 	if s.cleanDiscord != nil {
 		s.cleanDiscord.Add(entry)
 	}
-	endpoint := fmt.Sprintf("https://discord.com/api/v10/channels/%s/messages/%s", channelID, messageID)
-	headers := map[string]string{"Authorization": "Bot " + token}
-	delay := time.Until(deleteAt)
-	if delay < 0 {
-		delay = 0
-	}
-	time.AfterFunc(delay, func() {
-		req, err := http.NewRequest(http.MethodDelete, endpoint, nil)
-		if err != nil {
-			return
-		}
-		for key, value := range headers {
-			req.Header.Set(key, value)
-		}
-		_, _ = s.client.Do(req)
-		if s.cleanDiscord != nil {
-			s.cleanDiscord.Remove(entry)
-		}
-		if updateKey != "" {
-			s.updateDiscord.Remove(entryTarget, updateKey)
-		}
-	})
+	s.scheduleDiscordDeleteAttempt(entry, channelID, token, updateKey, 0)
 }
 
 func (s *Sender) scheduleDiscordWebhookDelete(url, messageID string, deleteAt time.Time, updateKey string) {
@@ -706,24 +685,7 @@ func (s *Sender) scheduleDiscordWebhookDelete(url, messageID string, deleteAt ti
 	if s.cleanWebhook != nil {
 		s.cleanWebhook.Add(entry)
 	}
-	endpoint := fmt.Sprintf("%s/messages/%s", url, messageID)
-	delay := time.Until(deleteAt)
-	if delay < 0 {
-		delay = 0
-	}
-	time.AfterFunc(delay, func() {
-		req, err := http.NewRequest(http.MethodDelete, endpoint, nil)
-		if err != nil {
-			return
-		}
-		_, _ = s.client.Do(req)
-		if s.cleanWebhook != nil {
-			s.cleanWebhook.Remove(entry)
-		}
-		if updateKey != "" {
-			s.updateWebhook.Remove(url, updateKey)
-		}
-	})
+	s.scheduleDiscordWebhookDeleteAttempt(entry, url, updateKey, 0)
 }
 
 func (s *Sender) scheduleTelegramDelete(token, chatID string, messageID int, deleteAt time.Time, updateKey string) {
@@ -757,6 +719,129 @@ func (s *Sender) scheduleTelegramDelete(token, chatID string, messageID int, del
 			s.updateTelegram.Remove(chatID, updateKey)
 		}
 	})
+}
+
+func (s *Sender) scheduleDiscordDeleteAttempt(entry cleanEntry, channelID, token, updateKey string, attempt int) {
+	deleteAt := time.Unix(0, entry.DeleteAt*int64(time.Millisecond))
+	delay := time.Until(deleteAt)
+	if delay < 0 {
+		delay = 0
+	}
+	time.AfterFunc(delay, func() {
+		retryAfter, terminal, err := s.deleteDiscordChannelMessage(channelID, entry.MessageID, token)
+		if terminal && err == nil {
+			if s.cleanDiscord != nil {
+				s.cleanDiscord.Remove(entry)
+			}
+			if updateKey != "" && s.updateDiscord != nil {
+				s.updateDiscord.Remove(entry.Target, updateKey)
+			}
+			return
+		}
+		if logger := logging.Get().Discord; logger != nil && err != nil {
+			logger.Warnf("discord clean delete failed (%s/%s), retrying: %v", channelID, entry.MessageID, err)
+		}
+		nextAt := time.Now().Add(cleanRetryDelay(entry, attempt, retryAfter))
+		entry.DeleteAt = nextAt.UnixMilli()
+		if s.cleanDiscord != nil {
+			s.cleanDiscord.Add(entry)
+		}
+		s.scheduleDiscordDeleteAttempt(entry, channelID, token, updateKey, attempt+1)
+	})
+}
+
+func (s *Sender) scheduleDiscordWebhookDeleteAttempt(entry cleanEntry, url, updateKey string, attempt int) {
+	deleteAt := time.Unix(0, entry.DeleteAt*int64(time.Millisecond))
+	delay := time.Until(deleteAt)
+	if delay < 0 {
+		delay = 0
+	}
+	time.AfterFunc(delay, func() {
+		retryAfter, terminal, err := s.deleteDiscordWebhookMessage(url, entry.MessageID)
+		if terminal && err == nil {
+			if s.cleanWebhook != nil {
+				s.cleanWebhook.Remove(entry)
+			}
+			if updateKey != "" && s.updateWebhook != nil {
+				s.updateWebhook.Remove(url, updateKey)
+			}
+			return
+		}
+		if logger := logging.Get().Discord; logger != nil && err != nil {
+			logger.Warnf("discord webhook clean delete failed (%s), retrying: %v", entry.MessageID, err)
+		}
+		nextAt := time.Now().Add(cleanRetryDelay(entry, attempt, retryAfter))
+		entry.DeleteAt = nextAt.UnixMilli()
+		if s.cleanWebhook != nil {
+			s.cleanWebhook.Add(entry)
+		}
+		s.scheduleDiscordWebhookDeleteAttempt(entry, url, updateKey, attempt+1)
+	})
+}
+
+func (s *Sender) deleteDiscordChannelMessage(channelID, messageID, token string) (time.Duration, bool, error) {
+	endpoint := fmt.Sprintf("https://discord.com/api/v10/channels/%s/messages/%s", channelID, messageID)
+	headers := map[string]string{"Authorization": "Bot " + token}
+	status, respHeaders, respBody, err := s.doRawRequest(http.MethodDelete, endpoint, nil, "", headers)
+	if err != nil {
+		return 0, false, err
+	}
+	return classifyDiscordDeleteResponse(status, respHeaders, respBody)
+}
+
+func (s *Sender) deleteDiscordWebhookMessage(url, messageID string) (time.Duration, bool, error) {
+	endpoint := fmt.Sprintf("%s/messages/%s", url, messageID)
+	status, respHeaders, respBody, err := s.doRawRequest(http.MethodDelete, endpoint, nil, "", nil)
+	if err != nil {
+		return 0, false, err
+	}
+	return classifyDiscordDeleteResponse(status, respHeaders, respBody)
+}
+
+func classifyDiscordDeleteResponse(status int, headers http.Header, body []byte) (time.Duration, bool, error) {
+	switch {
+	case status >= 200 && status < 300:
+		return 0, true, nil
+	case status == http.StatusTooManyRequests:
+		return discordRetryAfter(headers, body), false, fmt.Errorf("http %d: rate limited", status)
+	case status == http.StatusNotFound:
+		// Treat "already gone" as success for cleanup.
+		return 0, true, nil
+	case status == http.StatusBadRequest || status == http.StatusUnauthorized || status == http.StatusForbidden:
+		// Permanent failure classes for cleanup delete; avoid retry loops.
+		return 0, true, nil
+	default:
+		return 0, false, fmt.Errorf("http %d: %s", status, strings.TrimSpace(string(body)))
+	}
+}
+
+func cleanRetryDelay(entry cleanEntry, attempt int, retryAfter time.Duration) time.Duration {
+	base := retryAfter
+	if base <= 0 {
+		backoff := []time.Duration{
+			5 * time.Minute,
+			15 * time.Minute,
+			30 * time.Minute,
+			60 * time.Minute,
+			2 * time.Hour,
+		}
+		if attempt < 0 {
+			attempt = 0
+		}
+		if attempt >= len(backoff) {
+			base = backoff[len(backoff)-1]
+		} else {
+			base = backoff[attempt]
+		}
+	}
+	// Add deterministic jitter to avoid synchronized retry spikes.
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(entry.Type))
+	_, _ = h.Write([]byte(entry.Target))
+	_, _ = h.Write([]byte(entry.MessageID))
+	_, _ = h.Write([]byte{byte(attempt)})
+	jitter := time.Duration(h.Sum32()%15000) * time.Millisecond
+	return base + jitter
 }
 
 func (s *Sender) postJSONRaw(endpoint string, payload any, headers map[string]string) (int, string, error) {
