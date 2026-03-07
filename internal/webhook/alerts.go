@@ -1962,7 +1962,7 @@ func buildRenderData(p *Processor, hook *Hook, match alertMatch) map[string]any 
 			data["oldSlotsAvailable"] = getInt(hook.Message["old_slots_available"])
 			data["trainerCount"] = 6 - getInt(hook.Message["slots_available"])
 			data["oldTrainerCount"] = 6 - getInt(hook.Message["old_slots_available"])
-			data["inBattle"] = getBool(hook.Message["is_in_battle"]) || getBool(hook.Message["in_battle"])
+			data["inBattle"] = gymInBattle(hook.Message)
 			oldTeamNameEng, _, _ := teamDetails(p, getInt(data["oldTeamId"]))
 			prevTeamNameEng, prevTeamEmojiKey, _ := teamDetails(p, getInt(data["previousControlId"]))
 			data["teamNameEng"] = teamNameEng
@@ -3807,7 +3807,7 @@ func uiconsURL(baseURL, imageType string, hook *Hook, shinyPossible bool) string
 		if team == 0 {
 			team = getInt(hook.Message["team"])
 		}
-		inBattle := getBool(hook.Message["is_in_battle"]) || getBool(hook.Message["in_battle"])
+		inBattle := gymInBattle(hook.Message)
 		ex := getBool(hook.Message["is_exclusive"]) || getBool(hook.Message["exclusive"])
 		if url, ok := client.GymIcon(team, 0, inBattle, ex); ok {
 			return url
@@ -7943,7 +7943,7 @@ func matchGym(hook *Hook, row map[string]any) bool {
 	}
 	oldTeamRaw, hasOldTeam := hook.Message["old_team_id"]
 	oldTeam := getInt(oldTeamRaw)
-	inBattle := getBool(hook.Message["is_in_battle"]) || getBool(hook.Message["in_battle"])
+	inBattle := gymInBattle(hook.Message)
 	if hasOldTeam && oldTeam == team {
 		oldSlots := getInt(hook.Message["old_slots_available"])
 		newSlots := getInt(hook.Message["slots_available"])

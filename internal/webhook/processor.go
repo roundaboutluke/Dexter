@@ -1680,7 +1680,7 @@ func (p *Processor) dedupeGym(hook *Hook) bool {
 		id = getString(hook.Message["gym_id"])
 	}
 	team := teamFromHookMessage(hook.Message)
-	inBattle := getBool(hook.Message["is_in_battle"]) || getBool(hook.Message["in_battle"])
+	inBattle := gymInBattle(hook.Message)
 	cacheKey := fmt.Sprintf("%s_battle", id)
 	if inBattle {
 		p.cache.Set(cacheKey, 5*time.Minute)
@@ -1880,6 +1880,51 @@ func getBool(value any) bool {
 		return s == "true" || s == "1"
 	}
 	return false
+}
+
+// gymInBattle mirrors PoracleJS gym handling:
+// `const inBattle = hook.message.is_in_battle ?? hook.message.in_battle ?? 0`
+// followed by normal JS truthiness checks.
+func gymInBattle(message map[string]any) bool {
+	if message == nil {
+		return false
+	}
+	if raw, ok := message["is_in_battle"]; ok && raw != nil {
+		return jsTruthy(raw)
+	}
+	if raw, ok := message["in_battle"]; ok && raw != nil {
+		return jsTruthy(raw)
+	}
+	return false
+}
+
+func jsTruthy(value any) bool {
+	switch v := value.(type) {
+	case nil:
+		return false
+	case bool:
+		return v
+	case int:
+		return v != 0
+	case int64:
+		return v != 0
+	case float64:
+		return v != 0
+	case float32:
+		return v != 0
+	case json.Number:
+		if parsed, err := v.Float64(); err == nil {
+			return parsed != 0
+		}
+		return false
+	case string:
+		return v != ""
+	case []byte:
+		return len(v) > 0
+	default:
+		// Non-null objects/arrays are truthy in JS.
+		return true
+	}
 }
 
 func teamFromHookMessage(message map[string]any) int {
