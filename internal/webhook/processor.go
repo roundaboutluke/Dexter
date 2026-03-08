@@ -1682,12 +1682,13 @@ func (p *Processor) dedupeGym(hook *Hook) bool {
 	team := teamFromHookMessage(hook.Message)
 	inBattle := gymInBattle(hook.Message)
 	cacheKey := fmt.Sprintf("%s_battle", id)
+	tooSoon := p.cache.Get(cacheKey)
 	if inBattle {
 		p.cache.Set(cacheKey, 5*time.Minute)
 	}
 	cached := p.gymCache.Get(id)
 	if cached != nil {
-		if cached.TeamID == team && cached.SlotsAvailable == getInt(hook.Message["slots_available"]) && p.cache.Get(cacheKey) {
+		if cached.TeamID == team && cached.SlotsAvailable == getInt(hook.Message["slots_available"]) && tooSoon {
 			return false
 		}
 		hook.Message["old_team_id"] = cached.TeamID

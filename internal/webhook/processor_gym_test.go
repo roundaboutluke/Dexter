@@ -153,3 +153,46 @@ func TestMatchGymBattleChangesTreatsStringInBattleAsTrue(t *testing.T) {
 		t.Fatalf("expected gym battle match for JS-truthy in_battle string")
 	}
 }
+
+func TestDedupeGymAllowsFirstBattleUpdateBeforeCooldown(t *testing.T) {
+	p := &Processor{
+		cache:    NewTTLCache(),
+		gymCache: NewGymCache(),
+	}
+
+	// Seed the previous non-battle state so the next webhook looks like a same-team/same-slot battle change.
+	p.gymCache.Set("gym3", GymState{
+		TeamID:         2,
+		SlotsAvailable: 4,
+		LastOwnerID:    2,
+		InBattle:       false,
+	})
+
+	firstBattle := &Hook{
+		Type: "gym",
+		Message: map[string]any{
+			"id":              "gym3",
+			"team_id":         2,
+			"slots_available": 4,
+			"in_battle":       true,
+		},
+	}
+
+	if !p.dedupeGym(firstBattle) {
+		t.Fatalf("expected first in-battle update to pass before cooldown is applied")
+	}
+
+	secondBattle := &Hook{
+		Type: "gym",
+		Message: map[string]any{
+			"id":              "gym3",
+			"team_id":         2,
+			"slots_available": 4,
+			"in_battle":       true,
+		},
+	}
+
+	if p.dedupeGym(secondBattle) {
+		t.Fatalf("expected repeated in-battle update during cooldown to be suppressed")
+	}
+}
