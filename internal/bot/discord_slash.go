@@ -3016,6 +3016,11 @@ func (d *Discord) handleSlashRemove(s *discordgo.Session, i *discordgo.Interacti
 		d.respondEphemeral(s, i, "Tracking not found.")
 		return
 	}
+	// Keep slash removals in parity with text commands and legacy API deletes:
+	// monster alerts may still match from the fastMonsters cache until it is refreshed.
+	if d.manager != nil && d.manager.processor != nil {
+		d.manager.processor.RefreshAlertCacheAsync()
+	}
 	if strings.EqualFold(uid, "all") || strings.EqualFold(uid, "everything") {
 		d.respondEphemeral(s, i, fmt.Sprintf("Removed %d tracking entries.", removed))
 		return
