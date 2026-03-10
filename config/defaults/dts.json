@@ -626,16 +626,220 @@
       "embed": {
         "fields": [
           {
-            "name": "Getting Started",
-            "value": "Use `/profile` to set your **location**, choose **areas**, and configure your **scheduler** (active/quiet hours)."
+            "name": "Setup",
+            "value": "Use `{{prefix}}profile` to set your saved **location**, choose **areas**, and configure **quiet hours**. Most slash alerts work best once your profile is set."
           },
           {
-            "name": "Tracking",
-            "value": "`{{prefix}}track` Pokémon spawns\n`{{prefix}}raid` raids (boss/level, optional gym)\n`{{prefix}}egg` raid eggs\n`{{prefix}}maxbattle` max battles (optional station)\n`{{prefix}}quest` quests\n`{{prefix}}invasion` Team Rocket invasions\n`{{prefix}}lure` lures\n`{{prefix}}gym` gym changes (team/slots)\n`{{prefix}}fort` Pokéstop/Gym edits (new/removal/name/photo/location)\n`{{prefix}}nest` nests (Pokémon + min spawns)\n`{{prefix}}weather` weather alerts (uses your saved location if omitted)"
+            "name": "Add Alerts",
+            "value": "`{{prefix}}track` Pokemon spawns\n`{{prefix}}raid` bosses or raid levels\n`{{prefix}}egg` raid eggs by level\n`{{prefix}}maxbattle` max battles\n`{{prefix}}quest` quest rewards\n`{{prefix}}invasion` Team Rocket invasions\n`{{prefix}}gym`, `{{prefix}}fort`, `{{prefix}}nest`, `{{prefix}}weather`, `{{prefix}}lure`\n\nSlash tip: on the major tracking commands, leaving the first option blank opens a guided flow."
           },
           {
-            "name": "Manage",
-            "value": "`{{prefix}}tracked` show current tracking\n`{{prefix}}remove` remove a tracking entry\n`{{prefix}}start` enable alerts\n`{{prefix}}stop` disable alerts\n`{{prefix}}language` change language\n`{{prefix}}info` look up moves/items/weather/Pokémon\n`{{prefix}}help` show this help"
+            "name": "Manage Alerts",
+            "value": "`{{prefix}}tracked` review your alerts\n`{{prefix}}tracked profile:<profile>` view one profile\n`{{prefix}}tracked profile:all` show a cross-profile summary\n`{{prefix}}remove` remove one alert\n`{{prefix}}remove profile:<profile>` remove from a chosen profile\n`{{prefix}}start` and `{{prefix}}stop` enable or pause alerts"
+          },
+          {
+            "name": "Advanced",
+            "value": "`{{prefix}}language` changes your language\n`{{prefix}}info` looks up Pokemon, moves, items, weather, rarity, shiny lists, and translation help\n`{{prefix}}help command:<name>` shows focused help for a specific command"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "track",
+    "language": "en",
+    "type": "help",
+    "default": false,
+    "platform": "discord",
+    "template": {
+      "embed": {
+        "fields": [
+          {
+            "name": "Quick Start",
+            "value": "`{{prefix}}track pokemon:<name>` tracks one Pokemon.\n`{{prefix}}track pokemon:everything` tracks everything.\nWhen using slash commands, leaving `pokemon` blank opens a guided flow."
+          },
+          {
+            "name": "Useful Filters",
+            "value": "IV: `min_iv`, `max_iv`\nStats: `min_atk`, `min_def`, `min_sta`\nLevel/CP: `min_level`, `max_level`, `min_cp`, `max_cp`\nOther: `gender`, `size`, `distance`, `form`, `clean`, `template`"
+          },
+          {
+            "name": "Next Step",
+            "value": "After adding a track, use `{{prefix}}tracked` to confirm which profile it was saved to."
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "raid",
+    "language": "en",
+    "type": "help",
+    "default": false,
+    "platform": "discord",
+    "template": {
+      "embed": {
+        "fields": [
+          {
+            "name": "Boss Or Level",
+            "value": "`{{prefix}}raid type:<boss>` tracks a raid boss.\n`{{prefix}}raid type:<level>` tracks a raid level.\nWhen using slash commands, leaving `type` blank opens a guided flow."
+          },
+          {
+            "name": "Optional Filters",
+            "value": "`gym` narrows to one gym\n`team` filters by gym ownership\n`rsvp` filters RSVP state\n`distance`, `clean`, and `template` work here too"
+          },
+          {
+            "name": "Related",
+            "value": "Use `{{prefix}}egg` for egg alerts and `{{prefix}}maxbattle` for max battle alerts."
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "quest",
+    "language": "en",
+    "type": "help",
+    "default": false,
+    "platform": "discord",
+    "template": {
+      "embed": {
+        "fields": [
+          {
+            "name": "Rewards",
+            "value": "`{{prefix}}quest type:<pokemon>` tracks Pokemon rewards.\n`{{prefix}}quest type:<item>` tracks item rewards.\nSlash users can leave `type` blank to use the guided flow."
+          },
+          {
+            "name": "Filters",
+            "value": "`min_amount` only applies to item rewards.\n`ar` filters AR vs non-AR quests.\n`distance`, `clean`, and `template` are also supported."
+          },
+          {
+            "name": "Setup Reminder",
+            "value": "Quest tracking depends on your saved location and selected areas being set correctly in `{{prefix}}profile`."
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "invasion",
+    "language": "en",
+    "type": "help",
+    "default": false,
+    "platform": "discord",
+    "template": {
+      "embed": {
+        "fields": [
+          {
+            "name": "Types",
+            "value": "`{{prefix}}invasion type:<leader>` tracks leaders.\n`{{prefix}}invasion type:<grunt>` tracks grunt lineups.\nSlash users can leave `type` blank to use the guided flow."
+          },
+          {
+            "name": "Filters",
+            "value": "`distance`, `clean`, and `template` are supported.\nAutocomplete helps with the known grunt and leader names."
+          },
+          {
+            "name": "Review",
+            "value": "Use `{{prefix}}tracked` after adding an invasion alert to confirm the saved profile."
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "tracked",
+    "language": "en",
+    "type": "help",
+    "default": false,
+    "platform": "discord",
+    "template": {
+      "embed": {
+        "fields": [
+          {
+            "name": "Default View",
+            "value": "`{{prefix}}tracked` shows the detailed list for your current effective profile."
+          },
+          {
+            "name": "Profile Scope",
+            "value": "`{{prefix}}tracked profile:<profile>` shows one specific profile.\n`{{prefix}}tracked profile:all` shows a summary across every profile without dumping the full list."
+          },
+          {
+            "name": "Large Lists",
+            "value": "If one profile has a very large tracking list, Poracle sends it as a text file instead of truncating the details."
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "remove",
+    "language": "en",
+    "type": "help",
+    "default": false,
+    "platform": "discord",
+    "template": {
+      "embed": {
+        "fields": [
+          {
+            "name": "Basic Use",
+            "value": "`{{prefix}}remove type:<kind> tracking:<entry>` removes one alert.\nAutocomplete is based on the selected tracking type."
+          },
+          {
+            "name": "Profile Scope",
+            "value": "By default, slash removal works inside your current effective profile.\nUse `profile:<profile>` to target one profile, or `profile:all` to search across every profile."
+          },
+          {
+            "name": "Tip",
+            "value": "If you are unsure where something was saved, run `{{prefix}}tracked profile:all` first."
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "profile",
+    "language": "en",
+    "type": "help",
+    "default": false,
+    "platform": "discord",
+    "template": {
+      "embed": {
+        "fields": [
+          {
+            "name": "What It Controls",
+            "value": "`{{prefix}}profile` manages your saved location, selected areas, active profile, and quiet-hour scheduler."
+          },
+          {
+            "name": "Why It Matters",
+            "value": "Most tracking commands save into your current effective profile and rely on your saved location or chosen areas."
+          },
+          {
+            "name": "Recommended Setup",
+            "value": "1. Set location\n2. Pick areas\n3. Review profile names\n4. Add a scheduler only if you actually use quiet hours"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "info",
+    "language": "en",
+    "type": "help",
+    "default": false,
+    "platform": "discord",
+    "template": {
+      "embed": {
+        "fields": [
+          {
+            "name": "Lookups",
+            "value": "`{{prefix}}info type:pokemon pokemon:<name>`\n`{{prefix}}info type:moves`\n`{{prefix}}info type:items`\n`{{prefix}}info type:weather`\n`{{prefix}}info type:rarity`\n`{{prefix}}info type:shiny`\n`{{prefix}}info type:translate`"
+          },
+          {
+            "name": "Guided Flow",
+            "value": "When using slash commands, leaving `type` blank opens a chooser. If you pick Pokemon, Poracle then prompts for the Pokemon name."
+          },
+          {
+            "name": "Weather Info",
+            "value": "Weather info can use your saved location or coordinates that you enter directly in the slash flow."
           }
         ]
       }

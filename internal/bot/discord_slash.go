@@ -14,6 +14,7 @@ import (
 	"poraclego/internal/command"
 	"poraclego/internal/config"
 	"poraclego/internal/geofence"
+	"poraclego/internal/i18n"
 	"poraclego/internal/logging"
 	"poraclego/internal/scanner"
 	"poraclego/internal/tileserver"
@@ -30,6 +31,10 @@ const (
 	slashEggLevelSelect              = "poracle:track:egg:level"
 	slashQuestInput                  = "poracle:track:quest:input"
 	slashInvasionInput               = "poracle:track:invasion:input"
+	slashGymTeamSelect               = "poracle:track:gym:team"
+	slashFortTypeSelect              = "poracle:track:fort:type"
+	slashWeatherConditionSelect      = "poracle:track:weather:condition"
+	slashLureTypeSelect              = "poracle:track:lure:type"
 	slashFiltersModal                = "poracle:track:filters"
 	slashConfirmButton               = "poracle:track:confirm"
 	slashCancelButton                = "poracle:track:cancel"
@@ -68,6 +73,7 @@ const (
 	slashProfileDeleteConfirm        = "poracle:profile:delete:confirm:"
 	slashProfileDeleteCancel         = "poracle:profile:delete:cancel:"
 	slashInfoCancelButton            = "poracle:info:cancel"
+	slashInfoTypeSelect              = "poracle:info:type"
 	slashInfoTranslateModal          = "poracle:info:translate"
 	slashInfoWeatherModal            = "poracle:info:weather"
 	slashInfoWeatherUseSaved         = "poracle:info:weather:saved"
@@ -259,9 +265,20 @@ func (d *Discord) handleSlashAutocomplete(s *discordgo.Session, i *discordgo.Int
 			choices = d.autocompleteInfoPokemonChoices(query)
 		}
 	case "remove":
-		if focused.Name == "tracking" {
+		if focused.Name == "profile" {
+			choices = d.autocompleteProfileChoices(i, query, true)
+		} else if focused.Name == "tracking" {
 			trackingType, _ := optionString(options, "type")
-			choices = d.autocompleteRemoveTrackingChoices(query, trackingType, i)
+			profileToken, _ := optionString(options, "profile")
+			choices = d.autocompleteRemoveTrackingChoices(query, trackingType, profileToken, i)
+		}
+	case "tracked":
+		if focused.Name == "profile" {
+			choices = d.autocompleteProfileChoices(i, query, true)
+		}
+	case "help":
+		if focused.Name == "command" {
+			choices = d.autocompleteHelpCommandChoices(query)
 		}
 	}
 
@@ -278,6 +295,13 @@ func (d *Discord) handleSlashComponent(s *discordgo.Session, i *discordgo.Intera
 	data := i.MessageComponentData()
 	if data.CustomID == slashInfoCancelButton {
 		d.respondEphemeral(s, i, "Canceled.")
+		return
+	}
+	if data.CustomID == slashInfoTypeSelect {
+		if len(data.Values) == 0 {
+			return
+		}
+		d.handleSlashInfoTypeChoice(s, i, data.Values[0])
 		return
 	}
 	if data.CustomID == slashInfoWeatherUseSaved {
@@ -515,10 +539,19 @@ func (d *Discord) handleSlashComponent(s *discordgo.Session, i *discordgo.Intera
 			d.respondWithRaidInput(s, i)
 		case "egg":
 			d.respondWithEggLevelSelect(s, i)
+		case "maxbattle":
+			d.respondWithRaidInput(s, i)
+		case "nest", "info-pokemon":
+			d.respondWithMonsterSearch(s, i)
 		}
 		return
 	case slashMonsterSelect:
 		if len(data.Values) == 0 {
+			return
+		}
+		if state.Command == "info" && state.Step == "info-pokemon" {
+			d.clearSlashState(i.Member, i.User)
+			d.executeSlashLineDeferred(s, i, "info "+data.Values[0])
 			return
 		}
 		state.Args = []string{data.Values[0]}
@@ -532,6 +565,39 @@ func (d *Discord) handleSlashComponent(s *discordgo.Session, i *discordgo.Intera
 		d.respondWithFiltersPrompt(s, i, state)
 		return
 	case slashEggLevelSelect:
+		if len(data.Values) == 0 {
+			return
+		}
+		state.Args = []string{data.Values[0]}
+		d.respondWithFiltersPrompt(s, i, state)
+		return
+	case slashGymTeamSelect:
+		if len(data.Values) == 0 {
+			return
+		}
+		state.Args = []string{data.Values[0]}
+		d.respondWithFiltersPrompt(s, i, state)
+		return
+	case slashFortTypeSelect:
+		if len(data.Values) == 0 {
+			return
+		}
+		state.Args = []string{data.Values[0]}
+		d.respondWithFiltersPrompt(s, i, state)
+		return
+	case slashWeatherConditionSelect:
+		if len(data.Values) == 0 {
+			return
+		}
+		args, errText := d.guidedWeatherArgs(i, data.Values[0])
+		if errText != "" {
+			d.respondEphemeral(s, i, errText)
+			return
+		}
+		state.Args = args
+		d.respondWithFiltersPrompt(s, i, state)
+		return
+	case slashLureTypeSelect:
 		if len(data.Values) == 0 {
 			return
 		}
@@ -636,6 +702,10 @@ func (d *Discord) handleSlashModal(s *discordgo.Session, i *discordgo.Interactio
 			d.respondEphemeral(s, i, "Please enter a Pokemon name or ID.")
 			return
 		}
+		if state.Command == "info" && state.Step == "info-pokemon" && strings.EqualFold(strings.TrimSpace(query), "everything") {
+			d.respondEphemeral(s, i, "Please pick a specific Pokemon.")
+			return
+		}
 		if strings.EqualFold(strings.TrimSpace(query), "everything") {
 			state.Args = []string{"everything"}
 			d.respondWithFiltersPrompt(s, i, state)
@@ -719,6 +789,14 @@ func (d *Discord) respondWithEggOptions(s *discordgo.Session, i *discordgo.Inter
 	})
 }
 
+func (d *Discord) respondWithMaxbattleOptions(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	d.respondWithButtons(s, i, "Track a max battle boss, level, or everything?", []discordgo.MessageComponent{
+		discordgo.Button{CustomID: slashChooseEverything, Label: "Everything", Style: discordgo.PrimaryButton},
+		discordgo.Button{CustomID: slashChooseSearch, Label: "Boss/Level", Style: discordgo.SecondaryButton},
+		discordgo.Button{CustomID: slashCancelButton, Label: "Cancel", Style: discordgo.DangerButton},
+	})
+}
+
 func (d *Discord) respondWithQuestInput(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	d.respondWithModal(s, i, slashQuestInput, "Quest filters", "Filters", "reward:items d500 clean")
 }
@@ -746,6 +824,72 @@ func (d *Discord) respondWithEggLevelSelect(s *discordgo.Session, i *discordgo.I
 
 func (d *Discord) respondWithFiltersInput(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	d.respondWithModal(s, i, slashFiltersModal, "Extra filters", "Args", "atk:15 def:15 sta:15 d500 clean")
+}
+
+func (d *Discord) respondWithGymTeamSelect(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	options := []discordgo.SelectMenuOption{
+		{Label: "Everything", Value: "everything"},
+		{Label: "Mystic (Blue)", Value: "mystic"},
+		{Label: "Valor (Red)", Value: "valor"},
+		{Label: "Instinct (Yellow)", Value: "instinct"},
+		{Label: "Uncontested", Value: "uncontested"},
+		{Label: "Normal", Value: "normal"},
+	}
+	d.respondWithSelectMenu(s, i, "Select a gym team", slashGymTeamSelect, options)
+}
+
+func (d *Discord) respondWithFortTypeSelect(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	options := []discordgo.SelectMenuOption{
+		{Label: "Everything", Value: "everything"},
+		{Label: "Pokestop", Value: "pokestop"},
+		{Label: "Gym", Value: "gym"},
+	}
+	d.respondWithSelectMenu(s, i, "Select a fort type", slashFortTypeSelect, options)
+}
+
+func (d *Discord) respondWithWeatherConditionSelect(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	choices := d.autocompleteWeatherChoices("")
+	if len(choices) == 0 {
+		d.respondEphemeral(s, i, "No weather conditions found.")
+		return
+	}
+	options := make([]discordgo.SelectMenuOption, 0, len(choices))
+	for _, choice := range choices {
+		if choice == nil {
+			continue
+		}
+		options = append(options, discordgo.SelectMenuOption{
+			Label: choice.Name,
+			Value: fmt.Sprintf("%v", choice.Value),
+		})
+	}
+	d.respondWithSelectMenu(s, i, "Select a weather condition", slashWeatherConditionSelect, options)
+}
+
+func (d *Discord) respondWithLureTypeSelect(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	options := []discordgo.SelectMenuOption{
+		{Label: "Everything", Value: "everything"},
+		{Label: "Basic", Value: "basic"},
+		{Label: "Glacial", Value: "glacial"},
+		{Label: "Mossy", Value: "mossy"},
+		{Label: "Magnetic", Value: "magnetic"},
+		{Label: "Rainy", Value: "rainy"},
+		{Label: "Golden", Value: "sparkly"},
+	}
+	d.respondWithSelectMenu(s, i, "Select a lure type", slashLureTypeSelect, options)
+}
+
+func (d *Discord) respondWithInfoTypeSelect(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	options := []discordgo.SelectMenuOption{
+		{Label: "Pokemon", Value: "pokemon"},
+		{Label: "Moves", Value: "moves"},
+		{Label: "Items", Value: "items"},
+		{Label: "Weather", Value: "weather"},
+		{Label: "Rarity", Value: "rarity"},
+		{Label: "Shiny", Value: "shiny"},
+		{Label: "Translate", Value: "translate"},
+	}
+	d.respondWithSelectMenu(s, i, "What do you want to look up?", slashInfoTypeSelect, options)
 }
 
 func (d *Discord) respondWithFiltersPrompt(s *discordgo.Session, i *discordgo.InteractionCreate, state *slashBuilderState) {
@@ -1209,10 +1353,25 @@ func (d *Discord) promptSlashConfirmation(s *discordgo.Session, i *discordgo.Int
 		ExpiresAt: time.Now().Add(5 * time.Minute),
 	}
 	d.setSlashState(i.Member, i.User, state)
+	commandLine := strings.TrimSpace(state.Command + " " + strings.Join(state.Args, " "))
+	profileNo, profileLabel := d.effectiveProfileInfo(i)
+	contextFields := []*discordgo.MessageEmbedField{
+		{Name: "Profile", Value: profileLabel, Inline: true},
+		{Name: "Command", Value: commandLine, Inline: false},
+	}
 	if len(fields) == 0 {
-		commandLine := strings.TrimSpace(state.Command + " " + strings.Join(state.Args, " "))
-		fields = []*discordgo.MessageEmbedField{
-			{Name: "command", Value: commandLine, Inline: false},
+		fields = contextFields
+	} else {
+		fields = append(fields, contextFields...)
+	}
+	if profileNo > 0 && len(fields) > 0 {
+		for _, field := range fields {
+			if field == nil {
+				continue
+			}
+			if field.Name == "Profile" {
+				field.Value = profileLabel
+			}
 		}
 	}
 	embed := &discordgo.MessageEmbed{
@@ -1735,6 +1894,101 @@ func appendRangeArg(args []string, prefix, maxPrefix string, minVal, maxVal *int
 	return append(args, fmt.Sprintf("%s%d", maxPrefix, *maxVal))
 }
 
+func (d *Discord) startSlashGuide(i *discordgo.InteractionCreate, commandName, step string) {
+	state := &slashBuilderState{
+		Command:   commandName,
+		Step:      step,
+		ExpiresAt: time.Now().Add(5 * time.Minute),
+	}
+	d.setSlashState(i.Member, i.User, state)
+}
+
+func (d *Discord) logSlashUX(i *discordgo.InteractionCreate, commandName, action, detail string) {
+	logger := logging.Get().Discord
+	if logger == nil || i == nil {
+		return
+	}
+	userID, _ := slashUser(i)
+	if detail != "" {
+		logger.Infof("slash ux: command=%s action=%s user=%s detail=%s", commandName, action, userID, detail)
+		return
+	}
+	logger.Infof("slash ux: command=%s action=%s user=%s", commandName, action, userID)
+}
+
+func (d *Discord) effectiveProfileInfo(i *discordgo.InteractionCreate) (int, string) {
+	if d == nil || d.manager == nil || d.manager.query == nil {
+		return 1, "Profile 1"
+	}
+	userID, _ := slashUser(i)
+	if userID == "" {
+		return 1, "Profile 1"
+	}
+	profileNo := d.userProfileNo(userID)
+	profiles, err := d.manager.query.SelectAllQuery("profiles", map[string]any{"id": userID})
+	if err != nil {
+		return profileNo, fmt.Sprintf("Profile %d", profileNo)
+	}
+	if row := profileRowByNo(profiles, profileNo); row != nil {
+		return profileNo, profileDisplayName(row)
+	}
+	return profileNo, fmt.Sprintf("Profile %d", profileNo)
+}
+
+func (d *Discord) guidedWeatherArgs(i *discordgo.InteractionCreate, condition string) ([]string, string) {
+	condition = strings.TrimSpace(condition)
+	if condition == "" {
+		return nil, "Please pick a weather condition."
+	}
+	userID, _ := slashUser(i)
+	location := ""
+	if d.manager != nil && d.manager.query != nil && userID != "" {
+		if row, err := d.manager.query.SelectOneQuery("humans", map[string]any{"id": userID}); err == nil && row != nil {
+			lat := toFloat(row["latitude"])
+			lon := toFloat(row["longitude"])
+			if lat != 0 || lon != 0 {
+				location = fmt.Sprintf("%s,%s", formatFloat(lat), formatFloat(lon))
+			} else if d.manager.fences != nil {
+				areas := parseAreaListFromHuman(row)
+				if len(areas) > 0 {
+					target := strings.ToLower(strings.TrimSpace(areas[0]))
+					for _, fence := range d.manager.fences.Fences {
+						if strings.EqualFold(strings.TrimSpace(fence.Name), target) {
+							if centerLat, centerLon, ok := fenceCentroid(fence); ok {
+								location = fmt.Sprintf("%s,%s", formatFloat(centerLat), formatFloat(centerLon))
+							}
+							break
+						}
+					}
+				}
+			}
+		}
+	}
+	if location == "" {
+		return nil, "Set a saved location in `/profile`, or provide a location with `/weather condition:<condition> location:<place>`."
+	}
+	args := append(strings.Fields(location), "|", condition)
+	return args, ""
+}
+
+func profileDisplayName(row map[string]any) string {
+	if row == nil {
+		return "Profile"
+	}
+	profileNo := toInt(row["profile_no"], 0)
+	name := ""
+	if raw, ok := row["name"]; ok && raw != nil {
+		name = strings.TrimSpace(fmt.Sprintf("%v", raw))
+	}
+	if name == "" {
+		return fmt.Sprintf("Profile %d", profileNo)
+	}
+	if profileNo > 0 {
+		return fmt.Sprintf("%s (P%d)", name, profileNo)
+	}
+	return name
+}
+
 func (d *Discord) executeSlashCommand(s *discordgo.Session, i *discordgo.InteractionCreate, state *slashBuilderState) {
 	if state == nil {
 		d.respondEphemeral(s, i, "No command to run.")
@@ -1793,29 +2047,46 @@ func (d *Discord) executeSlashLineDeferred(s *discordgo.Session, i *discordgo.In
 	}
 }
 
-func (d *Discord) buildSlashReply(s *discordgo.Session, i *discordgo.InteractionCreate, line string) string {
-	if line == "" {
-		return "No command to run."
+func (d *Discord) buildSlashContext(s *discordgo.Session, i *discordgo.InteractionCreate) *command.Context {
+	if d == nil || d.manager == nil || i == nil {
+		return nil
 	}
 	channelName := ""
 	isDM := i.GuildID == ""
-	if channel, err := s.Channel(i.ChannelID); err == nil && channel != nil {
-		channelName = channel.Name
-		if channel.Type == discordgo.ChannelTypeDM || channel.Type == discordgo.ChannelTypeGroupDM {
-			isDM = true
+	if s != nil {
+		if channel, err := s.Channel(i.ChannelID); err == nil && channel != nil {
+			channelName = channel.Name
+			if channel.Type == discordgo.ChannelTypeDM || channel.Type == discordgo.ChannelTypeGroupDM {
+				isDM = true
+			}
 		}
 	}
 	roles := []string{}
 	userID, userName := slashUser(i)
-	isAdmin := containsID(d.manager.cfg, "discord.admins", userID)
-	if isDM {
-		roles = d.rolesForDM(s, userID)
-	} else if channelName != "" {
-		if member, err := s.GuildMember(i.GuildID, userID); err == nil && member != nil {
-			roles = append(roles, member.Roles...)
+	isAdmin := false
+	if d.manager.cfg != nil {
+		isAdmin = containsID(d.manager.cfg, "discord.admins", userID)
+	}
+	if s != nil {
+		if isDM {
+			roles = d.rolesForDM(s, userID)
+		} else if channelName != "" {
+			if member, err := s.GuildMember(i.GuildID, userID); err == nil && member != nil {
+				roles = append(roles, member.Roles...)
+			}
 		}
 	}
-	ctx := d.manager.Context("discord", "", "/", userID, userName, i.ChannelID, channelName, isDM, isAdmin, roles, ".")
+	return d.manager.Context("discord", "", "/", userID, userName, i.ChannelID, channelName, isDM, isAdmin, roles, ".")
+}
+
+func (d *Discord) buildSlashReply(s *discordgo.Session, i *discordgo.InteractionCreate, line string) string {
+	if line == "" {
+		return "No command to run."
+	}
+	ctx := d.buildSlashContext(s, i)
+	if ctx == nil {
+		return "No command to run."
+	}
 	tokens := splitQuotedArgs(line)
 	if len(tokens) > 0 {
 		if disabled, ok := ctx.Config.GetStringSlice("general.disabledCommands"); ok {
@@ -1838,9 +2109,12 @@ func (d *Discord) handleSlashTrack(s *discordgo.Session, i *discordgo.Interactio
 	options := slashOptions(i.ApplicationCommandData())
 	pokemon, ok := optionString(options, "pokemon")
 	if !ok || strings.TrimSpace(pokemon) == "" {
-		d.respondEphemeral(s, i, "Please pick a Pokemon.")
+		d.startSlashGuide(i, "track", "monster")
+		d.logSlashUX(i, "track", "guide_entry", "")
+		d.respondWithMonsterOptions(s, i)
 		return
 	}
+	d.logSlashUX(i, "track", "direct_submit", "")
 	pokemon = strings.TrimSpace(pokemon)
 	args := []string{pokemon}
 	if strings.EqualFold(pokemon, "everything") {
@@ -1920,9 +2194,12 @@ func (d *Discord) handleSlashRaid(s *discordgo.Session, i *discordgo.Interaction
 	options := slashOptions(i.ApplicationCommandData())
 	raidType, ok := optionString(options, "type")
 	if !ok || strings.TrimSpace(raidType) == "" {
-		d.respondEphemeral(s, i, "Please pick a raid type.")
+		d.startSlashGuide(i, "raid", "raid")
+		d.logSlashUX(i, "raid", "guide_entry", "")
+		d.respondWithRaidOptions(s, i)
 		return
 	}
+	d.logSlashUX(i, "raid", "direct_submit", "")
 	args := []string{normalizeRaidType(strings.TrimSpace(raidType))}
 	if value, ok := optionString(options, "team"); ok {
 		switch strings.ToLower(value) {
@@ -1959,9 +2236,12 @@ func (d *Discord) handleSlashMaxbattle(s *discordgo.Session, i *discordgo.Intera
 	options := slashOptions(i.ApplicationCommandData())
 	mbType, ok := optionString(options, "type")
 	if !ok || strings.TrimSpace(mbType) == "" {
-		d.respondEphemeral(s, i, "Please pick a max battle type.")
+		d.startSlashGuide(i, "maxbattle", "maxbattle")
+		d.logSlashUX(i, "maxbattle", "guide_entry", "")
+		d.respondWithMaxbattleOptions(s, i)
 		return
 	}
+	d.logSlashUX(i, "maxbattle", "direct_submit", "")
 	args := []string{normalizeRaidType(strings.TrimSpace(mbType))}
 	if value, ok := optionBool(options, "gmax_only"); ok && value {
 		args = append(args, "gmax")
@@ -1985,9 +2265,12 @@ func (d *Discord) handleSlashEgg(s *discordgo.Session, i *discordgo.InteractionC
 	options := slashOptions(i.ApplicationCommandData())
 	level, ok := optionString(options, "level")
 	if !ok || strings.TrimSpace(level) == "" {
-		d.respondEphemeral(s, i, "Please pick an egg level.")
+		d.startSlashGuide(i, "egg", "egg")
+		d.logSlashUX(i, "egg", "guide_entry", "")
+		d.respondWithEggOptions(s, i)
 		return
 	}
+	d.logSlashUX(i, "egg", "direct_submit", "")
 	args := []string{}
 	if ok && strings.TrimSpace(level) != "" {
 		args = append(args, normalizeRaidType(strings.TrimSpace(level)))
@@ -2027,9 +2310,12 @@ func (d *Discord) handleSlashQuest(s *discordgo.Session, i *discordgo.Interactio
 	options := slashOptions(i.ApplicationCommandData())
 	questType, ok := optionString(options, "type")
 	if !ok || strings.TrimSpace(questType) == "" {
-		d.respondEphemeral(s, i, "Please pick a quest reward.")
+		d.startSlashGuide(i, "quest", "quest")
+		d.logSlashUX(i, "quest", "guide_entry", "")
+		d.respondWithQuestInput(s, i)
 		return
 	}
+	d.logSlashUX(i, "quest", "direct_submit", "")
 	questType = strings.TrimSpace(questType)
 	if minAmount, ok := optionInt(options, "min_amount"); ok && minAmount > 0 {
 		if strings.HasPrefix(strings.ToLower(questType), "stardust") {
@@ -2061,9 +2347,12 @@ func (d *Discord) handleSlashIncident(s *discordgo.Session, i *discordgo.Interac
 	options := slashOptions(i.ApplicationCommandData())
 	incidentType, ok := optionString(options, "type")
 	if !ok || strings.TrimSpace(incidentType) == "" {
-		d.respondEphemeral(s, i, "Please pick an invasion type.")
+		d.startSlashGuide(i, "invasion", "invasion")
+		d.logSlashUX(i, "invasion", "guide_entry", "")
+		d.respondWithInvasionInput(s, i)
 		return
 	}
+	d.logSlashUX(i, "invasion", "direct_submit", "")
 	args := []string{formatInvasionArg(strings.TrimSpace(incidentType))}
 	if value, ok := optionInt(options, "distance"); ok && value > 0 {
 		args = append(args, fmt.Sprintf("d%d", value))
@@ -2081,9 +2370,12 @@ func (d *Discord) handleSlashGym(s *discordgo.Session, i *discordgo.InteractionC
 	options := slashOptions(i.ApplicationCommandData())
 	team, ok := optionString(options, "team")
 	if !ok || strings.TrimSpace(team) == "" {
-		d.respondEphemeral(s, i, "Please pick a team.")
+		d.startSlashGuide(i, "gym", "gym")
+		d.logSlashUX(i, "gym", "guide_entry", "")
+		d.respondWithGymTeamSelect(s, i)
 		return
 	}
+	d.logSlashUX(i, "gym", "direct_submit", "")
 	args := []string{strings.ToLower(strings.TrimSpace(team))}
 	if value, ok := optionBool(options, "slot_changes"); ok && value {
 		args = append(args, "slot_changes")
@@ -2136,6 +2428,13 @@ func (d *Discord) handleSlashFort(s *discordgo.Session, i *discordgo.Interaction
 	if value, ok := optionString(options, "template"); ok && strings.TrimSpace(value) != "" {
 		args = append(args, "template:"+strings.TrimSpace(value))
 	}
+	if len(args) == 0 {
+		d.startSlashGuide(i, "fort", "fort")
+		d.logSlashUX(i, "fort", "guide_entry", "")
+		d.respondWithFortTypeSelect(s, i)
+		return
+	}
+	d.logSlashUX(i, "fort", "direct_submit", "")
 	d.promptSlashConfirmation(s, i, "fort", args, d.confirmTitle("fort"), d.confirmFields(i))
 }
 
@@ -2143,9 +2442,12 @@ func (d *Discord) handleSlashNest(s *discordgo.Session, i *discordgo.Interaction
 	options := slashOptions(i.ApplicationCommandData())
 	pokemon, ok := optionString(options, "pokemon")
 	if !ok || strings.TrimSpace(pokemon) == "" {
-		d.respondEphemeral(s, i, "Please pick a Pokemon.")
+		d.startSlashGuide(i, "nest", "nest")
+		d.logSlashUX(i, "nest", "guide_entry", "")
+		d.respondWithMonsterSearch(s, i)
 		return
 	}
+	d.logSlashUX(i, "nest", "direct_submit", "")
 	args := []string{strings.TrimSpace(pokemon)}
 	if value, ok := optionInt(options, "min_spawn"); ok && value > 0 {
 		args = append(args, fmt.Sprintf("minspawn%d", value))
@@ -2166,9 +2468,12 @@ func (d *Discord) handleSlashWeather(s *discordgo.Session, i *discordgo.Interact
 	options := slashOptions(i.ApplicationCommandData())
 	condition, ok := optionString(options, "condition")
 	if !ok || strings.TrimSpace(condition) == "" {
-		d.respondEphemeral(s, i, "Please pick a weather condition.")
+		d.startSlashGuide(i, "weather", "weather")
+		d.logSlashUX(i, "weather", "guide_entry", "")
+		d.respondWithWeatherConditionSelect(s, i)
 		return
 	}
+	d.logSlashUX(i, "weather", "direct_submit", "")
 	location, _ := optionString(options, "location")
 	location = strings.TrimSpace(location)
 	if location == "" {
@@ -2216,9 +2521,12 @@ func (d *Discord) handleSlashLure(s *discordgo.Session, i *discordgo.Interaction
 	options := slashOptions(i.ApplicationCommandData())
 	lureType, ok := optionString(options, "type")
 	if !ok || strings.TrimSpace(lureType) == "" {
-		d.respondEphemeral(s, i, "Please pick a lure type.")
+		d.startSlashGuide(i, "lure", "lure")
+		d.logSlashUX(i, "lure", "guide_entry", "")
+		d.respondWithLureTypeSelect(s, i)
 		return
 	}
+	d.logSlashUX(i, "lure", "direct_submit", "")
 	args := []string{strings.TrimSpace(lureType)}
 	if value, ok := optionInt(options, "distance"); ok && value > 0 {
 		args = append(args, fmt.Sprintf("d%d", value))
@@ -2996,10 +3304,16 @@ func (d *Discord) handleSlashRemove(s *discordgo.Session, i *discordgo.Interacti
 		return
 	}
 
-	userID, _ := slashUser(i)
-	// Do not scope removals to current_profile_no: scheduler-driven quiet hours can set
-	// current_profile_no=0, which would otherwise prevent users from removing their trackings.
-	where := map[string]any{"id": userID}
+	profileToken, _ := optionString(options, "profile")
+	selection, errText := d.resolveSlashProfileSelection(i, profileToken)
+	if errText != "" {
+		d.respondEphemeral(s, i, errText)
+		return
+	}
+	where := map[string]any{"id": selection.UserID}
+	if selection.Mode != slashProfileScopeAll && selection.ProfileNo > 0 {
+		where["profile_no"] = selection.ProfileNo
+	}
 	if !strings.EqualFold(uid, "all") && !strings.EqualFold(uid, "everything") {
 		where["uid"] = parseUID(uid)
 	}
@@ -3009,11 +3323,12 @@ func (d *Discord) handleSlashRemove(s *discordgo.Session, i *discordgo.Interacti
 		return
 	}
 	if removed == 0 {
+		target := selection.TargetLabel()
 		if strings.EqualFold(uid, "all") || strings.EqualFold(uid, "everything") {
-			d.respondEphemeral(s, i, "No tracking entries found.")
+			d.respondEphemeral(s, i, fmt.Sprintf("No tracking entries found in %s.", target))
 			return
 		}
-		d.respondEphemeral(s, i, "Tracking not found.")
+		d.respondEphemeral(s, i, fmt.Sprintf("Tracking not found in %s.", target))
 		return
 	}
 	// Keep slash removals in parity with text commands and legacy API deletes:
@@ -3021,15 +3336,25 @@ func (d *Discord) handleSlashRemove(s *discordgo.Session, i *discordgo.Interacti
 	if d.manager != nil && d.manager.processor != nil {
 		d.manager.processor.RefreshAlertCacheAsync()
 	}
+	d.logSlashUX(i, "remove", "scope", selection.LogValue())
 	if strings.EqualFold(uid, "all") || strings.EqualFold(uid, "everything") {
-		d.respondEphemeral(s, i, fmt.Sprintf("Removed %d tracking entries.", removed))
+		target := selection.TargetLabel()
+		d.respondEphemeral(s, i, fmt.Sprintf("Removed %d tracking entries from %s. Next: use `/tracked` to review your alerts.", removed, target))
 		return
 	}
-	d.respondEphemeral(s, i, "Tracking removed.")
+	d.respondEphemeral(s, i, fmt.Sprintf("Tracking removed from %s. Next: use `/tracked` to review your alerts.", selection.TargetLabel()))
 }
 
 func (d *Discord) handleSlashTracked(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	d.executeSlashLineDeferred(s, i, "tracked")
+	d.respondDeferredEphemeral(s, i)
+	reply := d.buildSlashTrackedReply(s, i)
+	if reply == "" {
+		reply = "Done."
+	}
+	if d.sendSpecialSlashReply(s, i, reply) {
+		return
+	}
+	d.respondEditMessage(s, i, reply, nil)
 }
 
 func (d *Discord) handleSlashStart(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -3044,9 +3369,20 @@ func (d *Discord) handleSlashHelp(s *discordgo.Session, i *discordgo.Interaction
 	// Use a dedicated DTS help template for slash users, so legacy `!help` can stay focused on legacy commands.
 	// Falls back to default `help` behaviour if the template does not exist.
 	d.respondDeferredEphemeral(s, i)
-	reply := d.buildSlashReply(s, i, "help slash")
+	options := slashOptions(i.ApplicationCommandData())
+	commandName, _ := optionString(options, "command")
+	commandName = strings.ToLower(strings.TrimSpace(commandName))
+	line := "help slash"
+	if commandName != "" {
+		line = "help " + commandName
+	}
+	reply := d.buildSlashReply(s, i, line)
 	if strings.TrimSpace(reply) == "🙅" {
-		reply = d.buildSlashReply(s, i, "help")
+		if commandName != "" {
+			reply = fmt.Sprintf("No dedicated help is available for `%s` yet. Try `/help`.", commandName)
+		} else {
+			reply = d.buildSlashReply(s, i, "help")
+		}
 	}
 	if reply == "" {
 		reply = "Done."
@@ -3063,7 +3399,7 @@ func (d *Discord) handleSlashInfo(s *discordgo.Session, i *discordgo.Interaction
 
 	infoType, ok := optionString(options, "type")
 	if !ok || strings.TrimSpace(infoType) == "" {
-		d.respondEphemeral(s, i, "Please pick an info type.")
+		d.respondWithInfoTypeSelect(s, i)
 		return
 	}
 	infoType = strings.ToLower(strings.TrimSpace(infoType))
@@ -3073,7 +3409,8 @@ func (d *Discord) handleSlashInfo(s *discordgo.Session, i *discordgo.Interaction
 		pokemon, _ := optionString(options, "pokemon")
 		pokemon = strings.TrimSpace(pokemon)
 		if pokemon == "" {
-			d.respondEphemeral(s, i, "Please pick a Pokemon.")
+			d.startSlashGuide(i, "info", "info-pokemon")
+			d.respondWithMonsterSearch(s, i)
 			return
 		}
 		if strings.EqualFold(pokemon, "everything") {
@@ -3094,6 +3431,513 @@ func (d *Discord) handleSlashInfo(s *discordgo.Session, i *discordgo.Interaction
 	default:
 		d.executeSlashLineDeferred(s, i, "info")
 	}
+}
+
+func (d *Discord) handleSlashInfoTypeChoice(s *discordgo.Session, i *discordgo.InteractionCreate, value string) {
+	infoType := strings.ToLower(strings.TrimSpace(value))
+	if infoType == "" {
+		d.respondEphemeral(s, i, "Please pick something to look up.")
+		return
+	}
+	d.logSlashUX(i, "info", "guide_choice", infoType)
+	switch infoType {
+	case "pokemon":
+		d.startSlashGuide(i, "info", "info-pokemon")
+		d.respondWithMonsterSearch(s, i)
+	case "moves", "items", "rarity", "shiny":
+		d.executeSlashLineDeferred(s, i, "info "+infoType)
+	case "weather":
+		d.respondWithButtons(s, i, "Weather info: use your saved location or enter coordinates?", []discordgo.MessageComponent{
+			discordgo.Button{CustomID: slashInfoWeatherUseSaved, Label: "Use saved location", Style: discordgo.PrimaryButton},
+			discordgo.Button{CustomID: slashInfoWeatherEnterCoordinates, Label: "Enter coordinates", Style: discordgo.SecondaryButton},
+			discordgo.Button{CustomID: slashInfoCancelButton, Label: "Cancel", Style: discordgo.DangerButton},
+		})
+	case "translate":
+		d.respondWithModal(s, i, slashInfoTranslateModal, "Translate", "Text", "Bonjour")
+	default:
+		d.executeSlashLineDeferred(s, i, "info "+infoType)
+	}
+}
+
+func slashCommandAllowed(ctx *command.Context, commandName string) bool {
+	if ctx == nil || ctx.Config == nil {
+		return true
+	}
+	disabled, _ := ctx.Config.GetStringSlice("general.disabledCommands")
+	for _, entry := range disabled {
+		if strings.EqualFold(entry, commandName) {
+			return false
+		}
+	}
+	if ctx.Platform != "discord" {
+		return true
+	}
+	raw, ok := ctx.Config.Get("discord.commandSecurity")
+	if !ok {
+		return true
+	}
+	security, ok := raw.(map[string]any)
+	if !ok {
+		return true
+	}
+	list, ok := security[commandName]
+	if !ok {
+		return true
+	}
+	switch values := list.(type) {
+	case []any:
+		for _, item := range values {
+			value := strings.TrimSpace(fmt.Sprintf("%v", item))
+			if value == "" {
+				continue
+			}
+			if value == ctx.UserID {
+				return true
+			}
+			for _, role := range ctx.Roles {
+				if value == role {
+					return true
+				}
+			}
+		}
+		return false
+	case []string:
+		for _, value := range values {
+			if value == ctx.UserID {
+				return true
+			}
+			for _, role := range ctx.Roles {
+				if value == role {
+					return true
+				}
+			}
+		}
+		return false
+	default:
+		return true
+	}
+}
+
+func containsAnyFold(values []string, targets ...string) bool {
+	for _, value := range values {
+		for _, target := range targets {
+			if strings.EqualFold(strings.TrimSpace(value), strings.TrimSpace(target)) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (d *Discord) slashTranslator(locale string) *i18n.Translator {
+	if d != nil && d.manager != nil && d.manager.i18n != nil {
+		return d.manager.i18n.Translator(locale)
+	}
+	tr, _ := i18n.NewTranslator(".", locale)
+	return tr
+}
+
+func (d *Discord) slashTrackingDisabled(key string) bool {
+	if d == nil || d.manager == nil || d.manager.cfg == nil {
+		return false
+	}
+	disabled, _ := d.manager.cfg.GetBool(key)
+	return disabled
+}
+
+func (d *Discord) slashTrackedAreaText(tr *i18n.Translator, human map[string]any) string {
+	selected := parseAreaListFromHuman(human)
+	if len(selected) == 0 {
+		return tr.Translate("You have not selected any area yet", false)
+	}
+	names := []string{}
+	if d != nil && d.manager != nil && d.manager.fences != nil {
+		for _, fence := range d.manager.fences.Fences {
+			if containsString(selected, strings.ToLower(strings.TrimSpace(fence.Name))) {
+				names = append(names, fence.Name)
+			}
+		}
+	}
+	if len(names) == 0 {
+		names = append(names, selected...)
+	}
+	return fmt.Sprintf("%s %s", tr.Translate("You are currently set to receive alarms in", false), strings.Join(names, ", "))
+}
+
+func (d *Discord) slashTrackedBlockedAlerts(human map[string]any) []string {
+	blocked := []string{}
+	if raw, ok := human["blocked_alerts"].(string); ok && raw != "" {
+		_ = json.Unmarshal([]byte(raw), &blocked)
+	}
+	return blocked
+}
+
+func (d *Discord) slashTrackedSimpleSection(userID string, profileNo int, blocked []string, tr *i18n.Translator, table, disabledKey, blockedText, emptyText, heading string, blockedKeys []string, rowText func(map[string]any) string) string {
+	if d.slashTrackingDisabled(disabledKey) {
+		return ""
+	}
+	if containsAnyFold(blocked, blockedKeys...) {
+		return blockedText
+	}
+	rows, err := d.manager.query.SelectAllQuery(table, map[string]any{"id": userID, "profile_no": profileNo})
+	if err != nil {
+		return ""
+	}
+	if len(rows) == 0 {
+		return emptyText
+	}
+	lines := []string{heading}
+	for _, row := range rows {
+		lines = append(lines, rowText(row))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (d *Discord) slashTrackedCategoryDetails(userID string, profileNo int, blocked []string, tr *i18n.Translator) string {
+	sections := []string{}
+
+	if !d.slashTrackingDisabled("general.disablePokemon") {
+		if containsAnyFold(blocked, "monster") {
+			sections = append(sections, tr.Translate("You do not have permission to track monsters", false))
+		} else if rows, err := d.manager.query.SelectAllQuery("monsters", map[string]any{"id": userID, "profile_no": profileNo}); err == nil {
+			if len(rows) == 0 {
+				sections = append(sections, tr.Translate("You're not tracking any monsters", false))
+			} else {
+				lines := []string{tr.Translate("You're tracking the following monsters:", false)}
+				for _, row := range rows {
+					lines = append(lines, tracking.MonsterRowText(d.manager.cfg, tr, d.manager.data, row))
+				}
+				if containsAnyFold(blocked, "pvp") {
+					lines = append(lines, tr.Translate("Your permission level means you will not get results from PVP tracking", false))
+				}
+				sections = append(sections, strings.Join(lines, "\n"))
+			}
+		}
+	}
+
+	if !d.slashTrackingDisabled("general.disableRaid") {
+		if containsAnyFold(blocked, "raid") {
+			sections = append(sections, tr.Translate("You do not have permission to track raids", false))
+		} else if containsAnyFold(blocked, "egg") {
+			sections = append(sections, tr.Translate("You do not have permission to track eggs", false))
+		} else {
+			raids, _ := d.manager.query.SelectAllQuery("raid", map[string]any{"id": userID, "profile_no": profileNo})
+			eggs, _ := d.manager.query.SelectAllQuery("egg", map[string]any{"id": userID, "profile_no": profileNo})
+			if len(raids) == 0 && len(eggs) == 0 {
+				sections = append(sections, tr.Translate("You're not tracking any raids", false))
+			} else {
+				lines := []string{tr.Translate("You're tracking the following raids:", false)}
+				for _, row := range raids {
+					lines = append(lines, tracking.RaidRowText(d.manager.cfg, tr, d.manager.data, row, d.manager.scanner))
+				}
+				for _, row := range eggs {
+					lines = append(lines, tracking.EggRowText(d.manager.cfg, tr, d.manager.data, row, d.manager.scanner))
+				}
+				sections = append(sections, strings.Join(lines, "\n"))
+			}
+		}
+	}
+
+	if section := d.slashTrackedSimpleSection(
+		userID,
+		profileNo,
+		blocked,
+		tr,
+		"maxbattle",
+		"general.disableMaxBattle",
+		tr.Translate("You do not have permission to track max battles", false),
+		tr.Translate("You're not tracking any max battles", false),
+		tr.Translate("You're tracking the following max battles:", false),
+		[]string{"maxbattle"},
+		func(row map[string]any) string {
+			return tracking.MaxbattleRowText(d.manager.cfg, tr, d.manager.data, row)
+		},
+	); section != "" {
+		sections = append(sections, section)
+	}
+
+	if section := d.slashTrackedSimpleSection(
+		userID,
+		profileNo,
+		blocked,
+		tr,
+		"quest",
+		"general.disableQuest",
+		tr.Translate("You do not have permission to track quests", false),
+		tr.Translate("You're not tracking any quests", false),
+		tr.Translate("You're tracking the following quests:", false),
+		[]string{"quest"},
+		func(row map[string]any) string {
+			return tracking.QuestRowText(d.manager.cfg, tr, d.manager.data, row)
+		},
+	); section != "" {
+		sections = append(sections, section)
+	}
+
+	if section := d.slashTrackedSimpleSection(
+		userID,
+		profileNo,
+		blocked,
+		tr,
+		"invasion",
+		"general.disableInvasion",
+		tr.Translate("You do not have permission to track invasions", false),
+		tr.Translate("You're not tracking any invasions", false),
+		tr.Translate("You're tracking the following invasions:", false),
+		[]string{"invasion"},
+		func(row map[string]any) string {
+			return tracking.InvasionRowText(d.manager.cfg, tr, d.manager.data, row)
+		},
+	); section != "" {
+		sections = append(sections, section)
+	}
+
+	if section := d.slashTrackedSimpleSection(
+		userID,
+		profileNo,
+		blocked,
+		tr,
+		"lures",
+		"general.disableLure",
+		tr.Translate("You do not have permission to track lures", false),
+		tr.Translate("You're not tracking any lures", false),
+		tr.Translate("You're tracking the following lures:", false),
+		[]string{"lure"},
+		func(row map[string]any) string {
+			return tracking.LureRowText(d.manager.cfg, tr, d.manager.data, row)
+		},
+	); section != "" {
+		sections = append(sections, section)
+	}
+
+	if section := d.slashTrackedSimpleSection(
+		userID,
+		profileNo,
+		blocked,
+		tr,
+		"nests",
+		"general.disableNest",
+		tr.Translate("You do not have permission to track nests", false),
+		tr.Translate("You're not tracking any nests", false),
+		tr.Translate("You're tracking the following nests:", false),
+		[]string{"nest"},
+		func(row map[string]any) string {
+			return tracking.NestRowText(d.manager.cfg, tr, d.manager.data, row)
+		},
+	); section != "" {
+		sections = append(sections, section)
+	}
+
+	if section := d.slashTrackedSimpleSection(
+		userID,
+		profileNo,
+		blocked,
+		tr,
+		"gym",
+		"general.disableGym",
+		tr.Translate("You do not have permission to track gyms", false),
+		tr.Translate("You're not tracking any gyms", false),
+		tr.Translate("You're tracking the following gyms:", false),
+		[]string{"gym"},
+		func(row map[string]any) string {
+			return tracking.GymRowText(d.manager.cfg, tr, d.manager.data, row, d.manager.scanner)
+		},
+	); section != "" {
+		sections = append(sections, section)
+	}
+
+	if section := d.slashTrackedSimpleSection(
+		userID,
+		profileNo,
+		blocked,
+		tr,
+		"forts",
+		"general.disableFortUpdate",
+		tr.Translate("You do not have permission to track fort changes", false),
+		tr.Translate("You're not tracking any fort changes", false),
+		tr.Translate("You're tracking the following fort changes:", false),
+		[]string{"forts"},
+		func(row map[string]any) string {
+			return tracking.FortUpdateRowText(d.manager.cfg, tr, d.manager.data, row)
+		},
+	); section != "" {
+		sections = append(sections, section)
+	}
+
+	if section := d.slashTrackedSimpleSection(
+		userID,
+		profileNo,
+		blocked,
+		tr,
+		"weather",
+		"general.disableWeather",
+		tr.Translate("You do not have permission to track weather", false),
+		tr.Translate("You're not tracking any weather", false),
+		tr.Translate("You're tracking the following weather:", false),
+		[]string{"weather"},
+		func(row map[string]any) string {
+			return tracking.WeatherRowText(tr, d.manager.data, row)
+		},
+	); section != "" {
+		sections = append(sections, section)
+	}
+
+	if len(sections) == 0 {
+		return tr.Translate("No tracking entries found.", false)
+	}
+	return strings.Join(sections, "\n\n")
+}
+
+type slashTrackedCountSpec struct {
+	Key         string
+	Singular    string
+	Plural      string
+	Table       string
+	DisabledKey string
+	BlockedKeys []string
+}
+
+func slashTrackedCountSpecs() []slashTrackedCountSpec {
+	return []slashTrackedCountSpec{
+		{Key: "monsters", Singular: "monster", Plural: "monsters", Table: "monsters", DisabledKey: "general.disablePokemon", BlockedKeys: []string{"monster"}},
+		{Key: "raids", Singular: "raid", Plural: "raids", Table: "raid", DisabledKey: "general.disableRaid", BlockedKeys: []string{"raid"}},
+		{Key: "eggs", Singular: "egg", Plural: "eggs", Table: "egg", DisabledKey: "general.disableRaid", BlockedKeys: []string{"egg"}},
+		{Key: "maxbattles", Singular: "max battle", Plural: "max battles", Table: "maxbattle", DisabledKey: "general.disableMaxBattle", BlockedKeys: []string{"maxbattle"}},
+		{Key: "quests", Singular: "quest", Plural: "quests", Table: "quest", DisabledKey: "general.disableQuest", BlockedKeys: []string{"quest"}},
+		{Key: "invasions", Singular: "invasion", Plural: "invasions", Table: "invasion", DisabledKey: "general.disableInvasion", BlockedKeys: []string{"invasion"}},
+		{Key: "lures", Singular: "lure", Plural: "lures", Table: "lures", DisabledKey: "general.disableLure", BlockedKeys: []string{"lure"}},
+		{Key: "weather", Singular: "weather alert", Plural: "weather alerts", Table: "weather", DisabledKey: "general.disableWeather", BlockedKeys: []string{"weather"}},
+		{Key: "gyms", Singular: "gym alert", Plural: "gym alerts", Table: "gym", DisabledKey: "general.disableGym", BlockedKeys: []string{"gym"}},
+		{Key: "nests", Singular: "nest", Plural: "nests", Table: "nests", DisabledKey: "general.disableNest", BlockedKeys: []string{"nest"}},
+		{Key: "forts", Singular: "fort change", Plural: "fort changes", Table: "forts", DisabledKey: "general.disableFortUpdate", BlockedKeys: []string{"forts"}},
+	}
+}
+
+func pluralTrackingCount(count int, singular, plural string) string {
+	if count == 1 {
+		return fmt.Sprintf("1 %s", singular)
+	}
+	return fmt.Sprintf("%d %s", count, plural)
+}
+
+func (d *Discord) slashTrackedProfileCounts(userID string, blocked []string) map[int]map[string]int {
+	counts := map[int]map[string]int{}
+	if d == nil || d.manager == nil || d.manager.query == nil || userID == "" {
+		return counts
+	}
+	for _, spec := range slashTrackedCountSpecs() {
+		if d.slashTrackingDisabled(spec.DisabledKey) || containsAnyFold(blocked, spec.BlockedKeys...) {
+			continue
+		}
+		rows, err := d.manager.query.SelectAllQuery(spec.Table, map[string]any{"id": userID})
+		if err != nil {
+			continue
+		}
+		for _, row := range rows {
+			profileNo := toInt(row["profile_no"], 0)
+			if profileNo <= 0 {
+				profileNo = 1
+			}
+			if counts[profileNo] == nil {
+				counts[profileNo] = map[string]int{}
+			}
+			counts[profileNo][spec.Key]++
+		}
+	}
+	return counts
+}
+
+func (d *Discord) buildSlashTrackedAllProfilesSummary(selection slashProfileSelection, tr *i18n.Translator) string {
+	blocked := d.slashTrackedBlockedAlerts(selection.Human)
+	countsByProfile := d.slashTrackedProfileCounts(selection.UserID, blocked)
+	lines := []string{}
+	for _, row := range selection.Profiles {
+		profileNo := toInt(row["profile_no"], 0)
+		counts := countsByProfile[profileNo]
+		if len(counts) == 0 {
+			continue
+		}
+		label := profileDisplayName(row)
+		if profileNo == selection.EffectiveNo {
+			label += " (current)"
+		}
+		parts := []string{}
+		for _, spec := range slashTrackedCountSpecs() {
+			if count := counts[spec.Key]; count > 0 {
+				parts = append(parts, pluralTrackingCount(count, spec.Singular, spec.Plural))
+			}
+		}
+		if len(parts) == 0 {
+			continue
+		}
+		lines = append(lines, fmt.Sprintf("%s: %s", label, strings.Join(parts, ", ")))
+	}
+	if len(lines) == 0 {
+		return "You're not tracking anything in any profile."
+	}
+	header := "Tracking summary across all profiles."
+	if row := profileRowByNo(selection.Profiles, selection.EffectiveNo); row != nil {
+		header = fmt.Sprintf("Tracking summary across all profiles. Current profile: %s.", profileDisplayName(row))
+	}
+	return header + "\n\n" + strings.Join(lines, "\n") + "\n\nUse `/tracked profile:<profile>` for full details."
+}
+
+func (d *Discord) buildSlashTrackedReply(s *discordgo.Session, i *discordgo.InteractionCreate) string {
+	if d == nil || d.manager == nil || d.manager.query == nil {
+		return "Target is not registered."
+	}
+	ctx := d.buildSlashContext(s, i)
+	if ctx == nil {
+		return "Target is not registered."
+	}
+	lang := d.userLanguage(ctx.UserID)
+	tr := d.slashTranslator(lang)
+	if ctx.Config != nil {
+		if disabled, ok := ctx.Config.GetStringSlice("general.disabledCommands"); ok && containsString(disabled, "tracked") {
+			return "That command is disabled."
+		}
+	}
+	if !slashCommandAllowed(ctx, "tracked") {
+		return tr.Translate("You do not have permission to execute this command", false)
+	}
+
+	options := slashOptions(i.ApplicationCommandData())
+	profileToken, _ := optionString(options, "profile")
+	selection, errText := d.resolveSlashProfileSelection(i, profileToken)
+	if errText != "" {
+		return errText
+	}
+	d.logSlashUX(i, "tracked", "scope", selection.LogValue())
+
+	if selection.Mode == slashProfileScopeAll {
+		return d.buildSlashTrackedAllProfilesSummary(selection, tr)
+	}
+
+	lines := []string{fmt.Sprintf("Viewing tracking for %s.", selection.TargetLabel())}
+	alertStatus := map[bool]string{
+		true:  tr.Translate("enabled", false),
+		false: tr.Translate("disabled", false),
+	}[toInt(selection.Human["enabled"], 0) != 0]
+	lines = append(lines, fmt.Sprintf("%s **%s**", tr.Translate("Your alerts are currently", false), alertStatus))
+	lat := toFloat(selection.Human["latitude"])
+	lon := toFloat(selection.Human["longitude"])
+	if lat != 0 && lon != 0 {
+		lines = append(lines, fmt.Sprintf("%s https://maps.google.com/maps?q=%f,%f", tr.Translate("Your location is currently set to", false), lat, lon))
+	} else {
+		lines = append(lines, tr.Translate("You have not set a location yet", false))
+	}
+	if selection.Mode == slashProfileScopeSpecific && selection.ProfileNo != selection.EffectiveNo {
+		if row := profileRowByNo(selection.Profiles, selection.EffectiveNo); row != nil {
+			lines = append(lines, fmt.Sprintf("Current profile: %s.", profileDisplayName(row)))
+		}
+	}
+	sections := []string{strings.Join(lines, "\n"), d.slashTrackedAreaText(tr, selection.Human), d.slashTrackedCategoryDetails(selection.UserID, selection.ProfileNo, d.slashTrackedBlockedAlerts(selection.Human), tr)}
+	message := strings.Join(sections, "\n\n")
+	if len(message) < 4000 {
+		return message
+	}
+	fileName := fmt.Sprintf("tracked-p%d.txt", selection.ProfileNo)
+	return command.FileReply(fileName, fmt.Sprintf("Tracking for %s is attached as a file:", selection.TargetLabel()), message)
 }
 
 func (d *Discord) handleSlashLanguage(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -3166,6 +4010,51 @@ func removeTrackingTable(trackingType string) string {
 	}
 }
 
+const (
+	slashProfileScopeEffective = "effective"
+	slashProfileScopeSpecific  = "specific"
+	slashProfileScopeAll       = "all"
+)
+
+type slashProfileSelection struct {
+	UserID      string
+	Human       map[string]any
+	Profiles    []map[string]any
+	EffectiveNo int
+	Mode        string
+	ProfileNo   int
+}
+
+func (s slashProfileSelection) ProfileRow() map[string]any {
+	if s.Mode == slashProfileScopeAll {
+		return nil
+	}
+	return profileRowByNo(s.Profiles, s.ProfileNo)
+}
+
+func (s slashProfileSelection) TargetLabel() string {
+	if s.Mode == slashProfileScopeAll {
+		return "all profiles"
+	}
+	if row := s.ProfileRow(); row != nil {
+		return profileDisplayName(row)
+	}
+	if s.ProfileNo > 0 {
+		return fmt.Sprintf("Profile %d", s.ProfileNo)
+	}
+	return "your current profile"
+}
+
+func (s slashProfileSelection) LogValue() string {
+	if s.Mode == slashProfileScopeAll {
+		return "all"
+	}
+	if s.ProfileNo > 0 {
+		return fmt.Sprintf("p%d", s.ProfileNo)
+	}
+	return s.Mode
+}
+
 func parseUID(value string) any {
 	if value == "" {
 		return value
@@ -3174,6 +4063,82 @@ func parseUID(value string) any {
 		return parsed
 	}
 	return value
+}
+
+func effectiveProfileNoFromHuman(human map[string]any) int {
+	if human == nil {
+		return 1
+	}
+	current := toInt(human["current_profile_no"], 1)
+	if current > 0 {
+		return current
+	}
+	if preferred := toInt(human["preferred_profile_no"], 0); preferred > 0 {
+		return preferred
+	}
+	return 1
+}
+
+func (d *Discord) loadSlashProfileContext(i *discordgo.InteractionCreate) (string, map[string]any, []map[string]any, string) {
+	if d == nil || d.manager == nil || d.manager.query == nil {
+		return "", nil, nil, "Target is not registered."
+	}
+	userID, _ := slashUser(i)
+	if userID == "" {
+		return "", nil, nil, "Target is not registered."
+	}
+	human, err := d.manager.query.SelectOneQuery("humans", map[string]any{"id": userID})
+	if err != nil || human == nil {
+		return "", nil, nil, "Target is not registered."
+	}
+	profiles, err := d.manager.query.SelectAllQuery("profiles", map[string]any{"id": userID})
+	if err != nil {
+		return "", nil, nil, "Unable to load profiles."
+	}
+	sort.Slice(profiles, func(i, j int) bool {
+		return toInt(profiles[i]["profile_no"], 0) < toInt(profiles[j]["profile_no"], 0)
+	})
+	return userID, human, profiles, ""
+}
+
+func (d *Discord) resolveSlashProfileSelection(i *discordgo.InteractionCreate, token string) (slashProfileSelection, string) {
+	userID, human, profiles, errText := d.loadSlashProfileContext(i)
+	if errText != "" {
+		return slashProfileSelection{}, errText
+	}
+	effectiveNo := effectiveProfileNoFromHuman(human)
+	token = strings.TrimSpace(token)
+	if token == "" || strings.EqualFold(token, "effective") {
+		return slashProfileSelection{
+			UserID:      userID,
+			Human:       human,
+			Profiles:    profiles,
+			EffectiveNo: effectiveNo,
+			Mode:        slashProfileScopeEffective,
+			ProfileNo:   effectiveNo,
+		}, ""
+	}
+	if strings.EqualFold(token, "all") {
+		return slashProfileSelection{
+			UserID:      userID,
+			Human:       human,
+			Profiles:    profiles,
+			EffectiveNo: effectiveNo,
+			Mode:        slashProfileScopeAll,
+		}, ""
+	}
+	row := profileRowByToken(profiles, token)
+	if row == nil {
+		return slashProfileSelection{}, "That profile could not be found."
+	}
+	return slashProfileSelection{
+		UserID:      userID,
+		Human:       human,
+		Profiles:    profiles,
+		EffectiveNo: effectiveNo,
+		Mode:        slashProfileScopeSpecific,
+		ProfileNo:   toInt(row["profile_no"], 0),
+	}, ""
 }
 
 func (d *Discord) userProfileNo(userID string) int {
@@ -5326,16 +6291,97 @@ func (d *Discord) autocompleteTemplateChoices(query, templateType string) []*dis
 	return choices
 }
 
-func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, i *discordgo.InteractionCreate) []*discordgo.ApplicationCommandOptionChoice {
+func (d *Discord) autocompleteProfileChoices(i *discordgo.InteractionCreate, query string, includeAll bool) []*discordgo.ApplicationCommandOptionChoice {
+	if d == nil || d.manager == nil || d.manager.query == nil {
+		return nil
+	}
+	_, human, profiles, errText := d.loadSlashProfileContext(i)
+	if errText != "" {
+		return nil
+	}
+	query = strings.ToLower(strings.TrimSpace(query))
+	effectiveNo := effectiveProfileNoFromHuman(human)
+	choices := []*discordgo.ApplicationCommandOptionChoice{}
+	addChoice := func(label, value string, aliases ...string) {
+		if len(choices) >= 25 || label == "" || value == "" {
+			return
+		}
+		search := strings.ToLower(label + " " + value + " " + strings.Join(aliases, " "))
+		if query != "" && !strings.Contains(search, query) {
+			return
+		}
+		choices = append(choices, &discordgo.ApplicationCommandOptionChoice{
+			Name:  truncateChoiceLabel(label),
+			Value: value,
+		})
+	}
+	if row := profileRowByNo(profiles, effectiveNo); row != nil {
+		addChoice("Current profile: "+profileDisplayName(row), "effective", "current", "effective", fmt.Sprintf("p%d", effectiveNo))
+	} else {
+		addChoice(fmt.Sprintf("Current profile: Profile %d", effectiveNo), "effective", "current", "effective", fmt.Sprintf("p%d", effectiveNo))
+	}
+	for _, row := range profiles {
+		profileNo := toInt(row["profile_no"], 0)
+		if profileNo <= 0 {
+			continue
+		}
+		addChoice(profileDisplayName(row), fmt.Sprintf("%d", profileNo), fmt.Sprintf("profile %d", profileNo), fmt.Sprintf("p%d", profileNo), fmt.Sprintf("%v", row["name"]))
+	}
+	if includeAll {
+		addChoice("All profiles", "all", "all", "every", "summary")
+	}
+	return choices
+}
+
+func (d *Discord) autocompleteHelpCommandChoices(query string) []*discordgo.ApplicationCommandOptionChoice {
+	query = strings.ToLower(strings.TrimSpace(query))
+	ids := []string{}
+	seen := map[string]bool{}
+	if d != nil && d.manager != nil {
+		for _, tpl := range d.manager.templates {
+			if tpl.Type != "help" {
+				continue
+			}
+			if tpl.Platform != "" && !strings.EqualFold(tpl.Platform, "discord") {
+				continue
+			}
+			id := strings.TrimSpace(fmt.Sprintf("%v", tpl.ID))
+			if id == "" || strings.EqualFold(id, "slash") || seen[id] {
+				continue
+			}
+			seen[id] = true
+			ids = append(ids, id)
+		}
+	}
+	if len(ids) == 0 {
+		ids = []string{"track", "raid", "quest", "invasion", "tracked", "remove", "profile", "info"}
+	}
+	sort.Strings(ids)
+	choices := []*discordgo.ApplicationCommandOptionChoice{}
+	for _, id := range ids {
+		if query != "" && !strings.Contains(strings.ToLower(id), query) {
+			continue
+		}
+		choices = append(choices, &discordgo.ApplicationCommandOptionChoice{
+			Name:  id,
+			Value: id,
+		})
+		if len(choices) >= 25 {
+			break
+		}
+	}
+	return choices
+}
+
+func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType, profileToken string, i *discordgo.InteractionCreate) []*discordgo.ApplicationCommandOptionChoice {
 	if d.manager == nil || d.manager.query == nil {
 		return nil
 	}
-	userID, _ := slashUser(i)
-	if userID == "" {
+	selection, errText := d.resolveSlashProfileSelection(i, profileToken)
+	if errText != "" {
 		return nil
 	}
-	profileNo := d.userProfileNo(userID)
-	tr := d.manager.i18n.Translator(d.userLanguage(userID))
+	tr := d.slashTranslator(d.userLanguage(selection.UserID))
 
 	// Discord may send the previously-selected choice value back as the focused query.
 	// Those values look like "type|uid" and should not be used to filter results,
@@ -5387,22 +6433,31 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 		if rowProfile <= 0 {
 			return label
 		}
-		if profileNo == 0 || (profileNo > 0 && rowProfile != profileNo) {
+		if selection.Mode == slashProfileScopeAll {
 			return fmt.Sprintf("P%d: %s", rowProfile, label)
 		}
 		return label
 	}
 
 	whereByUser := func() map[string]any {
-		// Do not scope to profile_no here: if the scheduler set current_profile_no=0 for
-		// quiet hours, we'd return no rows and autocomplete would look broken.
-		return map[string]any{"id": userID}
+		where := map[string]any{"id": selection.UserID}
+		if selection.Mode != slashProfileScopeAll && selection.ProfileNo > 0 {
+			where["profile_no"] = selection.ProfileNo
+		}
+		return where
+	}
+
+	removeAllLabel := func(typeName string) string {
+		if selection.Mode == slashProfileScopeAll {
+			return fmt.Sprintf("Everything in all profiles (%s)", typeName)
+		}
+		return fmt.Sprintf("Everything in %s (%s)", selection.TargetLabel(), typeName)
 	}
 
 	switch strings.ToLower(trackingType) {
 	case "pokemon":
 		if query == "" {
-			appendChoice("Everything (remove all)", "pokemon|all")
+			appendChoice(removeAllLabel("remove all"), "pokemon|all")
 		}
 		rows, err := d.manager.query.SelectAllQueryLimit("monsters", whereByUser(), fetchLimit)
 		if err != nil {
@@ -5421,7 +6476,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 		}
 	case "raid":
 		if query == "" {
-			appendChoice("Everything (remove all)", "raid|all")
+			appendChoice(removeAllLabel("remove all"), "raid|all")
 		}
 		rows, err := d.manager.query.SelectAllQueryLimit("raid", whereByUser(), fetchLimit)
 		if err != nil {
@@ -5440,7 +6495,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 		}
 	case "egg":
 		if query == "" {
-			appendChoice("Everything (remove all)", "egg|all")
+			appendChoice(removeAllLabel("remove all"), "egg|all")
 		}
 		rows, err := d.manager.query.SelectAllQueryLimit("egg", whereByUser(), fetchLimit)
 		if err != nil {
@@ -5459,7 +6514,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 		}
 	case "maxbattle":
 		if query == "" {
-			appendChoice("Everything (remove all)", "maxbattle|all")
+			appendChoice(removeAllLabel("remove all"), "maxbattle|all")
 		}
 		rows, err := d.manager.query.SelectAllQueryLimit("maxbattle", whereByUser(), fetchLimit)
 		if err != nil {
@@ -5478,7 +6533,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 		}
 	case "quest":
 		if query == "" {
-			appendChoice("Everything (remove all)", "quest|all")
+			appendChoice(removeAllLabel("remove all"), "quest|all")
 		}
 		rows, err := d.manager.query.SelectAllQueryLimit("quest", whereByUser(), fetchLimit)
 		if err != nil {
@@ -5497,7 +6552,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 		}
 	case "incident", "invasion":
 		if query == "" {
-			appendChoice("Everything (remove all)", "invasion|all")
+			appendChoice(removeAllLabel("remove all"), "invasion|all")
 		}
 		rows, err := d.manager.query.SelectAllQueryLimit("invasion", whereByUser(), fetchLimit)
 		if err != nil {
@@ -5516,7 +6571,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 		}
 	case "lure":
 		if query == "" {
-			appendChoice("Everything (remove all)", "lure|all")
+			appendChoice(removeAllLabel("remove all"), "lure|all")
 		}
 		rows, err := d.manager.query.SelectAllQueryLimit("lures", whereByUser(), fetchLimit)
 		if err != nil {
@@ -5535,7 +6590,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 		}
 	case "weather":
 		if query == "" {
-			appendChoice("Everything (remove all)", "weather|all")
+			appendChoice(removeAllLabel("remove all"), "weather|all")
 		}
 		rows, err := d.manager.query.SelectAllQueryLimit("weather", whereByUser(), fetchLimit)
 		if err != nil {
@@ -5554,7 +6609,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 		}
 	case "gym":
 		if query == "" {
-			appendChoice("Everything (remove all)", "gym|all")
+			appendChoice(removeAllLabel("remove all"), "gym|all")
 		}
 		rows, err := d.manager.query.SelectAllQueryLimit("gym", whereByUser(), fetchLimit)
 		if err != nil {
@@ -5573,7 +6628,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 		}
 	case "nest":
 		if query == "" {
-			appendChoice("Everything (remove all)", "nest|all")
+			appendChoice(removeAllLabel("remove all"), "nest|all")
 		}
 		rows, err := d.manager.query.SelectAllQueryLimit("nests", whereByUser(), fetchLimit)
 		if err != nil {
@@ -5592,7 +6647,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType string, 
 		}
 	case "fort":
 		if query == "" {
-			appendChoice("Everything (remove all)", "fort|all")
+			appendChoice(removeAllLabel("remove all"), "fort|all")
 		}
 		rows, err := d.manager.query.SelectAllQueryLimit("forts", whereByUser(), fetchLimit)
 		if err != nil {
@@ -5777,18 +6832,12 @@ func (d *Discord) clearSlashState(member *discordgo.Member, user *discordgo.User
 	d.slashMu.Unlock()
 }
 
-func (d *Discord) registerSlashCommands(s *discordgo.Session) {
-	if s == nil || s.State == nil || s.State.User == nil {
-		return
-	}
-	appID := s.State.User.ID
-	deregisterSlashCommands := false
-	slashCommandsDisabled := false
+func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 	maxDistance := 0
 	pvpMaxRank := 0
 	gymBattleEnabled := false
 	hideTemplateOptions := false
-	if d.manager != nil && d.manager.cfg != nil {
+	if d != nil && d.manager != nil && d.manager.cfg != nil {
 		if value, ok := d.manager.cfg.GetInt("tracking.maxDistance"); ok {
 			maxDistance = value
 		}
@@ -5801,55 +6850,12 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 		if value, ok := d.manager.cfg.GetBool("discord.hideTemplateOptions"); ok {
 			hideTemplateOptions = value
 		}
-		// Optional namespaced override.
 		if value, ok := d.manager.cfg.GetBool("discord.slash.hideTemplateOptions"); ok {
 			hideTemplateOptions = value
-		}
-		if value, ok := d.manager.cfg.GetBool("discord.slash.deregisterOnStart"); ok {
-			deregisterSlashCommands = value
-		}
-		if value, ok := d.manager.cfg.GetBool("discord.slash.disabled"); ok {
-			slashCommandsDisabled = value
 		}
 	}
 	if pvpMaxRank <= 0 {
 		pvpMaxRank = 4096
-	}
-
-	if slashCommandsDisabled {
-		// Intentionally do nothing. This is to avoid interfering with other
-		// /command providers that use the same bot token / application.
-		return
-	}
-
-	if deregisterSlashCommands {
-		// Remove global slash commands so the next run can re-register from scratch.
-		logger := logging.Get().Discord
-		deleteFor := func(guildID string) {
-			commands, err := s.ApplicationCommands(appID, guildID)
-			if err != nil {
-				if logger != nil {
-					logger.Warnf("Slash command deregistration failed (guild=%q): %v", guildID, err)
-				}
-				return
-			}
-			for _, cmd := range commands {
-				if cmd == nil || cmd.ID == "" {
-					continue
-				}
-				_ = s.ApplicationCommandDelete(appID, guildID, cmd.ID)
-			}
-			if logger != nil {
-				scope := "global"
-				if guildID != "" {
-					scope = guildID
-				}
-				logger.Infof("Slash commands deregistered (%s): %d", scope, len(commands))
-			}
-		}
-
-		deleteFor("")
-		return
 	}
 
 	distanceOption := func() *discordgo.ApplicationCommandOption {
@@ -5894,8 +6900,7 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 		{
 			Type:         discordgo.ApplicationCommandOptionString,
 			Name:         "pokemon",
-			Description:  "Enter Pokemon name",
-			Required:     true,
+			Description:  "Choose a Pokemon, or leave blank for a guided flow",
 			Autocomplete: true,
 		},
 		{
@@ -5966,8 +6971,7 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 		{
 			Type:        discordgo.ApplicationCommandOptionString,
 			Name:        "team",
-			Description: "Select team",
-			Required:    true,
+			Description: "Choose a team, or leave blank for a guided flow",
 			Choices: []*discordgo.ApplicationCommandOptionChoice{
 				{Name: "Everything", Value: "everything"},
 				{Name: "Mystic (Blue)", Value: "mystic"},
@@ -5995,7 +6999,7 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 		{
 			Type:        discordgo.ApplicationCommandOptionString,
 			Name:        "type",
-			Description: "Select fort type",
+			Description: "Choose Pokestop or Gym, or leave blank for a guided flow",
 			Choices: []*discordgo.ApplicationCommandOptionChoice{
 				{Name: "Everything", Value: "everything"},
 				{Name: "Pokestop", Value: "pokestop"},
@@ -6016,8 +7020,7 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 		{
 			Type:         discordgo.ApplicationCommandOptionString,
 			Name:         "pokemon",
-			Description:  "Select Pokemon",
-			Required:     true,
+			Description:  "Choose a Pokemon, or leave blank for a guided flow",
 			Autocomplete: true,
 		},
 		{Type: discordgo.ApplicationCommandOptionInteger, Name: "min_spawn", Description: "Optional minimum average spawns", MinValue: floatPtr(0)},
@@ -6030,26 +7033,25 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 		{
 			Type:         discordgo.ApplicationCommandOptionString,
 			Name:         "condition",
-			Description:  "Select weather condition",
-			Required:     true,
+			Description:  "Choose weather, or leave blank for a guided flow",
 			Autocomplete: true,
 		},
-		{Type: discordgo.ApplicationCommandOptionString, Name: "location", Description: "Optional location (address or lat,lon)"},
+		{Type: discordgo.ApplicationCommandOptionString, Name: "location", Description: "Optional location. Leave blank to use your saved location."},
 		cleanFlagOption("Auto delete after expiration"),
 	}
 	weatherOptions = append(weatherOptions, templateOptions()...)
 
-	commands := []*discordgo.ApplicationCommand{
+	return []*discordgo.ApplicationCommand{
 		{
 			Name:        "track",
-			Description: "Set Pokemon spawn filters",
+			Description: "Track Pokemon spawns",
 			Options:     trackOptions,
 		},
 		{
 			Name:        "raid",
-			Description: "Add raid alert",
+			Description: "Track raid bosses or raid levels",
 			Options: append([]*discordgo.ApplicationCommandOption{
-				{Type: discordgo.ApplicationCommandOptionString, Name: "type", Description: "Enter level or Pokemon", Required: true, Autocomplete: true},
+				{Type: discordgo.ApplicationCommandOptionString, Name: "type", Description: "Choose a boss or level, or leave blank for a guided flow", Autocomplete: true},
 				{Type: discordgo.ApplicationCommandOptionString, Name: "gym", Description: "Optional gym", Autocomplete: true},
 				{
 					Type:        discordgo.ApplicationCommandOptionString,
@@ -6074,9 +7076,9 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 		},
 		{
 			Name:        "egg",
-			Description: "Add egg alert",
+			Description: "Track raid eggs by level",
 			Options: append([]*discordgo.ApplicationCommandOption{
-				{Type: discordgo.ApplicationCommandOptionString, Name: "level", Description: "Select egg level", Required: true, Autocomplete: true},
+				{Type: discordgo.ApplicationCommandOptionString, Name: "level", Description: "Choose an egg level, or leave blank for a guided flow", Autocomplete: true},
 				{Type: discordgo.ApplicationCommandOptionString, Name: "gym", Description: "Optional gym", Autocomplete: true},
 				{
 					Type:        discordgo.ApplicationCommandOptionString,
@@ -6101,9 +7103,9 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 		},
 		{
 			Name:        "maxbattle",
-			Description: "Add max battle alert",
+			Description: "Track max battles by boss or level",
 			Options: append([]*discordgo.ApplicationCommandOption{
-				{Type: discordgo.ApplicationCommandOptionString, Name: "type", Description: "Enter level or Pokemon", Required: true, Autocomplete: true},
+				{Type: discordgo.ApplicationCommandOptionString, Name: "type", Description: "Choose a boss or level, or leave blank for a guided flow", Autocomplete: true},
 				{Type: discordgo.ApplicationCommandOptionString, Name: "station", Description: "Optional station", Autocomplete: true},
 				{Type: discordgo.ApplicationCommandOptionBoolean, Name: "gmax_only", Description: "Only Gigantamax battles"},
 				distanceOption(),
@@ -6112,9 +7114,9 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 		},
 		{
 			Name:        "quest",
-			Description: "Add quest alert",
+			Description: "Track quest rewards",
 			Options: append([]*discordgo.ApplicationCommandOption{
-				{Type: discordgo.ApplicationCommandOptionString, Name: "type", Description: "Enter Pokemon or item", Required: true, Autocomplete: true},
+				{Type: discordgo.ApplicationCommandOptionString, Name: "type", Description: "Choose a reward, or leave blank for a guided flow", Autocomplete: true},
 				{Type: discordgo.ApplicationCommandOptionInteger, Name: "min_amount", Description: "Optional minimum value for items only", MinValue: floatPtr(0)},
 				{
 					Type:        discordgo.ApplicationCommandOptionString,
@@ -6132,42 +7134,41 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 		},
 		{
 			Name:        "invasion",
-			Description: "Add invasion alert",
+			Description: "Track Team Rocket invasions",
 			Options: append([]*discordgo.ApplicationCommandOption{
-				{Type: discordgo.ApplicationCommandOptionString, Name: "type", Description: "Enter leader or grunt type", Required: true, Autocomplete: true},
+				{Type: discordgo.ApplicationCommandOptionString, Name: "type", Description: "Choose a grunt or leader type, or leave blank for a guided flow", Autocomplete: true},
 				distanceOption(),
 				cleanFlagOption("Auto delete after expiration"),
 			}, templateOptions()...),
 		},
 		{
 			Name:        "gym",
-			Description: "Add gym alert",
+			Description: "Track gym team or slot changes",
 			Options:     gymOptions,
 		},
 		{
 			Name:        "fort",
-			Description: "Add fort update alert",
+			Description: "Track Pokestop and Gym changes",
 			Options:     fortOptions,
 		},
 		{
 			Name:        "nest",
-			Description: "Add nest alert",
+			Description: "Track nests by Pokemon",
 			Options:     nestOptions,
 		},
 		{
 			Name:        "weather",
-			Description: "Add weather alert",
+			Description: "Track weather at your saved location or a place you provide",
 			Options:     weatherOptions,
 		},
 		{
 			Name:        "lure",
-			Description: "Add lure alert",
+			Description: "Track lure modules",
 			Options: append([]*discordgo.ApplicationCommandOption{
 				{
 					Type:        discordgo.ApplicationCommandOptionString,
 					Name:        "type",
-					Description: "Select lure type",
-					Required:    true,
+					Description: "Choose a lure type, or leave blank for a guided flow",
 					Choices: []*discordgo.ApplicationCommandOptionChoice{
 						{Name: "Everything", Value: "everything"},
 						{Name: "Basic", Value: "basic"},
@@ -6191,20 +7192,23 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 		},
 		{
 			Name:        "profile",
-			Description: "Profile & Scheduler Settings",
+			Description: "Set your saved location, areas, and quiet hours",
 		},
 		{
 			Name:        "tracked",
-			Description: "Show current tracking",
+			Description: "Review what you are tracking",
+			Options: []*discordgo.ApplicationCommandOption{
+				{Type: discordgo.ApplicationCommandOptionString, Name: "profile", Description: "Choose which profile to review", Autocomplete: true},
+			},
 		},
 		{
 			Name:        "remove",
-			Description: "Delete custom trackings",
+			Description: "Remove one or more tracking entries",
 			Options: []*discordgo.ApplicationCommandOption{
 				{
 					Type:        discordgo.ApplicationCommandOptionString,
 					Name:        "type",
-					Description: "Select tracking type",
+					Description: "Choose what kind of alert to remove",
 					Required:    true,
 					Choices: []*discordgo.ApplicationCommandOptionChoice{
 						{Name: "pokemon", Value: "pokemon"},
@@ -6220,7 +7224,8 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 						{Name: "fort", Value: "fort"},
 					},
 				},
-				{Type: discordgo.ApplicationCommandOptionString, Name: "tracking", Description: "Select tracking to remove", Required: true, Autocomplete: true},
+				{Type: discordgo.ApplicationCommandOptionString, Name: "profile", Description: "Choose which profile to remove from", Autocomplete: true},
+				{Type: discordgo.ApplicationCommandOptionString, Name: "tracking", Description: "Choose what to remove", Required: true, Autocomplete: true},
 			},
 		},
 		{
@@ -6233,17 +7238,19 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 		},
 		{
 			Name:        "help",
-			Description: "Show command help",
+			Description: "Show slash command help",
+			Options: []*discordgo.ApplicationCommandOption{
+				{Type: discordgo.ApplicationCommandOptionString, Name: "command", Description: "Optional command to explain", Autocomplete: true},
+			},
 		},
 		{
 			Name:        "info",
-			Description: "Look up Poracle info",
+			Description: "Look up Pokemon, moves, items, weather, and more",
 			Options: []*discordgo.ApplicationCommandOption{
 				{
 					Type:        discordgo.ApplicationCommandOptionString,
 					Name:        "type",
-					Description: "Select info type",
-					Required:    true,
+					Description: "Choose what to look up, or leave blank for a guided flow",
 					Choices: []*discordgo.ApplicationCommandOptionChoice{
 						{Name: "Pokemon", Value: "pokemon"},
 						{Name: "Moves", Value: "moves"},
@@ -6254,11 +7261,61 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 						{Name: "Translate", Value: "translate"},
 					},
 				},
-				{Type: discordgo.ApplicationCommandOptionString, Name: "pokemon", Description: "Pokemon (required when type=pokemon)", Autocomplete: true},
+				{Type: discordgo.ApplicationCommandOptionString, Name: "pokemon", Description: "Pokemon name (used when type is Pokemon)", Autocomplete: true},
 			},
 		},
 	}
-	for _, cmd := range commands {
+}
+
+func (d *Discord) registerSlashCommands(s *discordgo.Session) {
+	if s == nil || s.State == nil || s.State.User == nil {
+		return
+	}
+	appID := s.State.User.ID
+	deregisterSlashCommands := false
+	slashCommandsDisabled := false
+	if d.manager != nil && d.manager.cfg != nil {
+		if value, ok := d.manager.cfg.GetBool("discord.slash.deregisterOnStart"); ok {
+			deregisterSlashCommands = value
+		}
+		if value, ok := d.manager.cfg.GetBool("discord.slash.disabled"); ok {
+			slashCommandsDisabled = value
+		}
+	}
+	if slashCommandsDisabled {
+		// Intentionally do nothing. This is to avoid interfering with other
+		// /command providers that use the same bot token / application.
+		return
+	}
+	if deregisterSlashCommands {
+		// Remove global slash commands so the next run can re-register from scratch.
+		logger := logging.Get().Discord
+		deleteFor := func(guildID string) {
+			commands, err := s.ApplicationCommands(appID, guildID)
+			if err != nil {
+				if logger != nil {
+					logger.Warnf("Slash command deregistration failed (guild=%q): %v", guildID, err)
+				}
+				return
+			}
+			for _, cmd := range commands {
+				if cmd == nil || cmd.ID == "" {
+					continue
+				}
+				_ = s.ApplicationCommandDelete(appID, guildID, cmd.ID)
+			}
+			if logger != nil {
+				scope := "global"
+				if guildID != "" {
+					scope = guildID
+				}
+				logger.Infof("Slash commands deregistered (%s): %d", scope, len(commands))
+			}
+		}
+		deleteFor("")
+		return
+	}
+	for _, cmd := range d.slashCommandDefinitions() {
 		_, _ = s.ApplicationCommandCreate(appID, "", cmd)
 	}
 }
