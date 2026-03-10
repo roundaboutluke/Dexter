@@ -27,14 +27,14 @@ import (
 type Server struct {
 	srv *http.Server
 
-	cfg     *config.Config
-	query   *db.Query
-	fences  *geofence.Store
-	root    string
-	data    *data.GameData
-	i18n    *i18n.Factory
-	dts     []dts.Template
-	scanner *scanner.Client
+	cfg       *config.Config
+	query     *db.Query
+	fences    *geofence.Store
+	root      string
+	data      *data.GameData
+	i18n      *i18n.Factory
+	dts       []dts.Template
+	scanner   *scanner.Client
 	processor *webhook.Processor
 
 	discordQueue  *dispatch.Queue
@@ -78,6 +78,9 @@ func New(cfg *config.Config, queue *webhook.Queue, processor *webhook.Processor,
 
 		var payload any
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			if logger := logging.Get().General; logger != nil {
+				logger.Errorf("API: %s %s %s invalid payload: %v", clientIP(r), r.Method, r.URL.Path, err)
+			}
 			writeJSON(w, http.StatusBadRequest, map[string]any{
 				"webserver": "unhappy",
 				"reason":    "invalid payload",
@@ -88,8 +91,14 @@ func New(cfg *config.Config, queue *webhook.Queue, processor *webhook.Processor,
 		switch data := payload.(type) {
 		case []any:
 			queue.Push(data...)
+			if logger := logging.Get().General; logger != nil {
+				logger.Infof("API: %s %s %s queued %d webhook payloads", clientIP(r), r.Method, r.URL.Path, len(data))
+			}
 		default:
 			queue.Push(data)
+			if logger := logging.Get().General; logger != nil {
+				logger.Infof("API: %s %s %s queued 1 webhook payload", clientIP(r), r.Method, r.URL.Path)
+			}
 		}
 
 		writeJSON(w, http.StatusOK, map[string]any{
@@ -99,7 +108,7 @@ func New(cfg *config.Config, queue *webhook.Queue, processor *webhook.Processor,
 
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           mux,
+		Handler:           withRequestLogging(mux),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
@@ -201,4 +210,49 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 			fmt.Fprintf(os.Stderr, "failed to write response: %v\n", err)
 		}
 	}
+}
+
+type loggingResponseWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (w *loggingResponseWriter) WriteHeader(status int) {
+	w.status = status
+	w.ResponseWriter.WriteHeader(status)
+}
+
+func withRequestLogging(next http.Handler) http.Handler {
+	if next == nil {
+		return http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		logRequest(r)
+		rec := &loggingResponseWriter{ResponseWriter: w, status: http.StatusOK}
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				logger := logging.Get().General
+				if logger != nil {
+					logger.Errorf("API: %s %s %s panic: %v", clientIP(r), r.Method, r.URL.Path, recovered)
+				}
+				http.Error(rec, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				return
+			}
+			if rec.status >= http.StatusInternalServerError {
+				logger := logging.Get().General
+				if logger != nil {
+					logger.Errorf("API: %s %s %s returned %d", clientIP(r), r.Method, r.URL.Path, rec.status)
+				}
+			}
+		}()
+		next.ServeHTTP(rec, r)
+	})
+}
+
+func logRequest(r *http.Request) {
+	logger := logging.Get().General
+	if logger == nil || r == nil {
+		return
+	}
+	logger.Infof("API: %s %s %s", clientIP(r), r.Method, r.URL.Path)
 }

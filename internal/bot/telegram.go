@@ -10,6 +10,7 @@ import (
 
 	"poraclego/internal/command"
 	"poraclego/internal/i18n"
+	"poraclego/internal/logging"
 )
 
 // Telegram bot wrapper.
@@ -31,6 +32,9 @@ func (t *Telegram) Start() error {
 		return err
 	}
 	t.bot = bot
+	if logger := logging.Get().General; logger != nil {
+		logger.Infof("Telegram ready: %s", bot.Self.UserName)
+	}
 	updateCfg := tgbotapi.NewUpdate(0)
 	updateCfg.Timeout = 30
 	updates := bot.GetUpdatesChan(updateCfg)

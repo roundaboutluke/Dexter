@@ -2,6 +2,7 @@ package command
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -74,6 +75,7 @@ func (r *Registry) Execute(ctx *Context, line string) (string, error) {
 		ctx.RawLine = line
 	}
 	name := strings.ToLower(parts[0])
+	logLabel := commandLogLabel(ctx, line)
 	handler, ok := r.handlers[name]
 	aliasLang := ""
 	if !ok && ctx != nil {
@@ -86,24 +88,38 @@ func (r *Registry) Execute(ctx *Context, line string) (string, error) {
 		}
 	}
 	if !ok {
+		if logger := ctx.CommandLogger(); logger != nil {
+			logger.Warnf("%s unknown command", logLabel)
+		}
 		return "", errors.New("unknown command")
+	}
+	if logger := ctx.CommandLogger(); logger != nil {
+		logger.Infof("%s", logLabel)
 	}
 	if name != "help" && len(parts) > 1 && strings.EqualFold(parts[1], "help") {
 		if helpHandler, okHelp := r.handlers["help"]; okHelp {
 			if aliasLang != "" && ctx != nil {
 				clone := *ctx
 				clone.Language = aliasLang
-				return helpHandler.Handle(&clone, []string{name})
+				reply, err := helpHandler.Handle(&clone, []string{name})
+				logCommandResult(ctx, logLabel, err)
+				return reply, err
 			}
-			return helpHandler.Handle(ctx, []string{name})
+			reply, err := helpHandler.Handle(ctx, []string{name})
+			logCommandResult(ctx, logLabel, err)
+			return reply, err
 		}
 	}
 	if aliasLang != "" {
 		clone := *ctx
 		clone.Language = aliasLang
-		return handler.Handle(&clone, parts[1:])
+		reply, err := handler.Handle(&clone, parts[1:])
+		logCommandResult(&clone, logLabel, err)
+		return reply, err
 	}
-	return handler.Handle(ctx, parts[1:])
+	reply, err := handler.Handle(ctx, parts[1:])
+	logCommandResult(ctx, logLabel, err)
+	return reply, err
 }
 
 func parseCommandArgs(line string) []string {
@@ -160,4 +176,37 @@ func resolveCommandAlias(ctx *Context, name string) (string, string) {
 		}
 	}
 	return "", ""
+}
+
+func commandLogLabel(ctx *Context, line string) string {
+	if ctx == nil {
+		return line
+	}
+	targetType := ctx.Platform + ":channel"
+	targetID := ctx.ChannelID
+	targetName := strings.TrimSpace(ctx.ChannelName)
+	if ctx.IsDM || ctx.ChannelID == "" {
+		targetType = ctx.Platform + ":user"
+		targetID = ctx.UserID
+		targetName = strings.TrimSpace(ctx.UserName)
+	}
+	if targetName == "" {
+		targetName = ctx.UserName
+	}
+	if targetName == "" {
+		targetName = targetID
+	}
+	return fmt.Sprintf("%s/%s-%s: %s", targetName, targetType, targetID, line)
+}
+
+func logCommandResult(ctx *Context, label string, err error) {
+	logger := ctx.CommandLogger()
+	if logger == nil {
+		return
+	}
+	if err != nil {
+		logger.Errorf("%s unhappy: %v", label, err)
+		return
+	}
+	logger.Debugf("%s completed", label)
 }

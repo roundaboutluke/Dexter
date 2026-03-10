@@ -10,6 +10,7 @@ import (
 	"poraclego/internal/dts"
 	"poraclego/internal/geofence"
 	"poraclego/internal/i18n"
+	"poraclego/internal/logging"
 	"poraclego/internal/render"
 	"poraclego/internal/scanner"
 	"poraclego/internal/stats"
@@ -34,6 +35,7 @@ type Context struct {
 	Timezone      *tz.Locator
 	Root          string
 	Scanner       *scanner.Client
+	Logs          logging.Loggers
 	// RefreshAlertCache triggers a reload of in-memory alert caches (e.g. fastMonsters).
 	RefreshAlertCache func()
 
@@ -85,4 +87,30 @@ func (c *Context) RenderTemplate(templateType, templateID string, payload any) (
 // Version returns the current PoracleGo version.
 func (c *Context) Version() string {
 	return version.Read(c.Root)
+}
+
+// CommandLogger returns the shared command logger when available.
+func (c *Context) CommandLogger() *logging.Logger {
+	if c == nil {
+		return nil
+	}
+	if c.Logs.Commands != nil {
+		return c.Logs.Commands
+	}
+	return c.Logs.Command
+}
+
+// TransportLogger returns the platform-specific transport logger when available.
+func (c *Context) TransportLogger() *logging.Logger {
+	if c == nil {
+		return nil
+	}
+	switch c.Platform {
+	case "discord":
+		return c.Logs.Discord
+	case "telegram":
+		return c.Logs.Telegram
+	default:
+		return c.Logs.General
+	}
 }

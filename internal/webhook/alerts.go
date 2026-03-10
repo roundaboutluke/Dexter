@@ -291,6 +291,15 @@ func (p *Processor) formatMessage(hook *Hook, match alertMatch) string {
 		if err == nil && strings.TrimSpace(rendered) != "" {
 			return rendered
 		}
+		if logger := p.controllerLogger(); logger != nil {
+			if err != nil {
+				logger.Errorf("%s: error rendering message template for %s/%s/%s: %v", hookLogReference(hook), match.Target.Platform, templateTypeForHook(hook), match.Target.Template, err)
+			} else {
+				logger.Warnf("%s: invalid or empty message template for %s/%s/%s", hookLogReference(hook), match.Target.Platform, templateTypeForHook(hook), match.Target.Template)
+			}
+		}
+	} else if logger := p.controllerLogger(); logger != nil {
+		logger.Warnf("%s: cannot find DTS template for %s/%s/%s", hookLogReference(hook), match.Target.Platform, templateTypeForHook(hook), match.Target.Template)
 	}
 	tr := defaultTranslator(p, hook)
 	switch hook.Type {
@@ -347,6 +356,8 @@ func (p *Processor) formatPayload(hook *Hook, match alertMatch) (map[string]any,
 		} else if renderedString, ok := rendered.(string); ok {
 			message = renderedString
 		}
+	} else if logger := p.controllerLogger(); logger != nil {
+		logger.Warnf("%s: cannot find payload template for %s/%s/%s", hookLogReference(hook), match.Target.Platform, templateTypeForHook(hook), match.Target.Template)
 	}
 	if ping != "" {
 		if content, ok := payload["content"].(string); ok {
@@ -2803,6 +2814,7 @@ func renderAny(value any, data map[string]any, meta map[string]any, p *Processor
 				if len(snippet) > 200 {
 					snippet = snippet[:200] + "..."
 				}
+				logger.Errorf("template render failed: %v [%s]", err, snippet)
 			}
 			return v
 		}
@@ -3472,6 +3484,9 @@ func shortenURL(p *Processor, url string) string {
 	}
 	short, err := shortener.Shorten(url)
 	if err != nil || short == "" {
+		if logger := logging.Get().General; logger != nil && err != nil {
+			logger.Warnf("shortener failed for %s: %v", url, err)
+		}
 		return url
 	}
 	return short

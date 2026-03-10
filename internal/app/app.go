@@ -84,9 +84,12 @@ func (a *App) Run(ctx context.Context) error {
 	if err := logging.Init(cfg, root); err != nil {
 		return err
 	}
+	logf("PoracleGo startup - initialising from %s", root)
 	validate.CheckConfig(cfg, logf)
 
+	logf("Generating supporting data files")
 	data.GenerateBestEffort(root, true, logf)
+	logf("Refreshing geofence cache")
 	geofence.FetchKojiFences(cfg, root, logf)
 
 	a.queue = webhook.NewQueue()
@@ -96,6 +99,7 @@ func (a *App) Run(ctx context.Context) error {
 	a.telegramWorker = dispatch.NewWorker(a.telegramQueue, cfg, "telegram", 750*time.Millisecond, root)
 	a.discordWorker.Start()
 	a.telegramWorker.Start()
+	logf("Started dispatch workers")
 
 	fences, err := geofence.Load(cfg, root)
 	if err != nil {
@@ -103,6 +107,7 @@ func (a *App) Run(ctx context.Context) error {
 	}
 	validate.CheckGeofence(fences.Fences, logf)
 	a.fences = fences
+	logf("Geofence loaded with %d fences", len(fences.Fences))
 
 	gameData, err := data.Load(root)
 	if err != nil {
@@ -111,12 +116,14 @@ func (a *App) Run(ctx context.Context) error {
 	a.data = gameData
 	a.i18n = i18n.NewFactory(root, cfg)
 	render.Init(root, cfg, a.data, a.i18n)
+	logf("Game data and translators loaded")
 
 	a.weatherTracker = webhook.NewWeatherTracker(cfg, root)
 	a.shinyPossible = shiny.NewPossible("")
 	a.shinyPossible.Start(ctx, filepath.Join(root, ".cache", "shinyPossible.json"))
 	a.pogoEvents = webhook.NewPogoEventParser("")
 	a.pogoEvents.Start(ctx, filepath.Join(root, ".cache", "pogoEvents.json"))
+	logf("Started shiny and event refresh workers")
 
 	scannerClient, err := scanner.New(cfg)
 	if err != nil {
@@ -141,6 +148,8 @@ func (a *App) Run(ctx context.Context) error {
 		} else {
 			return fmt.Errorf("migrations failed: %w", err)
 		}
+	} else {
+		logf("Database migrations complete")
 	}
 
 	templates, err := dts.Load(root)
@@ -149,6 +158,7 @@ func (a *App) Run(ctx context.Context) error {
 	}
 	validate.CheckDTS(templates, cfg, logf)
 	a.dts = templates
+	logf("Loaded %d DTS templates", len(templates))
 
 	statsTracker := stats.NewTracker()
 	a.statsWorker = stats.NewWorker(statsTracker, cfg)
@@ -157,6 +167,7 @@ func (a *App) Run(ctx context.Context) error {
 	digestStore := digest.NewStore()
 	a.processor = webhook.NewProcessor(a.queue, cfg, a.query, a.fences, a.data, a.i18n, a.dts, a.discordQueue, a.telegramQueue, statsTracker, a.weatherTracker, a.shinyPossible, tzLocator, a.pogoEvents, a.scannerClient, digestStore, root, 250*time.Millisecond)
 	a.processor.Start()
+	logf("Webhook processor started")
 
 	srv, err := server.New(cfg, a.queue, a.processor, a.discordQueue, a.telegramQueue, a.query, a.fences, root, a.data, a.i18n, a.dts, a.scannerClient)
 	if err != nil {
@@ -164,16 +175,25 @@ func (a *App) Run(ctx context.Context) error {
 	}
 	a.server = srv
 	a.server.Start()
+	host, _ := cfg.GetString("server.host")
+	port, ok := cfg.GetInt("server.port")
+	if !ok {
+		port = 3030
+	}
+	logf("Service started on %s:%d", host, port)
 
 	botManager := bot.NewManager(cfg, a.query, a.data, a.i18n, a.dts, a.fences, a.processor, a.discordQueue, a.telegramQueue, a.queue, statsTracker, a.weatherTracker, tzLocator, a.scannerClient)
 	botManager.Start()
 	a.botManager = botManager
 	a.server.SetBotManager(botManager)
+	logf("Bot manager started")
 
 	a.profileSchedule = profile.NewScheduler(cfg, a.query, a.i18n, tzLocator, a.discordQueue, a.telegramQueue, digestStore, a.dts)
 	a.profileSchedule.Start(ctx)
+	logf("Profile scheduler started")
 
 	a.startWatchers(ctx, root)
+	logf("File watchers started")
 
 	return nil
 }
@@ -189,6 +209,7 @@ func logf(format string, args ...any) {
 
 // Shutdown performs a graceful shutdown.
 func (a *App) Shutdown(ctx context.Context) error {
+	logf("Poracle shutdown - starting save of cache")
 	if a.processor != nil {
 		a.processor.SaveCaches()
 	}
@@ -213,5 +234,6 @@ func (a *App) Shutdown(ctx context.Context) error {
 	if a.scannerClient != nil {
 		_ = a.scannerClient.Close()
 	}
-	return nil
+	logf("Poracle shutdown - complete")
+	return logging.Close()
 }

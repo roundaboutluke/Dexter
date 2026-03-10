@@ -34,6 +34,35 @@ type Sender struct {
 	updateTelegram *updateCache
 }
 
+func (s *Sender) loggerForType(targetType string) *logging.Logger {
+	switch {
+	case strings.HasPrefix(targetType, "telegram"):
+		return logging.Get().Telegram
+	case strings.HasPrefix(targetType, "discord"), targetType == "webhook":
+		return logging.Get().Discord
+	default:
+		return logging.Get().General
+	}
+}
+
+func (s *Sender) logf(level logging.Level, targetType, format string, args ...any) {
+	logger := s.loggerForType(targetType)
+	if logger == nil || !logger.Enabled(level) {
+		return
+	}
+	logger.Logf(level, format, args...)
+}
+
+func (s *Sender) logJobf(level logging.Level, job MessageJob, format string, args ...any) {
+	ref := strings.TrimSpace(job.LogReference)
+	if ref == "" {
+		ref = "Unknown"
+	}
+	prefixArgs := []any{ref, job.Name, job.Target}
+	prefixArgs = append(prefixArgs, args...)
+	s.logf(level, job.Type, "%s: %s %s "+format, prefixArgs...)
+}
+
 // NewSender constructs a sender with a shared HTTP client.
 func NewSender(cfg *config.Config, root string) *Sender {
 	if root == "" {
@@ -62,17 +91,39 @@ func NewSender(cfg *config.Config, root string) *Sender {
 
 // Send dispatches a message to the configured platform.
 func (s *Sender) Send(job MessageJob) error {
+	start := time.Now()
+	s.logJobf(logging.LevelInfo, job, "sending message")
 	switch job.Type {
 	case "webhook":
-		return s.sendDiscordWebhook(job.Target, job)
+		err := s.sendDiscordWebhook(job.Target, job)
+		if err == nil {
+			s.logJobf(logging.TimingLevel(s.cfg), job, "WEBHOOK (%d ms)", time.Since(start).Milliseconds())
+		}
+		return err
 	case "discord:channel":
-		return s.sendDiscordChannel(job.Target, job)
+		err := s.sendDiscordChannel(job.Target, job)
+		if err == nil {
+			s.logJobf(logging.TimingLevel(s.cfg), job, "CHANNEL (%d ms)", time.Since(start).Milliseconds())
+		}
+		return err
 	case "discord:user":
-		return s.sendDiscordUser(job.Target, job)
+		err := s.sendDiscordUser(job.Target, job)
+		if err == nil {
+			s.logJobf(logging.TimingLevel(s.cfg), job, "USER (%d ms)", time.Since(start).Milliseconds())
+		}
+		return err
 	case "telegram:user", "telegram:channel":
-		return s.sendTelegram(job.Target, job)
+		err := s.sendTelegram(job.Target, job)
+		if err == nil {
+			s.logJobf(logging.TimingLevel(s.cfg), job, "TELEGRAM (%d ms)", time.Since(start).Milliseconds())
+		}
+		return err
 	case "telegram:group":
-		return s.sendTelegram(job.Target, job)
+		err := s.sendTelegram(job.Target, job)
+		if err == nil {
+			s.logJobf(logging.TimingLevel(s.cfg), job, "TELEGRAM (%d ms)", time.Since(start).Milliseconds())
+		}
+		return err
 	default:
 		return fmt.Errorf("unsupported dispatch type %s", job.Type)
 	}
@@ -86,7 +137,9 @@ func (s *Sender) sendDiscordWebhook(url string, job MessageJob) error {
 	s.maybeDeletePreviousForMonsterChangeWebhook(url, job)
 	if job.UpdateExisting && job.UpdateKey != "" {
 		if entry, ok := s.updateWebhook.Get(url, job.UpdateKey); ok {
+			s.logJobf(logging.LevelDebug, job, "attempting webhook edit for message %s", entry.MessageID)
 			if err := s.patchDiscordWebhookMessage(url, entry.MessageID, payload); err == nil {
+				s.logJobf(logging.LevelDebug, job, "updated existing webhook message %s", entry.MessageID)
 				return nil
 			}
 		}
@@ -137,7 +190,9 @@ func (s *Sender) sendDiscordChannel(channelID string, job MessageJob) error {
 			if editChannel == "" {
 				editChannel = channelID
 			}
+			s.logJobf(logging.LevelDebug, job, "attempting discord channel edit for message %s", entry.MessageID)
 			if err := s.patchDiscordChannelMessage(editChannel, entry.MessageID, token, payload); err == nil {
+				s.logJobf(logging.LevelDebug, job, "updated existing discord channel message %s", entry.MessageID)
 				return nil
 			}
 		}
@@ -190,7 +245,9 @@ func (s *Sender) sendDiscordUser(userID string, job MessageJob) error {
 			if editChannel == "" {
 				editChannel = channelID
 			}
+			s.logJobf(logging.LevelDebug, job, "attempting discord DM edit for message %s", entry.MessageID)
 			if err := s.patchDiscordChannelMessage(editChannel, entry.MessageID, token, payload); err == nil {
+				s.logJobf(logging.LevelDebug, job, "updated existing discord DM message %s", entry.MessageID)
 				return nil
 			}
 		}
@@ -310,6 +367,7 @@ func (s *Sender) sendTelegram(chatID string, job MessageJob) error {
 				}
 			}
 			if err := s.editTelegramMessage(token, chatID, entry.MessageID, payload); err == nil {
+				s.logJobf(logging.LevelDebug, job, "updated existing telegram message %s", entry.MessageID)
 				return nil
 			}
 		}
@@ -624,6 +682,9 @@ func (s *Sender) postTelegramWithResponse(endpoint string, payload map[string]an
 			}
 			if err := json.Unmarshal([]byte(body), &resp); err == nil && resp.Parameters.RetryAfter > 0 {
 				retryAfter = resp.Parameters.RetryAfter
+			}
+			if logger := logging.Get().Telegram; logger != nil {
+				logger.Warnf("telegram 429 rate limit endpoint=%s retry_after=%d attempt=%d", endpoint, retryAfter, attempt+1)
 			}
 			if attempt == maxRetries {
 				return 0, fmt.Errorf("telegram rate limited after %d retries", maxRetries)
@@ -1150,12 +1211,18 @@ func (s *Sender) discordRequestWithRetries(method, endpoint string, body []byte,
 		status, respHeaders, respBody, err := s.doRawRequest(method, endpoint, body, contentType, headers)
 		if err != nil {
 			if isTimeoutErr(err) && attempt < maxTimeoutRetries {
+				if logger := logging.Get().Discord; logger != nil {
+					logger.Warnf("discord timeout endpoint=%s attempt=%d", endpoint, attempt+1)
+				}
 				time.Sleep(discordTimeoutBackoff(endpoint, attempt))
 				continue
 			}
 			return nil, err
 		}
 		if status == http.StatusTooManyRequests {
+			if logger := logging.Get().Discord; logger != nil {
+				logger.Warnf("discord 429 rate limit endpoint=%s attempt=%d retry_after=%s", endpoint, attempt+1, discordRetryAfter(respHeaders, respBody))
+			}
 			if attempt == maxRetries {
 				return nil, fmt.Errorf("discord rate limited after %d retries", maxRetries)
 			}
