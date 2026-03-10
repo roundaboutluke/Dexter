@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"poraclego/internal/dispatch"
+	"poraclego/internal/logging"
 )
 
 func registerPostMessageRoutes(s *Server, mux *http.ServeMux) {
@@ -22,6 +23,9 @@ func registerPostMessageRoutes(s *Server, mux *http.ServeMux) {
 
 		var payload any
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			if logger := logging.Get().General; logger != nil {
+				logger.Errorf("API: %s %s %s invalid payload: %v", clientIP(r), r.Method, r.URL.Path, err)
+			}
 			writeJSON(w, http.StatusBadRequest, map[string]any{
 				"status":  "error",
 				"message": "invalid payload",
@@ -38,6 +42,9 @@ func registerPostMessageRoutes(s *Server, mux *http.ServeMux) {
 			if s.telegramQueue != nil && isTelegramPostMessageType(job.Type) {
 				s.telegramQueue.Push(job)
 			}
+		}
+		if logger := logging.Get().General; logger != nil {
+			logger.Infof("API: %s %s %s queued %d postMessage jobs", clientIP(r), r.Method, r.URL.Path, len(jobs))
 		}
 
 		writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})

@@ -25,21 +25,24 @@ const (
 	LevelError
 )
 
-// Logger writes structured log lines to console and files.
+// Logger writes log lines to console and files.
 type Logger struct {
 	name         string
 	consoleLevel Level
 	fileLevel    Level
 	writer       *rotatingWriter
+	errorWriter  *rotatingWriter
 	console      io.Writer
 }
 
-// Loggers holds category loggers.
+// Loggers holds the configured category loggers.
 type Loggers struct {
 	General    *Logger
+	Errors     *Logger
 	Webhooks   *Logger
 	Discord    *Logger
 	Telegram   *Logger
+	Commands   *Logger
 	Command    *Logger
 	Controller *Logger
 }
@@ -57,16 +60,32 @@ func Init(cfg *config.Config, root string) error {
 	dailyLimit := getInt(cfg, "logger.dailyLogLimit", 7)
 	webhookLimit := getInt(cfg, "logger.webhookLogLimit", 12)
 
-	global = Loggers{
-		General:    newLogger("general", consoleLevel, fileLevel, logDir, "daily", dailyLimit),
-		Webhooks:   newLogger("webhooks", consoleLevel, fileLevel, logDir, "hourly", webhookLimit),
-		Discord:    newLogger("discord", consoleLevel, fileLevel, logDir, "daily", dailyLimit),
-		Telegram:   newLogger("telegram", consoleLevel, fileLevel, logDir, "daily", dailyLimit),
-		Command:    newLogger("commands", consoleLevel, fileLevel, logDir, "daily", dailyLimit),
-		Controller: newLogger("controller", consoleLevel, fileLevel, logDir, "daily", dailyLimit),
+	errorWriter := newRotatingWriter(logDir, "errors", "daily", dailyLimit)
+	errorsLogger := &Logger{
+		name:         "errors",
+		consoleLevel: LevelError,
+		fileLevel:    LevelWarn,
+		writer:       errorWriter,
+		console:      io.Discard,
 	}
+	commandsLogger := newLogger("commands", consoleLevel, fileLevel, errorWriter, logDir, "daily", dailyLimit)
 
+	global = Loggers{
+		General:    newLogger("general", consoleLevel, fileLevel, errorWriter, logDir, "daily", dailyLimit),
+		Errors:     errorsLogger,
+		Webhooks:   newLogger("webhooks", consoleLevel, categoryFileLevel(cfg, "logger.enableLogs.webhooks", fileLevel), errorWriter, logDir, "hourly", webhookLimit),
+		Discord:    newLogger("discord", consoleLevel, categoryFileLevel(cfg, "logger.enableLogs.discord", fileLevel), errorWriter, logDir, "daily", dailyLimit),
+		Telegram:   newLogger("telegram", consoleLevel, categoryFileLevel(cfg, "logger.enableLogs.telegram", fileLevel), errorWriter, logDir, "daily", dailyLimit),
+		Commands:   commandsLogger,
+		Command:    commandsLogger,
+		Controller: newLogger("controller", consoleLevel, fileLevel, errorWriter, logDir, "daily", dailyLimit),
+	}
 	return nil
+}
+
+// Close closes the configured log writers.
+func Close() error {
+	return global.Close()
 }
 
 // Get returns the configured loggers.
@@ -74,15 +93,65 @@ func Get() Loggers {
 	return global
 }
 
-func newLogger(name string, consoleLevel, fileLevel Level, logDir, period string, keep int) *Logger {
-	writer := newRotatingWriter(logDir, name, period, keep)
+// Close closes all unique log writers.
+func (l Loggers) Close() error {
+	seen := map[*rotatingWriter]struct{}{}
+	var firstErr error
+	for _, logger := range []*Logger{l.General, l.Errors, l.Webhooks, l.Discord, l.Telegram, l.Commands, l.Controller} {
+		if logger == nil || logger.writer == nil {
+			continue
+		}
+		if _, ok := seen[logger.writer]; ok {
+			continue
+		}
+		seen[logger.writer] = struct{}{}
+		if err := logger.writer.Close(); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
+}
+
+func newLogger(name string, consoleLevel, fileLevel Level, errorWriter *rotatingWriter, logDir, period string, keep int) *Logger {
 	return &Logger{
 		name:         name,
 		consoleLevel: consoleLevel,
 		fileLevel:    fileLevel,
-		writer:       writer,
+		writer:       newRotatingWriter(logDir, name, period, keep),
+		errorWriter:  errorWriter,
 		console:      os.Stdout,
 	}
+}
+
+// Enabled reports whether the logger would emit the given level anywhere.
+func (l *Logger) Enabled(level Level) bool {
+	if l == nil {
+		return false
+	}
+	if level >= l.consoleLevel {
+		return true
+	}
+	if level >= l.fileLevel && l.writer != nil {
+		return true
+	}
+	return level >= LevelWarn && l.errorWriter != nil
+}
+
+// Close closes the logger's primary file writer.
+func (l *Logger) Close() error {
+	if l == nil || l.writer == nil {
+		return nil
+	}
+	return l.writer.Close()
+}
+
+// Logf writes a message at the given level.
+func (l *Logger) Logf(level Level, format string, args ...any) {
+	l.log(level, format, args...)
+}
+
+func (l *Logger) Sillyf(format string, args ...any) {
+	l.log(LevelSilly, format, args...)
 }
 
 func (l *Logger) Debugf(format string, args ...any) {
@@ -110,13 +179,46 @@ func (l *Logger) log(level Level, format string, args ...any) {
 		return
 	}
 	message := fmt.Sprintf(format, args...)
-	line := fmt.Sprintf("%s %s: %s\n", time.Now().Format("2006-01-02 15:04:05"), levelLabel(level), message)
-	if level >= l.consoleLevel {
+	line := fmt.Sprintf("%s %s: %s\n", time.Now().Format("2006-01-02 15:04:05"), level.String(), message)
+	if level >= l.consoleLevel && l.console != nil {
 		_, _ = io.WriteString(l.console, line)
 	}
 	if level >= l.fileLevel && l.writer != nil {
 		_, _ = l.writer.Write([]byte(line))
 	}
+	if level >= LevelWarn && l.errorWriter != nil && l.errorWriter != l.writer {
+		_, _ = l.errorWriter.Write([]byte(line))
+	}
+}
+
+// TimingLevel returns the preferred log level for timing measurements.
+func TimingLevel(cfg *config.Config) Level {
+	if cfg != nil {
+		if enabled, ok := cfg.GetBool("logger.timingStats"); ok && enabled {
+			return LevelVerbose
+		}
+	}
+	return LevelDebug
+}
+
+// PvpEnabled reports whether verbose PvP logging is enabled.
+func PvpEnabled(cfg *config.Config) bool {
+	if cfg == nil {
+		return false
+	}
+	enabled, _ := cfg.GetBool("logger.enableLogs.pvp")
+	return enabled
+}
+
+func categoryFileLevel(cfg *config.Config, path string, defaultLevel Level) Level {
+	if cfg == nil {
+		return defaultLevel
+	}
+	enabled, ok := cfg.GetBool(path)
+	if !ok || enabled {
+		return defaultLevel
+	}
+	return LevelWarn
 }
 
 type rotatingWriter struct {
@@ -157,6 +259,18 @@ func (w *rotatingWriter) Write(p []byte) (int, error) {
 	return w.file.Write(p)
 }
 
+func (w *rotatingWriter) Close() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.file == nil {
+		return nil
+	}
+	err := w.file.Close()
+	w.file = nil
+	w.filename = ""
+	return err
+}
+
 func (w *rotatingWriter) currentFilename() string {
 	period := time.Now().Format("2006-01-02")
 	if w.period == "hourly" {
@@ -166,6 +280,9 @@ func (w *rotatingWriter) currentFilename() string {
 }
 
 func cleanupLogs(logDir, prefix string, keep int) {
+	if keep <= 0 {
+		return
+	}
 	entries, err := os.ReadDir(logDir)
 	if err != nil {
 		return
@@ -190,7 +307,7 @@ func cleanupLogs(logDir, prefix string, keep int) {
 }
 
 func parseLevel(raw string) Level {
-	switch strings.ToLower(raw) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case "silly":
 		return LevelSilly
 	case "debug":
@@ -206,8 +323,8 @@ func parseLevel(raw string) Level {
 	}
 }
 
-func levelLabel(level Level) string {
-	switch level {
+func (l Level) String() string {
+	switch l {
 	case LevelSilly:
 		return "silly"
 	case LevelDebug:

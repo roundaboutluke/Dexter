@@ -120,6 +120,57 @@ type raidSeenEntry struct {
 	Expires   time.Time
 }
 
+func (p *Processor) generalLogger() *logging.Logger {
+	return logging.Get().General
+}
+
+func (p *Processor) controllerLogger() *logging.Logger {
+	return logging.Get().Controller
+}
+
+func (p *Processor) webhooksLogger() *logging.Logger {
+	return logging.Get().Webhooks
+}
+
+func (p *Processor) logInboundPayload(hook *Hook) {
+	logger := p.webhooksLogger()
+	if logger == nil || hook == nil || hook.Message == nil || !logger.Enabled(logging.LevelInfo) {
+		return
+	}
+	raw, err := json.Marshal(hook.Message)
+	if err != nil {
+		logger.Infof("%s %v", hook.Type, hook.Message)
+		return
+	}
+	logger.Infof("%s %s", hook.Type, string(raw))
+}
+
+func (p *Processor) logControllerf(level logging.Level, hook *Hook, format string, args ...any) {
+	logger := p.controllerLogger()
+	if logger == nil || !logger.Enabled(level) {
+		return
+	}
+	ref := hookLogReference(hook)
+	if ref != "" {
+		args = append([]any{ref}, args...)
+		logger.Logf(level, "%s: "+format, args...)
+		return
+	}
+	logger.Logf(level, format, args...)
+}
+
+func hookLogReference(hook *Hook) string {
+	if hook == nil || hook.Message == nil {
+		return ""
+	}
+	for _, key := range []string{"encounter_id", "gym_id", "pokestop_id", "nest_id", "id", "s2_cell_id"} {
+		if value := strings.TrimSpace(getString(hook.Message[key])); value != "" {
+			return value
+		}
+	}
+	return strings.TrimSpace(hook.Type)
+}
+
 // Start runs the processor loop in a goroutine.
 func (p *Processor) Start() {
 	if p == nil || p.processing {
@@ -299,6 +350,7 @@ func (p *Processor) handle(item any) {
 		}
 		return
 	}
+	p.logInboundPayload(hook)
 	if hook.Type == "raid" {
 		pokemonID := getInt(hook.Message["pokemon_id"])
 		if pokemonID == 0 {
@@ -390,22 +442,27 @@ func (p *Processor) handle(item any) {
 	normalizeHookCoordinates(hook)
 	p.normalizeHookExpiry(hook)
 	if shouldSkipExpiredHook(hook) {
+		p.logControllerf(logging.LevelDebug, hook, "%s already expired, ignoring", hook.Type)
 		return
 	}
 	if p.shouldSkipMinimumTime(hook) {
+		p.logControllerf(logging.LevelDebug, hook, "%s did not meet alertMinimumTime, ignoring", hook.Type)
 		return
 	}
 	if p.shouldSkipLongRaid(hook) {
+		p.logControllerf(logging.LevelDebug, hook, "%s is longer than 47 minutes and ignoreLongRaids is enabled", hook.Type)
 		return
 	}
 
 	switch hook.Type {
 	case "pokemon":
 		if p.disabled("general.disablePokemon") {
+			p.logControllerf(logging.LevelDebug, hook, "wild encounter was received but set to be ignored in config")
 			return
 		}
 		if !getBoolFromConfig(p.cfg, "tuning.disablePokemonCache", false) {
 			if !p.dedupePokemon(hook) {
+				p.logControllerf(logging.LevelDebug, hook, "wild encounter was sent again too soon, ignoring")
 				return
 			}
 		}
@@ -432,6 +489,7 @@ func (p *Processor) handle(item any) {
 			if encounterID != "" {
 				expires := hookExpiryUnix(hook)
 				if p.monsterChange.ShouldSuppressStandardAlert(encounterID, hook, expires) {
+					p.logControllerf(logging.LevelDebug, hook, "standard monster alert suppressed after monster change alert")
 					return
 				}
 			}
@@ -439,56 +497,69 @@ func (p *Processor) handle(item any) {
 		p.dispatch(hook)
 	case "raid", "egg":
 		if p.disabled("general.disableRaid") {
+			p.logControllerf(logging.LevelDebug, hook, "%s was received but set to be ignored in config", hook.Type)
 			return
 		}
 		if !p.dedupeRaid(hook) {
+			p.logControllerf(logging.LevelDebug, hook, "%s was sent again too soon, ignoring", hook.Type)
 			return
 		}
 		p.dispatch(hook)
 	case "max_battle":
 		if p.disabled("general.disableMaxBattle") {
+			p.logControllerf(logging.LevelDebug, hook, "max battle was received but set to be ignored in config")
 			return
 		}
 		if !p.dedupeMaxBattle(hook) {
+			p.logControllerf(logging.LevelDebug, hook, "max battle was sent again too soon, ignoring")
 			return
 		}
 		p.dispatch(hook)
 	case "invasion", "pokestop":
 		if p.disabled("general.disablePokestop") {
+			p.logControllerf(logging.LevelDebug, hook, "pokestop was received but set to be ignored in config")
 			return
 		}
 		p.handlePokestop(hook)
 	case "fort_update":
 		if p.disabled("general.disableFortUpdate") {
+			p.logControllerf(logging.LevelDebug, hook, "fort update was received but set to be ignored in config")
 			return
 		}
 		p.dispatch(hook)
 	case "quest":
 		if p.disabled("general.disableQuest") {
+			p.logControllerf(logging.LevelDebug, hook, "quest was received but set to be ignored in config")
 			return
 		}
 		if !p.dedupeQuest(hook) {
+			p.logControllerf(logging.LevelDebug, hook, "quest was sent again too soon, ignoring")
 			return
 		}
 		p.dispatch(hook)
 	case "gym", "gym_details":
 		if p.disabled("general.disableGym") {
+			p.logControllerf(logging.LevelDebug, hook, "gym was received but set to be ignored in config")
 			return
 		}
 		if !p.dedupeGym(hook) {
+			p.logControllerf(logging.LevelDebug, hook, "gym battle cooldown time hasn't ended, ignoring")
 			return
 		}
 		p.dispatch(hook)
 	case "nest":
 		if p.disabled("general.disableNest") {
+			p.logControllerf(logging.LevelDebug, hook, "nest was received but set to be ignored in config")
 			return
 		}
 		if !p.dedupeNest(hook) {
+			p.logControllerf(logging.LevelDebug, hook, "nest was sent again too soon, ignoring")
 			return
 		}
 		p.dispatch(hook)
 	case "weather":
 		if p.disabled("general.disableWeather") {
+			p.logControllerf(logging.LevelDebug, hook, "weather was received but set to be ignored in config")
 			return
 		}
 		if getString(hook.Message["s2_cell_id"]) == "" {
@@ -499,6 +570,7 @@ func (p *Processor) handle(item any) {
 			}
 		}
 		if !p.dedupeWeather(hook) {
+			p.logControllerf(logging.LevelDebug, hook, "weather for this cell was sent again too soon, ignoring")
 			return
 		}
 		if p.weatherData != nil {
@@ -507,6 +579,7 @@ func (p *Processor) handle(item any) {
 		if p.cfg != nil {
 			enabled, _ := p.cfg.GetBool("weather.weatherChangeAlert")
 			if !enabled {
+				p.logControllerf(logging.LevelDebug, hook, "weather change alerts are disabled, ignoring")
 				return
 			}
 		}
@@ -690,8 +763,10 @@ func (p *Processor) dispatch(hook *Hook) {
 		return
 	}
 	if len(targets) == 0 {
+		p.logControllerf(logging.LevelVerbose, hook, "no humans cared for %s", hook.Type)
 		return
 	}
+	queuedJobs := 0
 	trackWeather := false
 	if hook.Type == "pokemon" && p.cfg != nil && p.weatherData != nil {
 		trackWeather, _ = p.cfg.GetBool("weather.weatherChangeAlert")
@@ -763,6 +838,7 @@ func (p *Processor) dispatch(hook *Hook) {
 			UpdateKey:      updateKey,
 			UpdateExisting: updateExisting,
 		}
+		p.logControllerf(logging.LevelDebug, hook, "creating %s alert for %s %s %s %s", hook.Type, target.Type, target.ID, target.Name, target.Template)
 		if p.rateChecker == nil || job.AlwaysSend {
 			trackWeatherCare(match)
 			if hook.Type == "pokemon" && p.monsterChange != nil && updateKey != "" {
@@ -773,11 +849,13 @@ func (p *Processor) dispatch(hook *Hook) {
 				}
 			}
 			p.enqueue(job)
+			queuedJobs++
 			continue
 		}
 		additional, sendOriginal := p.applyRateLimit(job)
 		for _, extra := range additional {
 			p.enqueue(extra)
+			queuedJobs++
 		}
 		if sendOriginal {
 			trackWeatherCare(match)
@@ -789,8 +867,10 @@ func (p *Processor) dispatch(hook *Hook) {
 				}
 			}
 			p.enqueue(job)
+			queuedJobs++
 		}
 	}
+	p.logControllerf(logging.LevelInfo, hook, "%s matched %d humans and queued %d messages", hook.Type, len(targets), queuedJobs)
 }
 
 func shouldSkipExpiredHook(hook *Hook) bool {
@@ -911,6 +991,7 @@ func (p *Processor) dispatchMonsterChange(hook *Hook) {
 	if !changed || len(cares) == 0 || old.PokemonID == 0 {
 		return
 	}
+	p.logControllerf(logging.LevelInfo, hook, "monster change detected for %d cared targets", len(cares))
 
 	changeHook := &Hook{Type: "pokemon", Message: map[string]any{}}
 	for key, value := range hook.Message {
@@ -974,6 +1055,7 @@ func (p *Processor) dispatchMonsterChange(hook *Hook) {
 			// On flap/revert, edit the existing monster-change alert to avoid a third post.
 			UpdateExisting: flapping && changeUpdateKey != "",
 		}
+		p.logControllerf(logging.LevelDebug, changeHook, "creating monster change alert for %s %s %s %s", target.Type, target.ID, target.Name, target.Template)
 		if p.rateChecker == nil || job.AlwaysSend {
 			p.enqueue(job)
 			continue
@@ -999,10 +1081,12 @@ func (p *Processor) dispatchWeatherChange(hook *Hook) bool {
 		cellID = geo.WeatherCellID(lat, lon)
 	}
 	if cellID == "" {
+		p.logControllerf(logging.LevelDebug, hook, "weather change ignored because no weather cell could be resolved")
 		return false
 	}
 	weatherID := weatherCondition(hook.Message)
 	if weatherID == 0 {
+		p.logControllerf(logging.LevelDebug, hook, "weather change ignored because no weather condition was present")
 		return false
 	}
 	weatherHook := hook
@@ -1050,6 +1134,7 @@ func (p *Processor) dispatchWeatherChange(hook *Hook) bool {
 		prevWeather = cell.Data[prevHour]
 	}
 	if prevWeather == weatherID {
+		p.logControllerf(logging.LevelVerbose, weatherHook, "weather has not changed, nobody cares")
 		return false
 	}
 	showAltered := false
@@ -1058,14 +1143,17 @@ func (p *Processor) dispatchWeatherChange(hook *Hook) bool {
 	}
 	targetIDs := p.weatherData.EligibleTargets(cellID, weatherID, showAltered)
 	if len(targetIDs) == 0 {
+		p.logControllerf(logging.LevelVerbose, weatherHook, "weather change has no eligible targets")
 		return false
 	}
+	queuedJobs := 0
 	for _, id := range targetIDs {
 		entry := p.weatherData.CareEntry(cellID, id)
 		if entry == nil {
 			continue
 		}
 		if !p.weatherData.ShouldSendWeather(cellID, id, currentHour) {
+			p.logControllerf(logging.LevelDebug, weatherHook, "user already alerted for this weather change")
 			continue
 		}
 		target := alertTarget{
@@ -1120,17 +1208,24 @@ func (p *Processor) dispatchWeatherChange(hook *Hook) bool {
 			LogReference: "Webhook",
 			Language:     target.Language,
 		}
+		p.logControllerf(logging.LevelDebug, weatherHook, "creating weather alert for %s %s %s %s", target.Type, target.ID, target.Name, target.Template)
 		if p.rateChecker == nil || job.AlwaysSend {
 			p.enqueue(job)
+			queuedJobs++
 			continue
 		}
 		additional, sendOriginal := p.applyRateLimit(job)
 		for _, extra := range additional {
 			p.enqueue(extra)
+			queuedJobs++
 		}
 		if sendOriginal {
 			p.enqueue(job)
+			queuedJobs++
 		}
+	}
+	if queuedJobs > 0 {
+		p.logControllerf(logging.LevelInfo, weatherHook, "weather alert generated and %d humans cared", len(targetIDs))
 	}
 	return false
 }
@@ -1163,7 +1258,13 @@ func (p *Processor) applyRateLimit(job dispatch.MessageJob) ([]dispatch.MessageJ
 		return nil, true
 	}
 	if !rate.JustBreached {
+		if logger := p.generalLogger(); logger != nil {
+			logger.Infof("%s: Intercepted and stopped message for user (Rate limit) for %s %s %s Time to release: %d", job.LogReference, job.Type, job.Target, job.Name, rate.ResetTime)
+		}
 		return nil, false
+	}
+	if logger := p.generalLogger(); logger != nil {
+		logger.Infof("%s: Stopping alerts (Rate limit) for %s %s %s Time to release: %d", job.LogReference, job.Type, job.Target, job.Name, rate.ResetTime)
 	}
 
 	tr := p.i18n.Translator(job.Language)
@@ -1203,6 +1304,9 @@ func (p *Processor) applyRateLimit(job dispatch.MessageJob) ([]dispatch.MessageJ
 			}
 
 			logMessage = fmt.Sprintf("Stopped alerts (rate-limit exceeded too many times) for target %s %s %s", job.Type, destinationID, job.Name)
+			if logger := p.generalLogger(); logger != nil {
+				logger.Infof("%s: Stopping alerts [until restart] (Rate limit) for %s %s %s", job.LogReference, job.Type, job.Target, job.Name)
+			}
 			if job.Type == "discord:user" {
 				shameMessage = tr.TranslateFormat("<@{0}> has had their Poracle tracking disabled for exceeding the rate limit too many times!", destinationID)
 			}
@@ -1283,6 +1387,7 @@ func (p *Processor) applyPvp(hook *Hook) {
 	if p == nil || hook == nil || p.cfg == nil || p.pvpCalc == nil {
 		return
 	}
+	start := time.Now()
 	source, _ := p.cfg.GetString("pvp.dataSource")
 	if source == "" {
 		source = "webhook"
@@ -1331,6 +1436,10 @@ func (p *Processor) applyPvp(hook *Hook) {
 
 	if source == "compare" {
 		hook.Message["ohbem_pvp"] = pvpEntriesToPayload(filtered)
+		if logging.PvpEnabled(p.cfg) {
+			p.logControllerf(logging.LevelVerbose, hook, "PVP From internal compare: %v", hook.Message["ohbem_pvp"])
+		}
+		p.logControllerf(logging.TimingLevel(p.cfg), hook, "PVP time: %dms", time.Since(start).Milliseconds())
 		return
 	}
 	for league, entries := range filtered {
@@ -1340,6 +1449,10 @@ func (p *Processor) applyPvp(hook *Hook) {
 		}
 		hook.Message[key] = pvpEntriesToPayload(map[int][]pvp.Entry{league: entries})[league]
 	}
+	if logging.PvpEnabled(p.cfg) {
+		p.logControllerf(logging.LevelVerbose, hook, "PVP From internal: great=%v ultra=%v little=%v", hook.Message["pvp_rankings_great_league"], hook.Message["pvp_rankings_ultra_league"], hook.Message["pvp_rankings_little_league"])
+	}
+	p.logControllerf(logging.TimingLevel(p.cfg), hook, "PVP time: %dms", time.Since(start).Milliseconds())
 }
 
 func pvpLeagueKey(league int) string {
@@ -1612,6 +1725,7 @@ func (p *Processor) handlePokestop(hook *Hook) {
 	}
 	lureExpiration := getInt64(hook.Message["lure_expiration"])
 	if lureExpiration == 0 && incidentExpiration == 0 {
+		p.logControllerf(logging.LevelDebug, hook, "pokestop received but no invasion or lure information, ignoring")
 		return
 	}
 
@@ -1624,6 +1738,8 @@ func (p *Processor) handlePokestop(hook *Hook) {
 			if !p.shouldSkipMinimumTime(hook) {
 				p.dispatch(hook)
 			}
+		} else {
+			p.logControllerf(logging.LevelDebug, hook, "lure was sent again too soon, ignoring")
 		}
 	}
 
@@ -1638,6 +1754,8 @@ func (p *Processor) handlePokestop(hook *Hook) {
 				if !p.shouldSkipMinimumTime(hook) {
 					p.dispatch(hook)
 				}
+			} else {
+				p.logControllerf(logging.LevelDebug, hook, "invasion was sent again too soon, ignoring")
 			}
 		}
 	}
@@ -1657,6 +1775,8 @@ func (p *Processor) handlePokestop(hook *Hook) {
 			if !p.shouldSkipMinimumTime(hook) {
 				p.dispatch(hook)
 			}
+		} else {
+			p.logControllerf(logging.LevelDebug, hook, "confirmed invasion was sent again too soon, ignoring")
 		}
 	}
 }

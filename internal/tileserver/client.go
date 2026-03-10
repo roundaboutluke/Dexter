@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"poraclego/internal/config"
+	"poraclego/internal/logging"
 )
 
 // TileOptions configures a tileservercache request.
@@ -99,6 +100,7 @@ func GetOptions(cfg *config.Config, mapType string) TileOptions {
 func (c *Client) getURL(baseURL, mapType, template string, data map[string]any, pregenerate bool) (string, error) {
 	baseURL = strings.TrimRight(baseURL, "/")
 	if pregenerate {
+		start := time.Now()
 		endpoint := fmt.Sprintf("%s/%s/poracle-%s?pregenerate=true&regeneratable=true", baseURL, strings.ToLower(mapType), template)
 		body, err := json.Marshal(data)
 		if err != nil {
@@ -114,6 +116,9 @@ func (c *Client) getURL(baseURL, mapType, template string, data map[string]any, 
 			return "", err
 		}
 		if resp.StatusCode != http.StatusOK {
+			if logger := logging.Get().General; logger != nil {
+				logger.Warnf("tileserver pregenerate failed (%s/%s): http %d", mapType, template, resp.StatusCode)
+			}
 			return "", fmt.Errorf("tileserver http %d", resp.StatusCode)
 		}
 		response := strings.TrimSpace(string(raw))
@@ -124,12 +129,21 @@ func (c *Client) getURL(baseURL, mapType, template string, data map[string]any, 
 				case string:
 					response = strings.TrimSpace(value)
 				default:
+					if logger := logging.Get().General; logger != nil {
+						logger.Warnf("tileserver pregenerate invalid response (%s/%s)", mapType, template)
+					}
 					return "", fmt.Errorf("tileserver invalid response")
 				}
 			}
 		}
 		if strings.Contains(response, "<") {
+			if logger := logging.Get().General; logger != nil {
+				logger.Warnf("tileserver pregenerate returned HTML (%s/%s)", mapType, template)
+			}
 			return "", fmt.Errorf("tileserver invalid response")
+		}
+		if logger := logging.Get().General; logger != nil {
+			logger.Logf(logging.TimingLevel(c.cfg), "tileserver generated %s/%s (%d ms)", mapType, template, time.Since(start).Milliseconds())
 		}
 		if strings.HasPrefix(response, "http") {
 			return response, nil

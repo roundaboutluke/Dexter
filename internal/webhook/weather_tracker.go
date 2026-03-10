@@ -11,6 +11,7 @@ import (
 
 	"poraclego/internal/config"
 	"poraclego/internal/geo"
+	"poraclego/internal/logging"
 )
 
 // WeatherCell stores cached weather data for a cell.
@@ -534,8 +535,14 @@ func (w *WeatherTracker) fetchForecast(cellID string, lat, lon float64) {
 	if w == nil {
 		return
 	}
+	if logger := logging.Get().General; logger != nil {
+		logger.Debugf("%s: Requesting weather forecast", cellID)
+	}
 	key := w.nextWeatherKey()
 	if key == "" {
+		if logger := logging.Get().General; logger != nil {
+			logger.Infof("%s: Couldn't fetch weather forecast - no API key available", cellID)
+		}
 		return
 	}
 	locationKey := w.locationKey(cellID, key, lat, lon)
@@ -573,6 +580,9 @@ func (w *WeatherTracker) locationKey(cellID, apiKey string, lat, lon float64) st
 	endpoint := fmt.Sprintf("https://dataservice.accuweather.com/locations/v1/cities/geoposition/search?apikey=%s&q=%f,%f", apiKey, lat, lon)
 	resp, err := w.client.Get(endpoint)
 	if err != nil {
+		if logger := logging.Get().General; logger != nil {
+			logger.Warnf("%s: Fetching weather location errored: %v", cellID, err)
+		}
 		return ""
 	}
 	defer resp.Body.Close()
@@ -601,6 +611,9 @@ func (w *WeatherTracker) hourlyForecast(apiKey, locationKey string) []forecastEn
 	endpoint := fmt.Sprintf("https://dataservice.accuweather.com/forecasts/v1/hourly/12hour/%s?apikey=%s&details=true&metric=true", locationKey, apiKey)
 	resp, err := w.client.Get(endpoint)
 	if err != nil {
+		if logger := logging.Get().General; logger != nil {
+			logger.Warnf("%s: Fetching weather forecast errored: %v", locationKey, err)
+		}
 		return nil
 	}
 	defer resp.Body.Close()

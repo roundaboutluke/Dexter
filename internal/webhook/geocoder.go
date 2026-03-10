@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"poraclego/internal/config"
+	"poraclego/internal/logging"
 )
 
 // Geocoder performs reverse geocoding with basic caching.
@@ -123,6 +124,12 @@ func (g *Geocoder) Forward(query string) []GeoLocation {
 	if strings.TrimSpace(query) == "" {
 		return nil
 	}
+	start := time.Now()
+	defer func() {
+		if logger := logging.Get().General; logger != nil {
+			logger.Logf(logging.TimingLevel(g.cfg), "Geocode %s (%d ms)", query, time.Since(start).Milliseconds())
+		}
+	}()
 	switch strings.ToLower(provider) {
 	case "nominatim", "poracle":
 		return g.forwardNominatim(query)
@@ -148,6 +155,12 @@ func (g *Geocoder) Reverse(lat, lon float64) string {
 	if forwardOnly {
 		return ""
 	}
+	start := time.Now()
+	defer func() {
+		if logger := logging.Get().General; logger != nil {
+			logger.Logf(logging.TimingLevel(g.cfg), "Geocode %f,%f (%d ms)", lat, lon, time.Since(start).Milliseconds())
+		}
+	}()
 
 	cacheKey := geocodeCacheKey(g.cfg, lat, lon)
 	if cacheKey != "" {
@@ -193,6 +206,12 @@ func (g *Geocoder) ReverseDetails(lat, lon float64) *ReverseResult {
 	if forwardOnly {
 		return nil
 	}
+	start := time.Now()
+	defer func() {
+		if logger := logging.Get().General; logger != nil {
+			logger.Logf(logging.TimingLevel(g.cfg), "Geocode details %f,%f (%d ms)", lat, lon, time.Since(start).Milliseconds())
+		}
+	}()
 
 	cacheKey := geocodeCacheKey(g.cfg, lat, lon)
 	if cacheKey != "" {

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"poraclego/internal/config"
+	"poraclego/internal/logging"
 )
 
 // WeatherClient fetches external weather data when configured.
@@ -75,9 +76,15 @@ func (w *WeatherClient) Summary(lat, lon float64) string {
 }
 
 func (w *WeatherClient) locationKey(apiKey string, lat, lon float64) string {
+	if logger := logging.Get().General; logger != nil {
+		logger.Debugf("Requesting weather location for %f,%f", lat, lon)
+	}
 	endpoint := fmt.Sprintf("https://dataservice.accuweather.com/locations/v1/cities/geoposition/search?apikey=%s&q=%f,%f", apiKey, lat, lon)
 	resp, err := w.client.Get(endpoint)
 	if err != nil {
+		if logger := logging.Get().General; logger != nil {
+			logger.Warnf("weather location fetch failed for %f,%f: %v", lat, lon, err)
+		}
 		return ""
 	}
 	defer resp.Body.Close()
@@ -91,9 +98,15 @@ func (w *WeatherClient) locationKey(apiKey string, lat, lon float64) string {
 }
 
 func (w *WeatherClient) forecastSummary(apiKey, locationKey string) string {
+	if logger := logging.Get().General; logger != nil {
+		logger.Debugf("Requesting weather forecast for %s", locationKey)
+	}
 	endpoint := fmt.Sprintf("https://dataservice.accuweather.com/forecasts/v1/hourly/12hour/%s?apikey=%s&details=true&metric=true", locationKey, apiKey)
 	resp, err := w.client.Get(endpoint)
 	if err != nil {
+		if logger := logging.Get().General; logger != nil {
+			logger.Warnf("weather forecast fetch failed for %s: %v", locationKey, err)
+		}
 		return ""
 	}
 	defer resp.Body.Close()

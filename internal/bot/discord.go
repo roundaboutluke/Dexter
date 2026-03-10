@@ -351,11 +351,18 @@ func (d *Discord) logDM(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 	logMsg, err := s.ChannelMessageSend(channelID, msg)
 	if err != nil || logMsg == nil {
+		if logger := logging.Get().Discord; logger != nil && err != nil {
+			logger.Errorf("Failed to send Discord alert to dmLogChannel: %v", err)
+		}
 		return
 	}
 	if minutes, ok := d.manager.cfg.GetInt("discord.dmLogChannelDeletionTime"); ok && minutes > 0 {
 		time.AfterFunc(time.Duration(minutes)*time.Minute, func() {
-			_ = s.ChannelMessageDelete(channelID, logMsg.ID)
+			if err := s.ChannelMessageDelete(channelID, logMsg.ID); err != nil {
+				if logger := logging.Get().Discord; logger != nil {
+					logger.Warnf("Failed to delete dmLogChannel message %s: %v", logMsg.ID, err)
+				}
+			}
 		})
 	}
 }
