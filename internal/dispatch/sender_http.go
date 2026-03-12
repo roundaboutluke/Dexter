@@ -116,11 +116,15 @@ func (s *Sender) postRawWithResponse(url string, body io.Reader, contentType str
 }
 
 func (s *Sender) discordRequestWithRetries(method, endpoint string, body []byte, contentType string, headers map[string]string, maxRetries int) ([]byte, error) {
+	return s.discordRequestWithRetryOptions(method, endpoint, body, contentType, headers, maxRetries, true)
+}
+
+func (s *Sender) discordRequestWithRetryOptions(method, endpoint string, body []byte, contentType string, headers map[string]string, maxRetries int, retryTimeouts bool) ([]byte, error) {
 	const maxTimeoutRetries = 5
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		status, respHeaders, respBody, err := s.doRawRequest(method, endpoint, body, contentType, headers)
 		if err != nil {
-			if isTimeoutErr(err) && attempt < maxTimeoutRetries {
+			if retryTimeouts && isTimeoutErr(err) && attempt < maxTimeoutRetries {
 				if logger := logging.Get().Discord; logger != nil {
 					logger.Warnf("discord timeout endpoint=%s attempt=%d", endpoint, attempt+1)
 				}
@@ -232,14 +236,14 @@ func (s *Sender) postDiscordPayload(url string, payload map[string]any, headers 
 	const maxRetries = 10
 	if s.shouldUploadEmbedImages() {
 		if body, contentType, used, err := s.buildDiscordMultipartBytes(payload, webhook); err == nil && used {
-			return s.discordRequestWithRetries(http.MethodPost, url, body, contentType, headers, maxRetries)
+			return s.discordRequestWithRetryOptions(http.MethodPost, url, body, contentType, headers, maxRetries, false)
 		}
 	}
 	raw, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
 	}
-	return s.discordRequestWithRetries(http.MethodPost, url, raw, "application/json", headers, maxRetries)
+	return s.discordRequestWithRetryOptions(http.MethodPost, url, raw, "application/json", headers, maxRetries, false)
 }
 
 func (s *Sender) shouldUploadEmbedImages() bool {
