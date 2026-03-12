@@ -28,6 +28,10 @@ import (
 	"poraclego/internal/webhook"
 )
 
+type alertStatePreloader interface {
+	RefreshAlertCacheSync() error
+}
+
 // App wires PoracleGo components together.
 type App struct {
 	config          *config.Config
@@ -138,6 +142,7 @@ func (a *App) Run(ctx context.Context) error {
 	a.db = database
 	a.query = db.NewQuery(database.Conn)
 
+	forcedMigrationFailure := false
 	migrationsDir := filepath.Join(root, "migrations")
 	if err := db.EnsureMigrationsDir(migrationsDir); err != nil {
 		return fmt.Errorf("ensure migrations dir: %w", err)
@@ -145,6 +150,7 @@ func (a *App) Run(ctx context.Context) error {
 	if err := db.RunMigrations(ctx, database, migrationsDir); err != nil {
 		if a.forceMigrations {
 			logf("migrations failed (continuing due to --force): %v", err)
+			forcedMigrationFailure = true
 		} else {
 			return fmt.Errorf("migrations failed: %w", err)
 		}
@@ -166,7 +172,7 @@ func (a *App) Run(ctx context.Context) error {
 	tzLocator := tz.NewLocator(cfg, root)
 	digestStore := digest.NewStore()
 	a.processor = webhook.NewProcessor(a.queue, cfg, a.query, a.fences, a.data, a.i18n, a.dts, a.discordQueue, a.telegramQueue, statsTracker, a.weatherTracker, a.shinyPossible, tzLocator, a.pogoEvents, a.scannerClient, digestStore, root, 250*time.Millisecond)
-	if err := a.processor.RefreshAlertCacheSync(); err != nil {
+	if err := preloadAlertState(a.processor, forcedMigrationFailure); err != nil {
 		return fmt.Errorf("load alert state: %w", err)
 	}
 	a.processor.Start()
@@ -209,6 +215,28 @@ func logf(format string, args ...any) {
 		return
 	}
 	logger.Infof(format, args...)
+}
+
+func preloadAlertState(preloader alertStatePreloader, forcedMigrationFailure bool) error {
+	if preloader == nil {
+		return nil
+	}
+	if err := preloader.RefreshAlertCacheSync(); err != nil {
+		if !forcedMigrationFailure {
+			return err
+		}
+		logger := logging.Get().General
+		message := fmt.Sprintf("alert state preload failed after force-tolerated migration error; continuing without preloaded snapshot: %v", err)
+		if logger != nil {
+			logger.Warnf("%s", message)
+			logger.Warnf("webhook matching will use the DB fallback until a later alert-state refresh succeeds")
+		} else {
+			fmt.Fprintln(os.Stderr, message)
+			fmt.Fprintln(os.Stderr, "webhook matching will use the DB fallback until a later alert-state refresh succeeds")
+		}
+		return nil
+	}
+	return nil
 }
 
 // Shutdown performs a graceful shutdown.
