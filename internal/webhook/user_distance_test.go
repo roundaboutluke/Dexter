@@ -11,9 +11,9 @@ func TestPokemonRenderAddsUserDistanceAndTrackingFlags(t *testing.T) {
 	hook := &Hook{
 		Type: "pokemon",
 		Message: map[string]any{
-			"pokemon_id":    1,
-			"latitude":      1.0,
-			"longitude":     1.0,
+			"pokemon_id":     1,
+			"latitude":       1.0,
+			"longitude":      1.0,
 			"disappear_time": int64(1700000500),
 		},
 	}

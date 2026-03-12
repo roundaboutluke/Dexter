@@ -13,4 +13,3 @@ func TestTrimWeatherChangeTime_MirrorsPoracleJS(t *testing.T) {
 		t.Fatalf("trimWeatherChangeTime=%q, want empty string", got)
 	}
 }
-

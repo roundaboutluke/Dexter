@@ -154,12 +154,16 @@ func (m *Manager) Registry() *command.Registry {
 	return m.registry
 }
 
+// RefreshAlertState schedules a full alert-state refresh when a processor is available.
+func (m *Manager) RefreshAlertState() {
+	if m == nil || m.processor == nil {
+		return
+	}
+	m.processor.RefreshAlertCacheAsync()
+}
+
 // Context builds a command context.
 func (m *Manager) Context(platform, language, prefix, userID, userName, channelID, channelName string, isDM, isAdmin bool, roles []string, root string) *command.Context {
-	var refresh func()
-	if m.processor != nil {
-		refresh = func() { m.processor.RefreshAlertCacheAsync() }
-	}
 	return &command.Context{
 		Config:            m.cfg,
 		Query:             m.query,
@@ -176,7 +180,7 @@ func (m *Manager) Context(platform, language, prefix, userID, userName, channelI
 		Scanner:           m.scanner,
 		Root:              root,
 		Logs:              logging.Get(),
-		RefreshAlertCache: refresh,
+		RefreshAlertCache: m.RefreshAlertState,
 		Platform:          platform,
 		Language:          language,
 		Prefix:            prefix,

@@ -35,4 +35,3 @@ func TestInvasionTrackTypeKeepsMetalForMatching(t *testing.T) {
 		t.Fatalf("matchInvasionWithData=false, want true")
 	}
 }
-

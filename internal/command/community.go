@@ -76,6 +76,7 @@ func (c *CommunityCommand) Handle(ctx *Context, args []string) (string, error) {
 			}, map[string]any{"id": id}); err != nil {
 				return "", err
 			}
+			ctx.MarkAlertStateDirty()
 		}
 		lines = append(lines, "✅")
 		return strings.Join(lines, "\n"), nil
@@ -116,6 +117,7 @@ func (c *CommunityCommand) Handle(ctx *Context, args []string) (string, error) {
 			}, map[string]any{"id": id}); err != nil {
 				return "", err
 			}
+			ctx.MarkAlertStateDirty()
 		}
 		lines = append(lines, "✅")
 		return strings.Join(lines, "\n"), nil

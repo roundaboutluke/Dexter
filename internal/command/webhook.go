@@ -61,6 +61,7 @@ func (c *WebhookCommand) Handle(ctx *Context, args []string) (string, error) {
 		}); err != nil {
 			return "", err
 		}
+		ctx.MarkAlertStateDirty()
 		return tr.Translate("Webhook added.", false), nil
 	case "remove":
 		if webhookName == "" {
@@ -69,6 +70,7 @@ func (c *WebhookCommand) Handle(ctx *Context, args []string) (string, error) {
 		if _, err := ctx.Query.DeleteQuery("humans", map[string]any{"name": webhookName, "type": "webhook"}); err != nil {
 			return "", err
 		}
+		ctx.MarkAlertStateDirty()
 		return tr.Translate("Webhook removed.", false), nil
 	default:
 		return "", nil
@@ -109,6 +111,7 @@ func handleDiscordWebhook(ctx *Context, command string, webhookName string) (str
 			if _, err := ctx.Query.DeleteQuery("humans", map[string]any{"name": webhookName, "type": "webhook"}); err != nil {
 				return "", err
 			}
+			ctx.MarkAlertStateDirty()
 			return "✅", nil
 		}
 		return fmt.Sprintf("A webhook or channel with the name %s cannot be found", webhookName), nil
@@ -137,6 +140,7 @@ func handleDiscordWebhook(ctx *Context, command string, webhookName string) (str
 		}); err != nil {
 			return "", err
 		}
+		ctx.MarkAlertStateDirty()
 		return "✅", nil
 	default:
 		return tr.Translate("Unknown webhook command.", false), nil

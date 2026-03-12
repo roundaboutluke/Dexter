@@ -57,4 +57,3 @@ func TestDiademURL_QuestStopAndStation(t *testing.T) {
 		t.Fatalf("unexpected diadem URL: %q", got)
 	}
 }
-

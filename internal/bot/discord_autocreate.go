@@ -103,6 +103,7 @@ func (d *Discord) handleAutocreate(s *discordgo.Session, m *discordgo.MessageCre
 		}
 	}
 
+	dirty := false
 	for _, channelDef := range selected.Definition.Channels {
 		channelName := formatTemplate(channelDef.ChannelName, formatArgs)
 		create := discordgo.GuildChannelCreateData{
@@ -165,6 +166,7 @@ func (d *Discord) handleAutocreate(s *discordgo.Session, m *discordgo.MessageCre
 			"area":                 "[]",
 			"community_membership": "[]",
 		})
+		dirty = true
 
 		for _, cmd := range channelDef.Commands {
 			cmdLine := formatTemplate(cmd, subArgs)
@@ -177,6 +179,9 @@ func (d *Discord) handleAutocreate(s *discordgo.Session, m *discordgo.MessageCre
 			}
 			_, _ = d.manager.Registry().Execute(&clone, cmdLine)
 		}
+	}
+	if dirty {
+		d.manager.RefreshAlertState()
 	}
 }
 

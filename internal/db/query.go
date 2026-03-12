@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"sort"
@@ -9,12 +10,80 @@ import (
 
 // Query provides database helpers similar to PoracleJS.
 type Query struct {
-	db *sql.DB
+	db         *sql.DB
+	tx         *sql.Tx
+	postCommit *[]func()
 }
 
 // NewQuery constructs a query helper.
 func NewQuery(conn *sql.DB) *Query {
 	return &Query{db: conn}
+}
+
+type queryRunner interface {
+	Query(query string, args ...any) (*sql.Rows, error)
+	QueryRow(query string, args ...any) *sql.Row
+	Exec(query string, args ...any) (sql.Result, error)
+}
+
+func (q *Query) runner() queryRunner {
+	if q == nil {
+		return nil
+	}
+	if q.tx != nil {
+		return q.tx
+	}
+	return q.db
+}
+
+// WithTx runs fn inside a transaction. Nested calls reuse the active transaction.
+func (q *Query) WithTx(ctx context.Context, fn func(*Query) error) error {
+	if q == nil || q.db == nil {
+		return fmt.Errorf("withTx: database not initialized")
+	}
+	if fn == nil {
+		return nil
+	}
+	if q.tx != nil {
+		return fn(q)
+	}
+	tx, err := q.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("withTx: %w", err)
+	}
+	callbacks := []func(){}
+	txQuery := &Query{
+		db:         q.db,
+		tx:         tx,
+		postCommit: &callbacks,
+	}
+	if err := fn(txQuery); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("withTx: %w", err)
+	}
+	for _, cb := range callbacks {
+		if cb != nil {
+			cb()
+		}
+	}
+	return nil
+}
+
+// AfterCommit registers a callback to run after the surrounding transaction commits.
+// When no transaction is active, the callback runs immediately.
+func (q *Query) AfterCommit(fn func()) {
+	if q == nil || fn == nil {
+		return
+	}
+	if q.tx == nil || q.postCommit == nil {
+		fn()
+		return
+	}
+	*q.postCommit = append(*q.postCommit, fn)
 }
 
 // SelectOneQuery returns the first row matching conditions.
@@ -31,12 +100,12 @@ func (q *Query) SelectOneQuery(table string, conditions map[string]any) (map[str
 
 // SelectAllQuery returns all rows matching conditions.
 func (q *Query) SelectAllQuery(table string, conditions map[string]any) ([]map[string]any, error) {
-	if q == nil || q.db == nil {
+	if q == nil || q.runner() == nil {
 		return nil, fmt.Errorf("selectAllQuery: database not initialized")
 	}
 	whereSQL, args := buildWhere(conditions)
 	query := fmt.Sprintf("SELECT * FROM %s%s", table, whereSQL)
-	rows, err := q.db.Query(query, args...)
+	rows, err := q.runner().Query(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("selectAllQuery: %w", err)
 	}
@@ -50,13 +119,13 @@ func (q *Query) SelectAllQueryLimit(table string, conditions map[string]any, lim
 	if limit <= 0 {
 		return q.SelectAllQuery(table, conditions)
 	}
-	if q == nil || q.db == nil {
+	if q == nil || q.runner() == nil {
 		return nil, fmt.Errorf("selectAllQueryLimit: database not initialized")
 	}
 	whereSQL, args := buildWhere(conditions)
 	query := fmt.Sprintf("SELECT * FROM %s%s LIMIT ?", table, whereSQL)
 	args = append(args, limit)
-	rows, err := q.db.Query(query, args...)
+	rows, err := q.runner().Query(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("selectAllQueryLimit: %w", err)
 	}
@@ -69,10 +138,14 @@ func (q *Query) SelectWhereInQuery(table string, values []any, valuesColumn stri
 	if len(values) == 0 {
 		return []map[string]any{}, nil
 	}
+	runner := q.runner()
+	if runner == nil {
+		return nil, fmt.Errorf("selectWhereInQuery: database not initialized")
+	}
 	placeholders := strings.Repeat("?,", len(values))
 	placeholders = strings.TrimSuffix(placeholders, ",")
 	query := fmt.Sprintf("SELECT * FROM %s WHERE %s IN (%s)", table, quoteIdent(valuesColumn), placeholders)
-	rows, err := q.db.Query(query, values...)
+	rows, err := runner.Query(query, values...)
 	if err != nil {
 		return nil, fmt.Errorf("selectWhereInQuery: %w", err)
 	}
@@ -85,13 +158,17 @@ func (q *Query) SelectWhereInLikeQuery(table, likeColumn, likeValue, inColumn st
 	if len(inValues) == 0 {
 		return []map[string]any{}, nil
 	}
+	runner := q.runner()
+	if runner == nil {
+		return nil, fmt.Errorf("selectWhereInLikeQuery: database not initialized")
+	}
 	placeholders := strings.Repeat("?,", len(inValues))
 	placeholders = strings.TrimSuffix(placeholders, ",")
 	query := fmt.Sprintf("SELECT * FROM %s WHERE %s LIKE ? AND %s IN (%s)", table, quoteIdent(likeColumn), quoteIdent(inColumn), placeholders)
 	args := make([]any, 0, len(inValues)+1)
 	args = append(args, "%"+likeValue+"%")
 	args = append(args, inValues...)
-	rows, err := q.db.Query(query, args...)
+	rows, err := runner.Query(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("selectWhereInLikeQuery: %w", err)
 	}
@@ -104,10 +181,14 @@ func (q *Query) UpdateQuery(table string, values map[string]any, conditions map[
 	if len(values) == 0 {
 		return 0, nil
 	}
+	runner := q.runner()
+	if runner == nil {
+		return 0, fmt.Errorf("updateQuery: database not initialized")
+	}
 	setSQL, setArgs := buildSet(values)
 	whereSQL, whereArgs := buildWhere(conditions)
 	query := fmt.Sprintf("UPDATE %s%s%s", table, setSQL, whereSQL)
-	res, err := q.db.Exec(query, append(setArgs, whereArgs...)...)
+	res, err := runner.Exec(query, append(setArgs, whereArgs...)...)
 	if err != nil {
 		return 0, fmt.Errorf("updateQuery: %w", err)
 	}
@@ -116,11 +197,15 @@ func (q *Query) UpdateQuery(table string, values map[string]any, conditions map[
 
 // IncrementQuery increments a numeric column by value for matching rows.
 func (q *Query) IncrementQuery(table string, where map[string]any, target string, value int64) (int64, error) {
+	runner := q.runner()
+	if runner == nil {
+		return 0, fmt.Errorf("incrementQuery: database not initialized")
+	}
 	whereSQL, whereArgs := buildWhere(where)
 	targetIdent := quoteIdent(target)
 	query := fmt.Sprintf("UPDATE %s SET %s = %s + ?%s", table, targetIdent, targetIdent, whereSQL)
 	args := append([]any{value}, whereArgs...)
-	res, err := q.db.Exec(query, args...)
+	res, err := runner.Exec(query, args...)
 	if err != nil {
 		return 0, fmt.Errorf("incrementQuery: %w", err)
 	}
@@ -129,9 +214,13 @@ func (q *Query) IncrementQuery(table string, where map[string]any, target string
 
 // CountQuery returns a count of rows matching conditions.
 func (q *Query) CountQuery(table string, conditions map[string]any) (int64, error) {
+	runner := q.runner()
+	if runner == nil {
+		return 0, fmt.Errorf("countQuery: database not initialized")
+	}
 	whereSQL, args := buildWhere(conditions)
 	query := fmt.Sprintf("SELECT COUNT(*) FROM %s%s", table, whereSQL)
-	row := q.db.QueryRow(query, args...)
+	row := runner.QueryRow(query, args...)
 	var count int64
 	if err := row.Scan(&count); err != nil {
 		return 0, fmt.Errorf("countQuery: %w", err)
@@ -145,6 +234,10 @@ func (q *Query) InsertQuery(table string, values any) (int64, error) {
 	rows := normalizeRows(values)
 	if len(rows) == 0 {
 		return 0, nil
+	}
+	runner := q.runner()
+	if runner == nil {
+		return 0, fmt.Errorf("insertQuery: database not initialized")
 	}
 	switch strings.ToLower(table) {
 	case "monsters", "raid", "egg", "quest", "invasion", "weather", "lures", "gym", "nests", "forts":
@@ -172,7 +265,7 @@ func (q *Query) InsertQuery(table string, values any) (int64, error) {
 		}
 	}
 	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES %s", table, strings.Join(quotedColumns, ","), strings.Join(valueGroups, ","))
-	res, err := q.db.Exec(query, args...)
+	res, err := runner.Exec(query, args...)
 	if err != nil {
 		return 0, fmt.Errorf("insertQuery: %w", err)
 	}
@@ -181,7 +274,11 @@ func (q *Query) InsertQuery(table string, values any) (int64, error) {
 
 // ExecQuery runs a non-select statement and returns affected rows.
 func (q *Query) ExecQuery(sqlQuery string, args ...any) (int64, error) {
-	res, err := q.db.Exec(sqlQuery, args...)
+	runner := q.runner()
+	if runner == nil {
+		return 0, fmt.Errorf("execQuery: database not initialized")
+	}
+	res, err := runner.Exec(sqlQuery, args...)
 	if err != nil {
 		return 0, fmt.Errorf("execQuery: %w", err)
 	}
@@ -190,7 +287,11 @@ func (q *Query) ExecQuery(sqlQuery string, args ...any) (int64, error) {
 
 // MysteryQuery runs a raw SQL query and returns rows.
 func (q *Query) MysteryQuery(sqlQuery string) ([]map[string]any, error) {
-	rows, err := q.db.Query(sqlQuery)
+	runner := q.runner()
+	if runner == nil {
+		return nil, fmt.Errorf("mysteryQuery: database not initialized")
+	}
+	rows, err := runner.Query(sqlQuery)
 	if err != nil {
 		return nil, fmt.Errorf("mysteryQuery: %w", err)
 	}
@@ -202,6 +303,10 @@ func (q *Query) MysteryQuery(sqlQuery string) ([]map[string]any, error) {
 func (q *Query) DeleteWhereInQuery(table string, id any, values []any, valuesColumn string) (int64, error) {
 	if len(values) == 0 {
 		return 0, nil
+	}
+	runner := q.runner()
+	if runner == nil {
+		return 0, fmt.Errorf("deleteWhereInQuery: database not initialized")
 	}
 	placeholders := strings.Repeat("?,", len(values))
 	placeholders = strings.TrimSuffix(placeholders, ",")
@@ -226,7 +331,7 @@ func (q *Query) DeleteWhereInQuery(table string, id any, values []any, valuesCol
 	}
 
 	query := fmt.Sprintf("DELETE FROM %s WHERE %s IN (%s)%s", table, quoteIdent(valuesColumn), placeholders, whereSQL)
-	res, err := q.db.Exec(query, args...)
+	res, err := runner.Exec(query, args...)
 	if err != nil {
 		return 0, fmt.Errorf("deleteWhereInQuery: %w", err)
 	}
@@ -255,9 +360,13 @@ func (q *Query) InsertOrUpdateQuery(table string, values any) (int64, error) {
 
 // DeleteQuery deletes rows matching values.
 func (q *Query) DeleteQuery(table string, values map[string]any) (int64, error) {
+	runner := q.runner()
+	if runner == nil {
+		return 0, fmt.Errorf("deleteQuery: database not initialized")
+	}
 	whereSQL, args := buildWhere(values)
 	query := fmt.Sprintf("DELETE FROM %s%s", table, whereSQL)
-	res, err := q.db.Exec(query, args...)
+	res, err := runner.Exec(query, args...)
 	if err != nil {
 		return 0, fmt.Errorf("deleteQuery: %w", err)
 	}

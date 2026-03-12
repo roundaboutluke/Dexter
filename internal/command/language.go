@@ -71,6 +71,7 @@ func (c *LanguageCommand) Handle(ctx *Context, args []string) (string, error) {
 	if _, err := ctx.Query.UpdateQuery("humans", map[string]any{"language": newLanguage}, map[string]any{"id": result.TargetID}); err != nil {
 		return "", err
 	}
+	ctx.MarkAlertStateDirty()
 	name := languageNames[newLanguage]
 	if name == "" {
 		name = newLanguage

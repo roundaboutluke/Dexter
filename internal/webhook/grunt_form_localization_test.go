@@ -55,4 +55,3 @@ func TestGruntRewardListsTreatNormalFormAsEmptyBeforeTranslation(t *testing.T) {
 		t.Fatalf("lineup fullName=%v, want %q", got, "Translated")
 	}
 }
-

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"poraclego/internal/db"
 	"poraclego/internal/tileserver"
 	"poraclego/internal/webhook"
 )
@@ -105,10 +106,15 @@ func (c *LocationCommand) Handle(ctx *Context, args []string) (string, error) {
 		lon = 0
 	}
 
-	if _, err := ctx.Query.UpdateQuery("humans", map[string]any{"latitude": lat, "longitude": lon}, map[string]any{"id": targetID}); err != nil {
-		return "", err
-	}
-	if _, err := ctx.Query.UpdateQuery("profiles", map[string]any{"latitude": lat, "longitude": lon}, map[string]any{"id": targetID, "profile_no": profileNo}); err != nil {
+	if err := commitAlertStateTx(ctx, func(query *db.Query) error {
+		if _, err := query.UpdateQuery("humans", map[string]any{"latitude": lat, "longitude": lon}, map[string]any{"id": targetID}); err != nil {
+			return err
+		}
+		if _, err := query.UpdateQuery("profiles", map[string]any{"latitude": lat, "longitude": lon}, map[string]any{"id": targetID, "profile_no": profileNo}); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
 		return "", err
 	}
 

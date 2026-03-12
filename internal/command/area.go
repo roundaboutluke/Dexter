@@ -6,9 +6,11 @@ import (
 	"sort"
 	"strings"
 
+	"poraclego/internal/db"
 	"poraclego/internal/geofence"
 	"poraclego/internal/i18n"
 	"poraclego/internal/tileserver"
+	"poraclego/internal/tracking"
 )
 
 // AreaCommand manages area selection.
@@ -207,10 +209,15 @@ func updateAreas(ctx *Context, tr *i18n.Translator, targetID string, profileNo i
 		}
 	}
 	payload, _ := json.Marshal(filtered)
-	if _, err := ctx.Query.UpdateQuery("humans", map[string]any{"area": string(payload)}, map[string]any{"id": targetID}); err != nil {
-		return "", err
-	}
-	if _, err := ctx.Query.UpdateQuery("profiles", map[string]any{"area": string(payload)}, map[string]any{"id": targetID, "profile_no": profileNo}); err != nil {
+	if err := commitAlertStateTx(ctx, func(query *db.Query) error {
+		if _, err := query.UpdateQuery("humans", map[string]any{"area": string(payload)}, map[string]any{"id": targetID}); err != nil {
+			return err
+		}
+		if _, err := query.UpdateQuery("profiles", map[string]any{"area": string(payload)}, map[string]any{"id": targetID, "profile_no": profileNo}); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
 		return "", err
 	}
 
@@ -295,15 +302,11 @@ func firstArg(args []string) string {
 }
 
 func parseAreaListFromHuman(human map[string]any) []string {
-	current := []string{}
-	if raw, ok := human["area"].(string); ok && raw != "" {
-		_ = json.Unmarshal([]byte(raw), &current)
-	}
-	return current
+	return tracking.ParseAreaList(human)
 }
 
 func currentAreaText(tr *i18n.Translator, fences []geofence.Fence, selected []string) string {
-	return trackedAreaText(tr, fences, selected)
+	return tracking.AreaText(tr, fences, selected)
 }
 
 func areaDefault(ctx *Context, tr *i18n.Translator, human map[string]any, areas []areaEntry, language string, target Target) string {

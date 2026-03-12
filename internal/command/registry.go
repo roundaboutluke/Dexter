@@ -17,6 +17,36 @@ type Registry struct {
 	handlers map[string]Handler
 }
 
+var mutatingCommands = map[string]bool{
+	"area":       true,
+	"backup":     true,
+	"channel":    true,
+	"community":  true,
+	"disable":    true,
+	"egg":        true,
+	"enable":     true,
+	"fort":       true,
+	"gym":        true,
+	"help":       true,
+	"invasion":   true,
+	"language":   true,
+	"location":   true,
+	"lure":       true,
+	"maxbattle":  true,
+	"nest":       true,
+	"profile":    true,
+	"quest":      true,
+	"raid":       true,
+	"restore":    true,
+	"start":      true,
+	"stop":       true,
+	"track":      true,
+	"unregister": true,
+	"untrack":    true,
+	"weather":    true,
+	"webhook":    true,
+}
+
 // NewRegistry builds a registry with default handlers.
 func NewRegistry() *Registry {
 	r := &Registry{handlers: map[string]Handler{}}
@@ -100,24 +130,44 @@ func (r *Registry) Execute(ctx *Context, line string) (string, error) {
 		if helpHandler, okHelp := r.handlers["help"]; okHelp {
 			if aliasLang != "" && ctx != nil {
 				clone := *ctx
+				clone.resetAlertStateTracking()
 				clone.Language = aliasLang
 				reply, err := helpHandler.Handle(&clone, []string{name})
+				if err == nil && mutatingCommands[helpHandler.Name()] && clone.shouldRefreshAlertState() {
+					clone.RequestAlertStateRefresh()
+				}
 				logCommandResult(ctx, logLabel, err)
 				return reply, err
 			}
+			if ctx != nil {
+				ctx.resetAlertStateTracking()
+			}
 			reply, err := helpHandler.Handle(ctx, []string{name})
+			if err == nil && ctx != nil && mutatingCommands[helpHandler.Name()] && ctx.shouldRefreshAlertState() {
+				ctx.RequestAlertStateRefresh()
+			}
 			logCommandResult(ctx, logLabel, err)
 			return reply, err
 		}
 	}
 	if aliasLang != "" {
 		clone := *ctx
+		clone.resetAlertStateTracking()
 		clone.Language = aliasLang
 		reply, err := handler.Handle(&clone, parts[1:])
+		if err == nil && mutatingCommands[handler.Name()] && clone.shouldRefreshAlertState() {
+			clone.RequestAlertStateRefresh()
+		}
 		logCommandResult(&clone, logLabel, err)
 		return reply, err
 	}
+	if ctx != nil {
+		ctx.resetAlertStateTracking()
+	}
 	reply, err := handler.Handle(ctx, parts[1:])
+	if err == nil && mutatingCommands[handler.Name()] && ctx.shouldRefreshAlertState() {
+		ctx.RequestAlertStateRefresh()
+	}
 	logCommandResult(ctx, logLabel, err)
 	return reply, err
 }

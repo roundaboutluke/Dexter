@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"strings"
 
+	"poraclego/internal/alertstate"
 	"poraclego/internal/community"
+	"poraclego/internal/db"
 	"poraclego/internal/dispatch"
 	"poraclego/internal/dts"
 	"poraclego/internal/render"
@@ -29,6 +31,7 @@ func (c *StartCommand) Handle(ctx *Context, args []string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	ctx.MarkAlertStateDirty()
 	return tr.TranslateFormat("Your tracking is now activated, send {0}{1} for more information about available commands", ctx.Prefix, tr.Translate("help", true)), nil
 }
 
@@ -64,6 +67,7 @@ func (c *StopCommand) Handle(ctx *Context, args []string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	ctx.MarkAlertStateDirty()
 	return tr.TranslateFormat("All alert messages have been stopped, you can resume them with {0}{1}", ctx.Prefix, tr.Translate("start", true)), nil
 }
 
@@ -174,6 +178,7 @@ func (c *PoracleCommand) Handle(ctx *Context, _ []string) (string, error) {
 			if _, err := ctx.Query.UpdateQuery("humans", update, map[string]any{"id": ctx.UserID}); err != nil {
 				return "", err
 			}
+			ctx.MarkAlertStateDirty()
 			c.enqueueGreetings(ctx, ctx.UserID, ctx.Language)
 			if ctx.Platform == "telegram" {
 				c.enqueueTelegramWelcome(ctx)
@@ -203,6 +208,7 @@ func (c *PoracleCommand) Handle(ctx *Context, _ []string) (string, error) {
 	if _, err := ctx.Query.InsertQuery("humans", values); err != nil {
 		return "", err
 	}
+	ctx.MarkAlertStateDirty()
 	c.enqueueGreetings(ctx, ctx.UserID, ctx.Language)
 	if ctx.Platform == "telegram" {
 		c.enqueueTelegramWelcome(ctx)
@@ -377,25 +383,29 @@ func (c *UnregisterCommand) Handle(ctx *Context, args []string) (string, error) 
 		}
 	}
 	removed := false
-	for _, t := range targets {
-		if count, err := ctx.Query.CountQuery("humans", map[string]any{"id": t}); err == nil && count > 0 {
-			removed = true
+	if err := withAlertStateTx(ctx, func(query *db.Query) error {
+		for _, t := range targets {
+			if count, err := query.CountQuery("humans", map[string]any{"id": t}); err == nil && count > 0 {
+				removed = true
+			}
+			for _, table := range alertstate.TrackedTables() {
+				if _, err := query.DeleteQuery(table, map[string]any{"id": t}); err != nil {
+					return err
+				}
+			}
+			if _, err := query.DeleteQuery("humans", map[string]any{"id": t}); err != nil {
+				return err
+			}
+			if _, err := query.DeleteQuery("profiles", map[string]any{"id": t}); err != nil {
+				return err
+			}
 		}
-		_, _ = ctx.Query.DeleteQuery("egg", map[string]any{"id": t})
-		_, _ = ctx.Query.DeleteQuery("monsters", map[string]any{"id": t})
-		_, _ = ctx.Query.DeleteQuery("raid", map[string]any{"id": t})
-		_, _ = ctx.Query.DeleteQuery("quest", map[string]any{"id": t})
-		_, _ = ctx.Query.DeleteQuery("lures", map[string]any{"id": t})
-		_, _ = ctx.Query.DeleteQuery("forts", map[string]any{"id": t})
-		_, _ = ctx.Query.DeleteQuery("gym", map[string]any{"id": t})
-		_, _ = ctx.Query.DeleteQuery("invasion", map[string]any{"id": t})
-		_, _ = ctx.Query.DeleteQuery("nests", map[string]any{"id": t})
-		_, _ = ctx.Query.DeleteQuery("weather", map[string]any{"id": t})
-		_, _ = ctx.Query.DeleteQuery("humans", map[string]any{"id": t})
-		_, _ = ctx.Query.DeleteQuery("profiles", map[string]any{"id": t})
+		return nil
+	}); err != nil {
+		return "", err
 	}
-	if removed && ctx.RefreshAlertCache != nil {
-		ctx.RefreshAlertCache()
+	if removed {
+		ctx.MarkAlertStateDirty()
 	}
 	if removed {
 		return "✅", nil

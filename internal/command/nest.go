@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"poraclego/internal/db"
 	"poraclego/internal/tracking"
 )
 
@@ -143,10 +144,10 @@ func (c *NestCommand) Handle(ctx *Context, args []string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		if removed == 1 {
-			return prependWarning(warning, fmt.Sprintf("%s, %s", tr.Translate("I removed 1 entry", false), tr.TranslateFormat("use `{0}{1}` to see what you are currently tracking", ctx.Prefix, tr.Translate("tracked", true)))), nil
+		if removed > 0 {
+			ctx.MarkAlertStateDirty()
 		}
-		return prependWarning(warning, fmt.Sprintf("%s, %s", tr.TranslateFormat("I removed {0} entries", removed), tr.TranslateFormat("use `{0}{1}` to see what you are currently tracking", ctx.Prefix, tr.Translate("tracked", true)))), nil
+		return prependWarning(warning, trackedRemovalMessage(ctx, tr, removed)), nil
 	}
 
 	rows := []map[string]any{}
@@ -193,16 +194,7 @@ func (c *NestCommand) Handle(ctx *Context, args []string) (string, error) {
 				continue
 			}
 			if uid := toInt(existingRow["uid"], 0); uid != 0 {
-				if _, err := ctx.Query.UpdateQuery("nests", map[string]any{
-					"ping":          row["ping"],
-					"template":      row["template"],
-					"distance":      row["distance"],
-					"clean":         row["clean"],
-					"min_spawn_avg": row["min_spawn_avg"],
-					"form":          row["form"],
-				}, map[string]any{"uid": uid}); err != nil {
-					return "", err
-				}
+				row["uid"] = uid
 			}
 			updates = append(updates, row)
 			continue
@@ -210,31 +202,42 @@ func (c *NestCommand) Handle(ctx *Context, args []string) (string, error) {
 		inserts = append(inserts, row)
 	}
 
-	if len(inserts) > 0 {
-		if _, err := ctx.Query.InsertQuery("nests", inserts); err != nil {
+	if len(updates)+len(inserts) > 0 {
+		if err := commitAlertStateTx(ctx, func(query *db.Query) error {
+			for _, row := range updates {
+				if _, err := query.UpdateQuery("nests", map[string]any{
+					"ping":          row["ping"],
+					"template":      row["template"],
+					"distance":      row["distance"],
+					"clean":         row["clean"],
+					"min_spawn_avg": row["min_spawn_avg"],
+					"form":          row["form"],
+				}, map[string]any{"uid": row["uid"]}); err != nil {
+					return err
+				}
+			}
+			if len(inserts) > 0 {
+				if _, err := query.InsertQuery("nests", inserts); err != nil {
+					return err
+				}
+			}
+			return nil
+		}); err != nil {
 			return "", err
 		}
 	}
 
-	total := len(unchanged) + len(updates) + len(inserts)
-	if total > 50 {
-		return prependWarning(warning, tr.TranslateFormat("I have made a lot of changes. See {0}{1} for details", ctx.Prefix, tr.Translate("tracked", true))), nil
-	}
-
-	lines := []string{}
-	for _, row := range unchanged {
-		lines = append(lines, fmt.Sprintf("%s%s", tr.Translate("Unchanged: ", false), tracking.NestRowText(ctx.Config, tr, ctx.Data, row)))
-	}
-	for _, row := range updates {
-		lines = append(lines, fmt.Sprintf("%s%s", tr.Translate("Updated: ", false), tracking.NestRowText(ctx.Config, tr, ctx.Data, row)))
-	}
-	for _, row := range inserts {
-		lines = append(lines, fmt.Sprintf("%s%s", tr.Translate("New: ", false), tracking.NestRowText(ctx.Config, tr, ctx.Data, row)))
-	}
-	if len(lines) == 0 {
+	message := tracking.ChangeMessage(tr, ctx.Prefix, tr.Translate("tracked", true), tracking.UpsertPlan{
+		Unchanged: unchanged,
+		Updates:   updates,
+		Inserts:   inserts,
+	}, func(row map[string]any) string {
+		return tracking.NestRowText(ctx.Config, tr, ctx.Data, row)
+	})
+	if message == "" {
 		return warning, nil
 	}
-	return prependWarning(warning, strings.Join(lines, "\n")), nil
+	return prependWarning(warning, message), nil
 }
 
 type genRange struct {

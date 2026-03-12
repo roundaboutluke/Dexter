@@ -14,14 +14,14 @@ type monsterQuery interface {
 }
 
 // MonsterAlarmCache mirrors PoracleJS's monsterAlarmMatch cache behavior: it preloads the `monsters`
-// tracking table and can be refreshed on demand (e.g. via /api/tracking/pokemon/refresh).
+// tracking table for legacy fast-monster handling.
 //
 // It is intentionally minimal (stores raw rows) — the main goal is to avoid repeated DB reads and to
 // match the "refresh alerts" semantics in PoracleJS.
 type MonsterAlarmCache struct {
-	mu        sync.RWMutex
-	rows      []map[string]any
-	refreshMu sync.Mutex
+	mu         sync.RWMutex
+	rows       []map[string]any
+	refreshMu  sync.Mutex
 	refreshing bool
 }
 

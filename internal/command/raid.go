@@ -113,10 +113,10 @@ func (c *RaidCommand) Handle(ctx *Context, args []string) (string, error) {
 			}
 			total += removed
 		}
-		if total == 1 {
-			return prependWarning(warning, fmt.Sprintf("%s, %s", tr.Translate("I removed 1 entry", false), tr.TranslateFormat("use `{0}{1}` to see what you are currently tracking", ctx.Prefix, tr.Translate("tracked", true)))), nil
+		if total > 0 {
+			ctx.MarkAlertStateDirty()
 		}
-		return prependWarning(warning, fmt.Sprintf("%s, %s", tr.TranslateFormat("I removed {0} entries", total), tr.TranslateFormat("use `{0}{1}` to see what you are currently tracking", ctx.Prefix, tr.Translate("tracked", true)))), nil
+		return prependWarning(warning, trackedRemovalMessage(ctx, tr, total)), nil
 	}
 
 	rows := []map[string]any{}
@@ -167,63 +167,19 @@ func (c *RaidCommand) Handle(ctx *Context, args []string) (string, error) {
 		return "", err
 	}
 
-	insert := append([]map[string]any{}, rows...)
-	updates := []map[string]any{}
-	unchanged := []map[string]any{}
-	for i := len(insert) - 1; i >= 0; i-- {
-		candidate := insert[i]
-		for _, existing := range trackedRows {
-			if toInt(existing["pokemon_id"], 0) != toInt(candidate["pokemon_id"], 0) {
-				continue
-			}
-			if toInt(existing["level"], 0) != toInt(candidate["level"], 0) {
-				continue
-			}
-			diffs := raidDiffKeys(existing, candidate)
-			if len(diffs) == 1 && diffs[0] == "uid" {
-				unchanged = append(unchanged, candidate)
-				insert = append(insert[:i], insert[i+1:]...)
-				break
-			}
-			if len(diffs) == 2 && raidDiffIsUpdate(diffs) {
-				updated := map[string]any{}
-				for key, value := range candidate {
-					updated[key] = value
-				}
-				updated["uid"] = existing["uid"]
-				updates = append(updates, updated)
-				insert = append(insert[:i], insert[i+1:]...)
-				break
-			}
-		}
-	}
+	plan := tracking.PlanUpsert(rows, trackedRows, func(candidate, existing map[string]any) bool {
+		return toInt(existing["pokemon_id"], 0) == toInt(candidate["pokemon_id"], 0) &&
+			toInt(existing["level"], 0) == toInt(candidate["level"], 0)
+	}, "distance", "template", "clean", "gym_id")
+	message := tracking.ChangeMessage(tr, ctx.Prefix, tr.Translate("tracked", true), plan, func(row map[string]any) string {
+		return tracking.RaidRowText(ctx.Config, tr, ctx.Data, row, ctx.Scanner)
+	})
 
-	message := ""
-	if len(unchanged)+len(updates)+len(insert) > 50 {
-		message = tr.TranslateFormat("I have made a lot of changes. See {0}{1} for details", ctx.Prefix, tr.Translate("tracked", true))
-	} else {
-		for _, row := range unchanged {
-			message += fmt.Sprintf("%s%s\n", tr.Translate("Unchanged: ", false), tracking.RaidRowText(ctx.Config, tr, ctx.Data, row, ctx.Scanner))
-		}
-		for _, row := range updates {
-			message += fmt.Sprintf("%s%s\n", tr.Translate("Updated: ", false), tracking.RaidRowText(ctx.Config, tr, ctx.Data, row, ctx.Scanner))
-		}
-		for _, row := range insert {
-			message += fmt.Sprintf("%s%s\n", tr.Translate("New: ", false), tracking.RaidRowText(ctx.Config, tr, ctx.Data, row, ctx.Scanner))
-		}
-	}
-
-	if len(updates) > 0 {
-		_, err = ctx.Query.DeleteWhereInQuery("raid", map[string]any{
+	if len(plan.Inserts)+len(plan.Updates) > 0 {
+		if err := replaceTrackedRowsTx(ctx, "raid", map[string]any{
 			"id":         result.TargetID,
 			"profile_no": result.ProfileNo,
-		}, extractUids(updates), "uid")
-		if err != nil {
-			return "", err
-		}
-	}
-	if len(insert)+len(updates) > 0 {
-		if _, err := ctx.Query.InsertQuery("raid", append(insert, updates...)); err != nil {
+		}, plan.Updates, plan.Inserts); err != nil {
 			return "", err
 		}
 	}
@@ -470,34 +426,4 @@ func parseRSVP(args []string) int {
 		return 1
 	}
 	return 0
-}
-
-func raidDiffKeys(existing map[string]any, desired map[string]any) []string {
-	diffs := []string{}
-	if _, ok := existing["uid"]; ok {
-		diffs = append(diffs, "uid")
-	}
-	for key, desiredValue := range desired {
-		if key == "uid" {
-			continue
-		}
-		if fmt.Sprintf("%v", existing[key]) != fmt.Sprintf("%v", desiredValue) {
-			diffs = append(diffs, key)
-		}
-	}
-	return diffs
-}
-
-func raidDiffIsUpdate(diffs []string) bool {
-	if len(diffs) != 2 {
-		return false
-	}
-	if diffs[0] != "uid" && diffs[1] != "uid" {
-		return false
-	}
-	other := diffs[0]
-	if other == "uid" {
-		other = diffs[1]
-	}
-	return other == "distance" || other == "template" || other == "clean" || other == "gym_id"
 }

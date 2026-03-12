@@ -10,22 +10,22 @@ import (
 	"poraclego/internal/config"
 )
 
-func loadTestConfigFromMap(t *testing.T, cfg map[string]any) *config.Config {
-	t.Helper()
-	root := t.TempDir()
+func loadTestConfigFromMap(tb testing.TB, cfg map[string]any) *config.Config {
+	tb.Helper()
+	root := tb.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "config"), 0o755); err != nil {
-		t.Fatalf("mkdir config: %v", err)
+		tb.Fatalf("mkdir config: %v", err)
 	}
 	raw, err := json.Marshal(cfg)
 	if err != nil {
-		t.Fatalf("marshal config: %v", err)
+		tb.Fatalf("marshal config: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(root, "config", "default.json"), raw, 0o644); err != nil {
-		t.Fatalf("write default.json: %v", err)
+		tb.Fatalf("write default.json: %v", err)
 	}
 	loaded, err := config.Load(root)
 	if err != nil {
-		t.Fatalf("load config: %v", err)
+		tb.Fatalf("load config: %v", err)
 	}
 	return loaded
 }

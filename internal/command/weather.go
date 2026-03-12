@@ -72,6 +72,9 @@ func (c *WeatherCommand) Handle(ctx *Context, args []string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if updated > 0 {
+		ctx.MarkAlertStateDirty()
+	}
 	client := ""
 	if ctx.Config != nil {
 		client, _ = ctx.Config.GetString("database.client")

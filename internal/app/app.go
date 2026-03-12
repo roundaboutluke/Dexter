@@ -166,6 +166,9 @@ func (a *App) Run(ctx context.Context) error {
 	tzLocator := tz.NewLocator(cfg, root)
 	digestStore := digest.NewStore()
 	a.processor = webhook.NewProcessor(a.queue, cfg, a.query, a.fences, a.data, a.i18n, a.dts, a.discordQueue, a.telegramQueue, statsTracker, a.weatherTracker, a.shinyPossible, tzLocator, a.pogoEvents, a.scannerClient, digestStore, root, 250*time.Millisecond)
+	if err := a.processor.RefreshAlertCacheSync(); err != nil {
+		return fmt.Errorf("load alert state: %w", err)
+	}
 	a.processor.Start()
 	logf("Webhook processor started")
 
@@ -189,6 +192,7 @@ func (a *App) Run(ctx context.Context) error {
 	logf("Bot manager started")
 
 	a.profileSchedule = profile.NewScheduler(cfg, a.query, a.i18n, tzLocator, a.discordQueue, a.telegramQueue, digestStore, a.dts)
+	a.profileSchedule.SetRefreshAlertState(a.processor.RefreshAlertCacheAsync)
 	a.profileSchedule.Start(ctx)
 	logf("Profile scheduler started")
 

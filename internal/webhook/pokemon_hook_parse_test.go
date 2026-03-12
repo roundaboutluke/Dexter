@@ -36,14 +36,14 @@ func TestDedupePokemon_DisappearTimeVerifiedActsVerified(t *testing.T) {
 	hook := &Hook{
 		Type: "pokemon",
 		Message: map[string]any{
-			"encounter_id":           "enc1",
+			"encounter_id":            "enc1",
 			"disappear_time_verified": true,
-			"disappear_time":         expire,
-			"cp":                     103,
-			"pokemon_id":             734,
-			"form":                   3087,
-			"costume":                0,
-			"gender":                 1,
+			"disappear_time":          expire,
+			"cp":                      103,
+			"pokemon_id":              734,
+			"form":                    3087,
+			"costume":                 0,
+			"gender":                  1,
 		},
 	}
 	if !p.dedupePokemon(hook) {
@@ -63,4 +63,3 @@ func TestDedupePokemon_DisappearTimeVerifiedActsVerified(t *testing.T) {
 		t.Fatalf("dedupePokemon TTL=%s, want within [1h, 1h+6m]", remaining)
 	}
 }
-
