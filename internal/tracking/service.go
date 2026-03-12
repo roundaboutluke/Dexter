@@ -124,6 +124,7 @@ func PlanUpsert(
 	}
 	for i := len(plan.Inserts) - 1; i >= 0; i-- {
 		candidate := plan.Inserts[i]
+		var updateSource map[string]any
 		for _, row := range existing {
 			if !sameIdentity(candidate, row) {
 				continue
@@ -133,14 +134,19 @@ func PlanUpsert(
 			case len(diffKeys) == 0:
 				plan.Unchanged = append(plan.Unchanged, candidate)
 				plan.Inserts = append(plan.Inserts[:i], plan.Inserts[i+1:]...)
-			case HasOnlyAllowedDiffs(diffKeys, mutableFields...):
-				updated := CloneRow(candidate)
-				updated["uid"] = row["uid"]
-				plan.Updates = append(plan.Updates, updated)
-				plan.Inserts = append(plan.Inserts[:i], plan.Inserts[i+1:]...)
+				updateSource = nil
+				goto nextCandidate
+			case updateSource == nil && HasOnlyAllowedDiffs(diffKeys, mutableFields...):
+				updateSource = row
 			}
-			break
 		}
+		if updateSource != nil {
+			updated := CloneRow(candidate)
+			updated["uid"] = updateSource["uid"]
+			plan.Updates = append(plan.Updates, updated)
+			plan.Inserts = append(plan.Inserts[:i], plan.Inserts[i+1:]...)
+		}
+	nextCandidate:
 	}
 	return plan
 }
