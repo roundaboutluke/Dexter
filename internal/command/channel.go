@@ -130,6 +130,7 @@ func (c *ChannelCommand) Handle(ctx *Context, args []string) (string, error) {
 				}); err != nil {
 					return "", err
 				}
+				ctx.MarkAlertStateDirty()
 				reply := tr.Translate("Webhook added", false)
 				if areaName != "" {
 					reply = fmt.Sprintf("%s %s %s %s", reply, tr.Translate("with", false), tr.Translate("area", false), areaName)
@@ -161,6 +162,7 @@ func (c *ChannelCommand) Handle(ctx *Context, args []string) (string, error) {
 			}); err != nil {
 				return "", err
 			}
+			ctx.MarkAlertStateDirty()
 			reply := tr.Translate("Channel added", false)
 			if areaName != "" {
 				reply = fmt.Sprintf("%s %s %s %s", reply, tr.Translate("with", false), tr.Translate("area", false), areaName)
@@ -211,6 +213,7 @@ func (c *ChannelCommand) Handle(ctx *Context, args []string) (string, error) {
 				}); err != nil {
 					return "", err
 				}
+				ctx.MarkAlertStateDirty()
 				return "✅", nil
 			}
 			if ctx.IsDM {
@@ -239,6 +242,7 @@ func (c *ChannelCommand) Handle(ctx *Context, args []string) (string, error) {
 		}); err != nil {
 			return "", err
 		}
+		ctx.MarkAlertStateDirty()
 		return "Channel added.", nil
 	}
 
@@ -252,6 +256,7 @@ func (c *ChannelCommand) Handle(ctx *Context, args []string) (string, error) {
 				if _, err := ctx.Query.DeleteQuery("humans", map[string]any{"name": webhookName, "type": "webhook"}); err != nil {
 					return "", err
 				}
+				ctx.MarkAlertStateDirty()
 				return "✅", nil
 			}
 			if ctx.IsDM {
@@ -264,6 +269,7 @@ func (c *ChannelCommand) Handle(ctx *Context, args []string) (string, error) {
 			if _, err := ctx.Query.DeleteQuery("humans", map[string]any{"id": ctx.ChannelID}); err != nil {
 				return "", err
 			}
+			ctx.MarkAlertStateDirty()
 			return "✅", nil
 		}
 		if webhookName != "" {
@@ -282,6 +288,7 @@ func (c *ChannelCommand) Handle(ctx *Context, args []string) (string, error) {
 				if _, err := ctx.Query.DeleteQuery("humans", map[string]any{"id": channelID}); err != nil {
 					return "", err
 				}
+				ctx.MarkAlertStateDirty()
 				return "✅", nil
 			}
 			if ctx.IsDM {
@@ -295,6 +302,7 @@ func (c *ChannelCommand) Handle(ctx *Context, args []string) (string, error) {
 			if _, err := ctx.Query.DeleteQuery("humans", map[string]any{"id": channelID}); err != nil {
 				return "", err
 			}
+			ctx.MarkAlertStateDirty()
 			return "✅", nil
 		}
 		if ctx.IsDM {
@@ -303,6 +311,7 @@ func (c *ChannelCommand) Handle(ctx *Context, args []string) (string, error) {
 		if _, err := ctx.Query.DeleteQuery("humans", map[string]any{"id": ctx.ChannelID}); err != nil {
 			return "", err
 		}
+		ctx.MarkAlertStateDirty()
 		return "Channel removed.", nil
 	}
 

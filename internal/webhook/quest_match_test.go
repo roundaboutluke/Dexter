@@ -24,4 +24,3 @@ func TestMatchQuestWithDataUnsupportedRewardTypeMatchesNone(t *testing.T) {
 		t.Fatalf("matchQuestWithData=true, want false")
 	}
 }
-

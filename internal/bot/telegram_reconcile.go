@@ -10,7 +10,9 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
+	"poraclego/internal/alertstate"
 	"poraclego/internal/community"
+	"poraclego/internal/db"
 	"poraclego/internal/dts"
 	"poraclego/internal/render"
 )
@@ -41,8 +43,11 @@ func (t *Telegram) runReconciliation() {
 	}
 	updateNames, _ := t.manager.cfg.GetBool("reconciliation.telegram.updateUserNames")
 	removeInvalid, _ := t.manager.cfg.GetBool("reconciliation.telegram.removeInvalidUsers")
-	t.syncTelegramChannels()
-	t.syncTelegramUsers(updateNames, removeInvalid)
+	changed := t.syncTelegramChannels()
+	changed = t.syncTelegramUsers(updateNames, removeInvalid) || changed
+	if changed {
+		t.manager.RefreshAlertState()
+	}
 }
 
 func (t *Telegram) syncTelegramUser(userID int64, syncNames, removeInvalid bool) {
@@ -54,16 +59,19 @@ func (t *Telegram) syncTelegramUser(userID int64, syncNames, removeInvalid bool)
 	channelList := t.telegramChannelList()
 	name, channels := t.loadTelegramChannels(userID, channelList)
 	info := &telegramUserInfo{name: name, channels: channels}
-	t.reconcileTelegramUser(id, user, info, syncNames, removeInvalid)
+	if t.reconcileTelegramUser(id, user, info, syncNames, removeInvalid) {
+		t.manager.RefreshAlertState()
+	}
 }
 
-func (t *Telegram) syncTelegramUsers(syncNames, removeInvalid bool) {
+func (t *Telegram) syncTelegramUsers(syncNames, removeInvalid bool) bool {
 	users, err := t.manager.query.SelectAllQuery("humans", map[string]any{"type": "telegram:user"})
 	if err != nil {
-		return
+		return false
 	}
 	admins, _ := t.manager.cfg.GetStringSlice("telegram.admins")
 	channelList := t.telegramChannelList()
+	changed := false
 	for _, row := range users {
 		userID := getString(row["id"])
 		if containsString(admins, userID) {
@@ -75,8 +83,9 @@ func (t *Telegram) syncTelegramUsers(syncNames, removeInvalid bool) {
 		}
 		name, channels := t.loadTelegramChannels(idNum, channelList)
 		info := &telegramUserInfo{name: name, channels: channels}
-		t.reconcileTelegramUser(userID, row, info, syncNames, removeInvalid)
+		changed = t.reconcileTelegramUser(userID, row, info, syncNames, removeInvalid) || changed
 	}
+	return changed
 }
 
 type telegramUserInfo struct {
@@ -84,7 +93,7 @@ type telegramUserInfo struct {
 	channels []string
 }
 
-func (t *Telegram) reconcileTelegramUser(id string, user map[string]any, info *telegramUserInfo, syncNames, removeInvalid bool) {
+func (t *Telegram) reconcileTelegramUser(id string, user map[string]any, info *telegramUserInfo, syncNames, removeInvalid bool) bool {
 	channelList := []string{}
 	name := ""
 	if info != nil {
@@ -97,29 +106,35 @@ func (t *Telegram) reconcileTelegramUser(id string, user map[string]any, info *t
 		after := t.channelListHasAny(channelList)
 		if !before && after {
 			if user == nil {
-				_, _ = t.manager.query.InsertOrUpdateQuery("humans", map[string]any{
+				if changedRows, err := t.manager.query.InsertOrUpdateQuery("humans", map[string]any{
 					"id":                   id,
 					"type":                 "telegram:user",
 					"name":                 name,
 					"area":                 "[]",
 					"community_membership": "[]",
-				})
-				t.sendGreetingsTelegram(id)
+				}); err == nil {
+					t.sendGreetingsTelegram(id)
+					return changedRows > 0
+				}
 			} else if toInt(user["admin_disable"], 0) == 1 && hasDisabledDate(user) {
-				_, _ = t.manager.query.UpdateQuery("humans", map[string]any{
+				if changedRows, err := t.manager.query.UpdateQuery("humans", map[string]any{
 					"admin_disable": 0,
 					"disabled_date": nil,
-				}, map[string]any{"id": id})
-				t.sendGreetingsTelegram(id)
+				}, map[string]any{"id": id}); err == nil {
+					t.sendGreetingsTelegram(id)
+					return changedRows > 0
+				}
 			}
 		}
 		if before && !after && removeInvalid {
-			t.disableTelegramUser(user)
+			return t.disableTelegramUser(user)
 		}
 		if before && after && syncNames && getString(user["name"]) != name {
-			_, _ = t.manager.query.UpdateQuery("humans", map[string]any{"name": name}, map[string]any{"id": id})
+			if changedRows, err := t.manager.query.UpdateQuery("humans", map[string]any{"name": name}, map[string]any{"id": id}); err == nil {
+				return changedRows > 0
+			}
 		}
-		return
+		return false
 	}
 
 	communityList := t.communitiesForTelegramChannels(channelList)
@@ -128,27 +143,31 @@ func (t *Telegram) reconcileTelegramUser(id string, user map[string]any, info *t
 	areaRestriction := community.CalculateLocationRestrictions(t.manager.cfg, communityList)
 	if !before && after {
 		if user == nil {
-			_, _ = t.manager.query.InsertOrUpdateQuery("humans", map[string]any{
+			if changedRows, err := t.manager.query.InsertOrUpdateQuery("humans", map[string]any{
 				"id":                   id,
 				"type":                 "telegram:user",
 				"name":                 name,
 				"area":                 "[]",
 				"area_restriction":     toJSON(areaRestriction),
 				"community_membership": toJSON(communityList),
-			})
-			t.sendGreetingsTelegram(id)
+			}); err == nil {
+				t.sendGreetingsTelegram(id)
+				return changedRows > 0
+			}
 		} else if toInt(user["admin_disable"], 0) == 1 && hasDisabledDate(user) {
-			_, _ = t.manager.query.UpdateQuery("humans", map[string]any{
+			if changedRows, err := t.manager.query.UpdateQuery("humans", map[string]any{
 				"admin_disable":        0,
 				"disabled_date":        nil,
 				"area_restriction":     toJSON(areaRestriction),
 				"community_membership": toJSON(communityList),
-			}, map[string]any{"id": id})
-			t.sendGreetingsTelegram(id)
+			}, map[string]any{"id": id}); err == nil {
+				t.sendGreetingsTelegram(id)
+				return changedRows > 0
+			}
 		}
 	}
 	if before && !after && removeInvalid {
-		t.disableTelegramUser(user)
+		return t.disableTelegramUser(user)
 	}
 	if before && after {
 		updates := map[string]any{}
@@ -162,9 +181,12 @@ func (t *Telegram) reconcileTelegramUser(id string, user map[string]any, info *t
 			updates["community_membership"] = toJSON(communityList)
 		}
 		if len(updates) > 0 {
-			_, _ = t.manager.query.UpdateQuery("humans", updates, map[string]any{"id": id})
+			if changedRows, err := t.manager.query.UpdateQuery("humans", updates, map[string]any{"id": id}); err == nil {
+				return changedRows > 0
+			}
 		}
 	}
+	return false
 }
 
 func (t *Telegram) telegramChannelList() []string {
@@ -280,13 +302,13 @@ func (t *Telegram) communitiesForTelegramChannels(channels []string) []string {
 	return result
 }
 
-func (t *Telegram) syncTelegramChannels() {
+func (t *Telegram) syncTelegramChannels() bool {
 	rows, err := t.manager.query.SelectAllQuery("humans", map[string]any{
 		"type":          "telegram:channel",
 		"admin_disable": 0,
 	})
 	if err != nil {
-		return
+		return false
 	}
 	groups, err := t.manager.query.SelectAllQuery("humans", map[string]any{
 		"type":          "telegram:group",
@@ -295,6 +317,7 @@ func (t *Telegram) syncTelegramChannels() {
 	if err == nil {
 		rows = append(rows, groups...)
 	}
+	changed := false
 	for _, row := range rows {
 		if row["area_restriction"] == nil || row["community_membership"] == nil {
 			continue
@@ -302,44 +325,67 @@ func (t *Telegram) syncTelegramChannels() {
 		communities := parseStringList(row["community_membership"])
 		restriction := community.CalculateLocationRestrictions(t.manager.cfg, communities)
 		if !sameContents(parseStringList(row["area_restriction"]), restriction) {
-			_, _ = t.manager.query.UpdateQuery("humans", map[string]any{
+			if updated, err := t.manager.query.UpdateQuery("humans", map[string]any{
 				"area_restriction": toJSON(restriction),
-			}, map[string]any{"id": row["id"]})
+			}, map[string]any{"id": row["id"]}); err == nil && updated > 0 {
+				changed = true
+			}
 		}
 	}
+	return changed
 }
 
-func (t *Telegram) disableTelegramUser(user map[string]any) {
+func (t *Telegram) disableTelegramUser(user map[string]any) bool {
 	mode, _ := t.manager.cfg.GetString("general.roleCheckMode")
 	id := getString(user["id"])
 	switch mode {
 	case "disable-user":
 		if toInt(user["admin_disable"], 0) == 0 {
-			_, _ = t.manager.query.UpdateQuery("humans", map[string]any{
+			changedRows, _ := t.manager.query.UpdateQuery("humans", map[string]any{
 				"admin_disable": 1,
 				"disabled_date": time.Now(),
 			}, map[string]any{"id": id})
 			t.sendGoodbyeTelegram(id)
+			return changedRows > 0
 		}
 	case "delete":
-		t.removeUserTracking(id)
-		_, _ = t.manager.query.DeleteQuery("profiles", map[string]any{"id": id})
-		_, _ = t.manager.query.DeleteQuery("humans", map[string]any{"id": id})
+		changed := false
+		if err := t.manager.withQueryTx(func(query *db.Query) error {
+			trackingChanged, err := t.removeUserTracking(query, id)
+			if err != nil {
+				return err
+			}
+			changed = trackingChanged
+			if removed, err := query.DeleteQuery("profiles", map[string]any{"id": id}); err == nil && removed > 0 {
+				changed = true
+			} else if err != nil {
+				return err
+			}
+			if removed, err := query.DeleteQuery("humans", map[string]any{"id": id}); err == nil && removed > 0 {
+				changed = true
+			} else if err != nil {
+				return err
+			}
+			return nil
+		}); err != nil {
+			return false
+		}
 		t.sendGoodbyeTelegram(id)
+		return changed
 	}
+	return false
 }
 
-func (t *Telegram) removeUserTracking(id string) {
-	_, _ = t.manager.query.DeleteQuery("egg", map[string]any{"id": id})
-	_, _ = t.manager.query.DeleteQuery("monsters", map[string]any{"id": id})
-	_, _ = t.manager.query.DeleteQuery("raid", map[string]any{"id": id})
-	_, _ = t.manager.query.DeleteQuery("quest", map[string]any{"id": id})
-	_, _ = t.manager.query.DeleteQuery("lures", map[string]any{"id": id})
-	_, _ = t.manager.query.DeleteQuery("gym", map[string]any{"id": id})
-	_, _ = t.manager.query.DeleteQuery("invasion", map[string]any{"id": id})
-	_, _ = t.manager.query.DeleteQuery("nests", map[string]any{"id": id})
-	_, _ = t.manager.query.DeleteQuery("forts", map[string]any{"id": id})
-	_, _ = t.manager.query.DeleteQuery("weather", map[string]any{"id": id})
+func (t *Telegram) removeUserTracking(query *db.Query, id string) (bool, error) {
+	changed := false
+	for _, table := range alertstate.TrackedTables() {
+		if removed, err := query.DeleteQuery(table, map[string]any{"id": id}); err == nil && removed > 0 {
+			changed = true
+		} else if err != nil {
+			return false, err
+		}
+	}
+	return changed, nil
 }
 
 func (t *Telegram) sendGreetingsTelegram(userID string) {

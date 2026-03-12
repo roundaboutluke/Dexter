@@ -81,7 +81,7 @@ func TestMatchPokemonPvpEvolutionDirectTrackingEnabled(t *testing.T) {
 	hook := &Hook{
 		Type: "pokemon",
 		Message: map[string]any{
-			"pokemon_id":          133,
+			"pokemon_id":         133,
 			"form":               0,
 			"cp":                 2000,
 			"pokemon_level":      30,
@@ -112,7 +112,7 @@ func TestMatchPokemonPvpEvolutionDirectTrackingDisabled(t *testing.T) {
 	hook := &Hook{
 		Type: "pokemon",
 		Message: map[string]any{
-			"pokemon_id":          133,
+			"pokemon_id":         133,
 			"form":               0,
 			"cp":                 2000,
 			"pokemon_level":      30,
@@ -143,7 +143,7 @@ func TestMatchPokemonPvpEverythingDoesNotMatchEvolutionEntries(t *testing.T) {
 	hook := &Hook{
 		Type: "pokemon",
 		Message: map[string]any{
-			"pokemon_id":          133,
+			"pokemon_id":         133,
 			"form":               0,
 			"cp":                 2000,
 			"pokemon_level":      30,
@@ -174,7 +174,7 @@ func TestMatchPokemonPvpEvolutionHonorsGlobalMinCP(t *testing.T) {
 	hook := &Hook{
 		Type: "pokemon",
 		Message: map[string]any{
-			"pokemon_id":          133,
+			"pokemon_id":         133,
 			"form":               0,
 			"cp":                 2000,
 			"pokemon_level":      30,
@@ -199,4 +199,3 @@ func TestMatchPokemonPvpEvolutionHonorsGlobalMinCP(t *testing.T) {
 		t.Fatalf("expected no match when evolution entry is below global min CP")
 	}
 }
-

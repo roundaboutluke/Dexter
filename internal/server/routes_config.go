@@ -29,33 +29,33 @@ func registerConfigRoutes(s *Server, mux *http.ServeMux) {
 		dataSource, _ := s.cfg.GetString("pvp.dataSource")
 
 		payload := map[string]any{
-			"status":                     "ok",
-			"version":                    version.Read(s.root),
-			"locale":                     getStringValueFromConfig(s.cfg, "general.locale", ""),
-			"prefix":                     getStringValueFromConfig(s.cfg, "discord.prefix", ""),
-			"providerURL":                getStringValueFromConfig(s.cfg, "geocoding.providerURL", ""),
-			"addressFormat":              getStringValueFromConfig(s.cfg, "locale.addressFormat", ""),
-			"staticKey":                  getAnyValueFromConfig(s.cfg, "geocoding.staticKey"),
-			"pvpFilterMaxRank":           getIntValueFromConfig(s.cfg, "pvp.pvpFilterMaxRank", 0),
-			"pvpFilterGreatMinCP":        getIntValueFromConfig(s.cfg, "pvp.pvpFilterGreatMinCP", 0),
-			"pvpFilterUltraMinCP":        getIntValueFromConfig(s.cfg, "pvp.pvpFilterUltraMinCP", 0),
-			"pvpFilterLittleMinCP":       getIntValueFromConfig(s.cfg, "pvp.pvpFilterLittleMinCP", 0),
-			"pvpLittleLeagueAllowed":     true,
-			"pvpCaps":                    pvpCaps,
-			"pvpRequiresMinCp":           forceMinCp && strings.EqualFold(dataSource, "webhook"),
-			"defaultPvpCap":              getIntValueFromConfig(s.cfg, "tracking.defaultUserTrackingLevelCap", 0),
-			"defaultTemplateName":        defaultTemplate,
+			"status":                 "ok",
+			"version":                version.Read(s.root),
+			"locale":                 getStringValueFromConfig(s.cfg, "general.locale", ""),
+			"prefix":                 getStringValueFromConfig(s.cfg, "discord.prefix", ""),
+			"providerURL":            getStringValueFromConfig(s.cfg, "geocoding.providerURL", ""),
+			"addressFormat":          getStringValueFromConfig(s.cfg, "locale.addressFormat", ""),
+			"staticKey":              getAnyValueFromConfig(s.cfg, "geocoding.staticKey"),
+			"pvpFilterMaxRank":       getIntValueFromConfig(s.cfg, "pvp.pvpFilterMaxRank", 0),
+			"pvpFilterGreatMinCP":    getIntValueFromConfig(s.cfg, "pvp.pvpFilterGreatMinCP", 0),
+			"pvpFilterUltraMinCP":    getIntValueFromConfig(s.cfg, "pvp.pvpFilterUltraMinCP", 0),
+			"pvpFilterLittleMinCP":   getIntValueFromConfig(s.cfg, "pvp.pvpFilterLittleMinCP", 0),
+			"pvpLittleLeagueAllowed": true,
+			"pvpCaps":                pvpCaps,
+			"pvpRequiresMinCp":       forceMinCp && strings.EqualFold(dataSource, "webhook"),
+			"defaultPvpCap":          getIntValueFromConfig(s.cfg, "tracking.defaultUserTrackingLevelCap", 0),
+			"defaultTemplateName":    defaultTemplate,
 			"channelNotesContainsCategory": getBoolValueFromConfig(s.cfg, "discord.checkRole", false) &&
 				getBoolValueFromConfig(s.cfg, "reconciliation.discord.updateChannelNotes", false),
 			"admins": map[string]any{
-				"discord": getStringSliceValueFromConfig(s.cfg, "discord.admins"),
+				"discord":  getStringSliceValueFromConfig(s.cfg, "discord.admins"),
 				"telegram": getStringSliceValueFromConfig(s.cfg, "telegram.admins"),
 			},
-			"maxDistance":              getIntValueFromConfig(s.cfg, "tracking.maxDistance", 0),
-			"defaultDistance":          getIntValueFromConfig(s.cfg, "tracking.defaultDistance", 0),
+			"maxDistance":               getIntValueFromConfig(s.cfg, "tracking.maxDistance", 0),
+			"defaultDistance":           getIntValueFromConfig(s.cfg, "tracking.defaultDistance", 0),
 			"everythingFlagPermissions": getAnyValueFromConfig(s.cfg, "tracking.everythingFlagPermissions"),
-			"disabledHooks":            disabledHooks(s),
-			"gymBattles":               getBoolValueFromConfig(s.cfg, "tracking.enableGymBattle", false),
+			"disabledHooks":             disabledHooks(s),
+			"gymBattles":                getBoolValueFromConfig(s.cfg, "tracking.enableGymBattle", false),
 		}
 
 		writeJSON(w, http.StatusOK, payload)
@@ -74,8 +74,8 @@ func registerConfigRoutes(s *Server, mux *http.ServeMux) {
 		}
 
 		payload := map[string]any{
-			"status":  "ok",
-			"discord": templateGroups(s, "discord"),
+			"status":   "ok",
+			"discord":  templateGroups(s, "discord"),
 			"telegram": templateGroups(s, "telegram"),
 		}
 		writeJSON(w, http.StatusOK, payload)

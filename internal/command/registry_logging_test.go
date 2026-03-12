@@ -1,6 +1,7 @@
 package command
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -66,17 +67,140 @@ func TestRegistryExecuteLogsUnknownCommand(t *testing.T) {
 	}
 }
 
+func TestRegistryExecuteRefreshesAlertStateOnceForSuccessfulMutatingCommand(t *testing.T) {
+	refreshCount := 0
+	registry := &Registry{handlers: map[string]Handler{
+		"track": stubHandler{
+			name: "track",
+			fn: func(ctx *Context, _ []string) (string, error) {
+				ctx.MarkAlertStateDirty()
+				return "ok", nil
+			},
+		},
+	}}
+	ctx := &Context{
+		RefreshAlertCache: func() { refreshCount++ },
+	}
+
+	reply, err := registry.Execute(ctx, "track pikachu")
+	if err != nil {
+		t.Fatalf("execute command: %v", err)
+	}
+	if reply != "ok" {
+		t.Fatalf("reply=%q, want ok", reply)
+	}
+	if refreshCount != 1 {
+		t.Fatalf("refreshCount=%d, want 1", refreshCount)
+	}
+}
+
+func TestRegistryExecuteSkipsRefreshOnHandlerError(t *testing.T) {
+	refreshCount := 0
+	registry := &Registry{handlers: map[string]Handler{
+		"track": stubHandler{
+			name: "track",
+			fn: func(ctx *Context, _ []string) (string, error) {
+				ctx.MarkAlertStateDirty()
+				return "", errors.New("boom")
+			},
+		},
+	}}
+	ctx := &Context{
+		RefreshAlertCache: func() { refreshCount++ },
+	}
+
+	if _, err := registry.Execute(ctx, "track pikachu"); err == nil {
+		t.Fatalf("expected handler error")
+	}
+	if refreshCount != 0 {
+		t.Fatalf("refreshCount=%d, want 0", refreshCount)
+	}
+}
+
+func TestRegistryExecuteSkipsRefreshForReadOnlyCommand(t *testing.T) {
+	refreshCount := 0
+	registry := &Registry{handlers: map[string]Handler{
+		"ping": stubHandler{
+			name: "ping",
+			fn: func(ctx *Context, _ []string) (string, error) {
+				ctx.MarkAlertStateDirty()
+				return "pong", nil
+			},
+		},
+	}}
+	ctx := &Context{
+		RefreshAlertCache: func() { refreshCount++ },
+	}
+
+	if _, err := registry.Execute(ctx, "ping"); err != nil {
+		t.Fatalf("execute command: %v", err)
+	}
+	if refreshCount != 0 {
+		t.Fatalf("refreshCount=%d, want 0", refreshCount)
+	}
+}
+
+func TestRegistryExecuteRefreshesAlertStateForPoracleAliasCommand(t *testing.T) {
+	refreshCount := 0
+	registry := &Registry{handlers: map[string]Handler{
+		"poracle": stubHandler{
+			name: "poracle",
+			fn: func(ctx *Context, _ []string) (string, error) {
+				ctx.MarkAlertStateDirty()
+				return "ok", nil
+			},
+		},
+	}}
+	ctx := &Context{
+		RefreshAlertCache: func() { refreshCount++ },
+	}
+
+	if _, err := registry.Execute(ctx, "poracle"); err != nil {
+		t.Fatalf("execute command: %v", err)
+	}
+	if refreshCount != 1 {
+		t.Fatalf("refreshCount=%d, want 1", refreshCount)
+	}
+}
+
+func TestRegistryExecuteRefreshesAlertStateForIncidentAliasCommand(t *testing.T) {
+	refreshCount := 0
+	registry := &Registry{handlers: map[string]Handler{
+		"incident": stubHandler{
+			name: "incident",
+			fn: func(ctx *Context, _ []string) (string, error) {
+				ctx.MarkAlertStateDirty()
+				return "ok", nil
+			},
+		},
+	}}
+	ctx := &Context{
+		RefreshAlertCache: func() { refreshCount++ },
+	}
+
+	if _, err := registry.Execute(ctx, "incident dragon"); err != nil {
+		t.Fatalf("execute command: %v", err)
+	}
+	if refreshCount != 1 {
+		t.Fatalf("refreshCount=%d, want 1", refreshCount)
+	}
+}
+
 type stubHandler struct {
 	name  string
 	reply string
 	err   error
+	fn    func(*Context, []string) (string, error)
 }
 
 func (h stubHandler) Name() string {
 	return h.name
 }
 
-func (h stubHandler) Handle(*Context, []string) (string, error) {
+func (h stubHandler) Handle(ctx *Context, args []string) (string, error) {
+	if h.fn != nil {
+		return h.fn(ctx, args)
+	}
 	return h.reply, h.err
 }
 

@@ -75,4 +75,3 @@ func TestMonsterAlarmCacheRefreshLoadsRowsWhenEnabled(t *testing.T) {
 		t.Fatalf("rows=%d, want 2", len(got))
 	}
 }
-

@@ -1,11 +1,13 @@
 package dispatch
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"poraclego/internal/config"
@@ -40,6 +42,46 @@ func TestDiscordRequestWithRetriesLogsRateLimits(t *testing.T) {
 	}
 	if !strings.Contains(body, "attempt=1") {
 		t.Fatalf("discord log missing attempt counter: %s", body)
+	}
+}
+
+func TestPostDiscordPayload_DoesNotRetryTimeouts(t *testing.T) {
+	var attempts int32
+	sender := &Sender{
+		client: &http.Client{
+			Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+				atomic.AddInt32(&attempts, 1)
+				return nil, context.DeadlineExceeded
+			}),
+		},
+	}
+
+	_, err := sender.postDiscordPayload("https://discord.test/api/messages", map[string]any{"content": "x"}, nil, false)
+	if err == nil {
+		t.Fatalf("expected timeout error")
+	}
+	if got := atomic.LoadInt32(&attempts); got != 1 {
+		t.Fatalf("expected exactly 1 create attempt, got %d", got)
+	}
+}
+
+func TestDiscordRequestWithRetries_RetriesTimeoutsForPatch(t *testing.T) {
+	var attempts int32
+	sender := &Sender{
+		client: &http.Client{
+			Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+				atomic.AddInt32(&attempts, 1)
+				return nil, context.DeadlineExceeded
+			}),
+		},
+	}
+
+	_, err := sender.discordRequestWithRetries(http.MethodPatch, "https://discord.test/api/messages/1", []byte(`{}`), "application/json", nil, 1)
+	if err == nil {
+		t.Fatalf("expected timeout error")
+	}
+	if got := atomic.LoadInt32(&attempts); got != 2 {
+		t.Fatalf("expected 2 patch attempts, got %d", got)
 	}
 }
 

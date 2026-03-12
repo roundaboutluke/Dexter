@@ -15,10 +15,16 @@ func (c *EnableCommand) Handle(ctx *Context, args []string) (string, error) {
 		return "🙅", nil
 	}
 	targets := parseTargetIDs(ctx, args, true)
+	changed := false
 	for _, id := range targets {
-		if _, err := ctx.Query.UpdateQuery("humans", map[string]any{"admin_disable": 0, "disabled_date": nil}, map[string]any{"id": id}); err != nil {
+		rows, err := ctx.Query.UpdateQuery("humans", map[string]any{"admin_disable": 0, "disabled_date": nil}, map[string]any{"id": id})
+		if err != nil {
 			return "", err
 		}
+		changed = changed || rows > 0
+	}
+	if changed {
+		ctx.MarkAlertStateDirty()
 	}
 	return "✅", nil
 }
@@ -33,10 +39,16 @@ func (c *DisableCommand) Handle(ctx *Context, args []string) (string, error) {
 		return "🙅", nil
 	}
 	targets := parseTargetIDs(ctx, args, false)
+	changed := false
 	for _, id := range targets {
-		if _, err := ctx.Query.UpdateQuery("humans", map[string]any{"admin_disable": 1, "disabled_date": nil}, map[string]any{"id": id}); err != nil {
+		rows, err := ctx.Query.UpdateQuery("humans", map[string]any{"admin_disable": 1, "disabled_date": nil}, map[string]any{"id": id})
+		if err != nil {
 			return "", err
 		}
+		changed = changed || rows > 0
+	}
+	if changed {
+		ctx.MarkAlertStateDirty()
 	}
 	return "✅", nil
 }

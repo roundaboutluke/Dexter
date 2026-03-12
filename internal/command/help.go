@@ -28,7 +28,9 @@ func (c *HelpCommand) Handle(ctx *Context, args []string) (string, error) {
 	if ctx.Query != nil && result.TargetID != "" {
 		if row, err := ctx.Query.SelectOneQuery("humans", map[string]any{"id": result.TargetID}); err == nil && row != nil {
 			if lang, ok := row["language"].(string); ok && lang == "" {
-				_, _ = ctx.Query.UpdateQuery("humans", map[string]any{"language": language}, map[string]any{"id": result.TargetID})
+				if updated, err := ctx.Query.UpdateQuery("humans", map[string]any{"language": language}, map[string]any{"id": result.TargetID}); err == nil && updated > 0 {
+					ctx.MarkAlertStateDirty()
+				}
 			}
 		}
 	}

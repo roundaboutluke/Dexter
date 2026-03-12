@@ -86,4 +86,3 @@ func TestAPISecretRejectsWithPoracleJSShape(t *testing.T) {
 		t.Fatalf("reason=%v, want api secret message", payload["reason"])
 	}
 }
-

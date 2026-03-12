@@ -92,7 +92,7 @@ func (c *UntrackCommand) Handle(ctx *Context, args []string) (string, error) {
 		}
 	}
 	if len(monsterIDs) == 0 {
-		return fmt.Sprintf("%s, %s", tr.TranslateFormat("I removed {0} entries", 0), tr.TranslateFormat("use `{0}{1}` to see what you are currently tracking", ctx.Prefix, tr.Translate("tracked", true))), nil
+		return trackedRemovalMessage(ctx, tr, 0), nil
 	}
 
 	rows, err := ctx.Query.DeleteWhereInQuery("monsters", map[string]any{
@@ -102,12 +102,8 @@ func (c *UntrackCommand) Handle(ctx *Context, args []string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if rows > 0 && ctx.RefreshAlertCache != nil {
-		ctx.RefreshAlertCache()
+	if rows > 0 {
+		ctx.MarkAlertStateDirty()
 	}
-
-	if rows == 1 {
-		return fmt.Sprintf("%s, %s", tr.Translate("I removed 1 entry", false), tr.TranslateFormat("use `{0}{1}` to see what you are currently tracking", ctx.Prefix, tr.Translate("tracked", true))), nil
-	}
-	return fmt.Sprintf("%s, %s", tr.TranslateFormat("I removed {0} entries", rows), tr.TranslateFormat("use `{0}{1}` to see what you are currently tracking", ctx.Prefix, tr.Translate("tracked", true))), nil
+	return trackedRemovalMessage(ctx, tr, rows), nil
 }

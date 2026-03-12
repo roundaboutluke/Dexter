@@ -72,3 +72,18 @@ func prependWarning(warning, message string) string {
 	}
 	return warning + "\n" + message
 }
+
+func trackedRemovalMessage(ctx *Context, tr *i18n.Translator, removed int64) string {
+	if removed == 1 {
+		return fmt.Sprintf(
+			"%s, %s",
+			tr.Translate("I removed 1 entry", false),
+			tr.TranslateFormat("use `{0}{1}` to see what you are currently tracking", ctx.Prefix, tr.Translate("tracked", true)),
+		)
+	}
+	return fmt.Sprintf(
+		"%s, %s",
+		tr.TranslateFormat("I removed {0} entries", removed),
+		tr.TranslateFormat("use `{0}{1}` to see what you are currently tracking", ctx.Prefix, tr.Translate("tracked", true)),
+	)
+}

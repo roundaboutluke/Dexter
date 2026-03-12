@@ -1,11 +1,10 @@
 package server
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 
-	"poraclego/internal/config"
+	"poraclego/internal/i18n"
 	"poraclego/internal/tracking"
 )
 
@@ -422,1158 +421,109 @@ func handleTrackingAllProfiles(w http.ResponseWriter, s *Server, id string) {
 }
 
 func handleTrackingQuestGet(w http.ResponseWriter, s *Server, id string) {
-	human, err := s.query.SelectOneQuery("humans", map[string]any{"id": id})
-	if err != nil || human == nil {
-		writeJSON(w, http.StatusOK, map[string]any{"status": "error", "message": "User not found"})
-		return
-	}
-	currentProfile := numberFromAnyOrDefault(human["current_profile_no"], 1)
-	rows, err := s.query.SelectAllQuery("quest", map[string]any{"id": id, "profile_no": currentProfile})
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "quest": rows})
+	handleTrackingGetGeneric(w, s, id, questTrackingRouteConfig(s))
 }
 
 func handleTrackingQuestDelete(w http.ResponseWriter, s *Server, id string, uid string) {
-	_, err := s.query.DeleteQuery("quest", map[string]any{"id": id, "uid": uid})
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
+	handleTrackingDeleteGeneric(w, s, id, uid, "quest")
 }
 
 func handleTrackingQuestDeleteBatch(w http.ResponseWriter, s *Server, id string, r *http.Request) {
-	payload, err := decodeAnyArray(r)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": "invalid payload"})
-		return
-	}
-	values := make([]any, 0, len(payload))
-	for _, item := range payload {
-		values = append(values, item)
-	}
-	_, err = s.query.DeleteWhereInQuery("quest", map[string]any{"id": id}, values, "uid")
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
+	handleTrackingDeleteBatchGeneric(w, s, id, r, "quest")
 }
 
 func handleTrackingQuestUpsert(w http.ResponseWriter, s *Server, id string, r *http.Request) {
-	human, err := s.query.SelectOneQuery("humans", map[string]any{"id": id})
-	if err != nil || human == nil {
-		writeJSON(w, http.StatusOK, map[string]any{"status": "error", "message": "User not found"})
-		return
-	}
-	language := getStringValue(human["language"], s.cfg, "general.locale")
-	translator := s.i18n.Translator(language)
-	currentProfile := numberFromAnyOrDefault(human["current_profile_no"], 1)
-
-	rows, err := decodeJSONRows(r)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": "invalid payload"})
-		return
-	}
-
-	insert := make([]map[string]any, 0, len(rows))
-	for _, row := range rows {
-		cleanRow, err := cleanQuestRow(s.cfg, id, currentProfile, row)
-		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": err.Error()})
-			return
-		}
-		insert = append(insert, cleanRow)
-	}
-
-	trackedRows, err := s.query.SelectAllQuery("quest", map[string]any{"id": id, "profile_no": currentProfile})
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-		return
-	}
-
-	updates := make([]map[string]any, 0)
-	alreadyPresent := make([]map[string]any, 0)
-	for i := len(insert) - 1; i >= 0; i-- {
-		toInsert := insert[i]
-		for _, existing := range trackedRows {
-			if intFromAny(existing["reward_type"]) != intFromAny(toInsert["reward_type"]) || intFromAny(existing["reward"]) != intFromAny(toInsert["reward"]) {
-				continue
-			}
-			diffKeys := diffGeneric(toInsert, existing)
-			if len(diffKeys) == 0 {
-				alreadyPresent = append(alreadyPresent, toInsert)
-				insert = append(insert[:i], insert[i+1:]...)
-				break
-			}
-			if len(diffKeys) == 1 && (containsString(diffKeys, "distance") || containsString(diffKeys, "template") || containsString(diffKeys, "clean")) {
-				clone := map[string]any{}
-				for key, value := range toInsert {
-					clone[key] = value
-				}
-				clone["uid"] = existing["uid"]
-				updates = append(updates, clone)
-				insert = append(insert[:i], insert[i+1:]...)
-				break
-			}
-		}
-	}
-
-	message := ""
-	total := len(alreadyPresent) + len(updates) + len(insert)
-	if total > 50 {
-		message = translator.TranslateFormat("I have made a lot of changes. See {0}{1} for details", "!", translator.Translate("tracked", false))
-	} else {
-		for _, row := range alreadyPresent {
-			message += translator.Translate("Unchanged: ", false) + tracking.QuestRowText(s.cfg, translator, s.data, row) + "\n"
-		}
-		for _, row := range updates {
-			message += translator.Translate("Updated: ", false) + tracking.QuestRowText(s.cfg, translator, s.data, row) + "\n"
-		}
-		for _, row := range insert {
-			message += translator.Translate("New: ", false) + tracking.QuestRowText(s.cfg, translator, s.data, row) + "\n"
-		}
-	}
-
-	if len(updates) > 0 {
-		uids := make([]any, 0, len(updates))
-		insertUpdates := make([]map[string]any, 0, len(updates))
-		for _, row := range updates {
-			if row["uid"] != nil {
-				uids = append(uids, row["uid"])
-			}
-			clone := map[string]any{}
-			for key, value := range row {
-				if key == "uid" {
-					continue
-				}
-				clone[key] = value
-			}
-			insertUpdates = append(insertUpdates, clone)
-		}
-		if len(uids) > 0 {
-			_, err = s.query.DeleteWhereInQuery("quest", map[string]any{"id": id, "profile_no": currentProfile}, uids, "uid")
-			if err != nil {
-				writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-				return
-			}
-		}
-		insert = append(insert, insertUpdates...)
-	}
-
-	if len(insert) > 0 {
-		if _, err := s.query.InsertQuery("quest", insert); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-			return
-		}
-	}
-
-	trimmed := strings.TrimSpace(message)
-	sendTrackingMessage(s, human, trimmed, language)
-	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "message": trimmed})
+	handleTrackingUpsertGeneric(w, s, id, r, questTrackingRouteConfig(s), func(translator *i18n.Translator, row map[string]any) string {
+		return tracking.QuestRowText(s.cfg, translator, s.data, row)
+	})
 }
 
 func handleTrackingInvasionGet(w http.ResponseWriter, s *Server, id string) {
-	human, err := s.query.SelectOneQuery("humans", map[string]any{"id": id})
-	if err != nil || human == nil {
-		writeJSON(w, http.StatusOK, map[string]any{"status": "error", "message": "User not found"})
-		return
-	}
-	currentProfile := numberFromAnyOrDefault(human["current_profile_no"], 1)
-	rows, err := s.query.SelectAllQuery("invasion", map[string]any{"id": id, "profile_no": currentProfile})
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "invasion": rows})
+	handleTrackingGetGeneric(w, s, id, invasionTrackingRouteConfig(s))
 }
 
 func handleTrackingInvasionDelete(w http.ResponseWriter, s *Server, id string, uid string) {
-	_, err := s.query.DeleteQuery("invasion", map[string]any{"id": id, "uid": uid})
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
+	handleTrackingDeleteGeneric(w, s, id, uid, "invasion")
 }
 
 func handleTrackingInvasionDeleteBatch(w http.ResponseWriter, s *Server, id string, r *http.Request) {
-	payload, err := decodeAnyArray(r)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": "invalid payload"})
-		return
-	}
-	values := make([]any, 0, len(payload))
-	for _, item := range payload {
-		values = append(values, item)
-	}
-	_, err = s.query.DeleteWhereInQuery("invasion", map[string]any{"id": id}, values, "uid")
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
+	handleTrackingDeleteBatchGeneric(w, s, id, r, "invasion")
 }
 
 func handleTrackingInvasionUpsert(w http.ResponseWriter, s *Server, id string, r *http.Request) {
-	human, err := s.query.SelectOneQuery("humans", map[string]any{"id": id})
-	if err != nil || human == nil {
-		writeJSON(w, http.StatusOK, map[string]any{"status": "error", "message": "User not found"})
-		return
-	}
-	language := getStringValue(human["language"], s.cfg, "general.locale")
-	translator := s.i18n.Translator(language)
-	currentProfile := numberFromAnyOrDefault(human["current_profile_no"], 1)
-
-	rows, err := decodeJSONRows(r)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": "invalid payload"})
-		return
-	}
-
-	insert := make([]map[string]any, 0, len(rows))
-	for _, row := range rows {
-		cleanRow, err := cleanInvasionRow(s.cfg, id, currentProfile, row)
-		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": err.Error()})
-			return
-		}
-		insert = append(insert, cleanRow)
-	}
-
-	trackedRows, err := s.query.SelectAllQuery("invasion", map[string]any{"id": id, "profile_no": currentProfile})
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-		return
-	}
-
-	updates := make([]map[string]any, 0)
-	alreadyPresent := make([]map[string]any, 0)
-	for i := len(insert) - 1; i >= 0; i-- {
-		toInsert := insert[i]
-		for _, existing := range trackedRows {
-			if getString(existing["grunt_type"]) != getString(toInsert["grunt_type"]) {
-				continue
-			}
-			diffKeys := diffGeneric(toInsert, existing)
-			if len(diffKeys) == 0 {
-				alreadyPresent = append(alreadyPresent, toInsert)
-				insert = append(insert[:i], insert[i+1:]...)
-				break
-			}
-			if len(diffKeys) == 1 && (containsString(diffKeys, "distance") || containsString(diffKeys, "template") || containsString(diffKeys, "clean")) {
-				clone := map[string]any{}
-				for key, value := range toInsert {
-					clone[key] = value
-				}
-				clone["uid"] = existing["uid"]
-				updates = append(updates, clone)
-				insert = append(insert[:i], insert[i+1:]...)
-				break
-			}
-		}
-	}
-
-	message := ""
-	total := len(alreadyPresent) + len(updates) + len(insert)
-	if total > 50 {
-		message = translator.TranslateFormat("I have made a lot of changes. See {0}{1} for details", "!", translator.Translate("tracked", false))
-	} else {
-		for _, row := range alreadyPresent {
-			message += translator.Translate("Unchanged: ", false) + tracking.InvasionRowText(s.cfg, translator, s.data, row) + "\n"
-		}
-		for _, row := range updates {
-			message += translator.Translate("Updated: ", false) + tracking.InvasionRowText(s.cfg, translator, s.data, row) + "\n"
-		}
-		for _, row := range insert {
-			message += translator.Translate("New: ", false) + tracking.InvasionRowText(s.cfg, translator, s.data, row) + "\n"
-		}
-	}
-
-	if len(updates) > 0 {
-		uids := make([]any, 0, len(updates))
-		insertUpdates := make([]map[string]any, 0, len(updates))
-		for _, row := range updates {
-			if row["uid"] != nil {
-				uids = append(uids, row["uid"])
-			}
-			clone := map[string]any{}
-			for key, value := range row {
-				if key == "uid" {
-					continue
-				}
-				clone[key] = value
-			}
-			insertUpdates = append(insertUpdates, clone)
-		}
-		if len(uids) > 0 {
-			_, err = s.query.DeleteWhereInQuery("invasion", map[string]any{"id": id, "profile_no": currentProfile}, uids, "uid")
-			if err != nil {
-				writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-				return
-			}
-		}
-		insert = append(insert, insertUpdates...)
-	}
-
-	if len(insert) > 0 {
-		if _, err := s.query.InsertQuery("invasion", insert); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-			return
-		}
-	}
-
-	trimmed := strings.TrimSpace(message)
-	sendTrackingMessage(s, human, trimmed, language)
-	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "message": trimmed})
+	handleTrackingUpsertGeneric(w, s, id, r, invasionTrackingRouteConfig(s), func(translator *i18n.Translator, row map[string]any) string {
+		return tracking.InvasionRowText(s.cfg, translator, s.data, row)
+	})
 }
 
 func handleTrackingLureGet(w http.ResponseWriter, s *Server, id string) {
-	human, err := s.query.SelectOneQuery("humans", map[string]any{"id": id})
-	if err != nil || human == nil {
-		writeJSON(w, http.StatusOK, map[string]any{"status": "error", "message": "User not found"})
-		return
-	}
-	currentProfile := numberFromAnyOrDefault(human["current_profile_no"], 1)
-	rows, err := s.query.SelectAllQuery("lures", map[string]any{"id": id, "profile_no": currentProfile})
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "lure": rows})
+	handleTrackingGetGeneric(w, s, id, lureTrackingRouteConfig(s))
 }
 
 func handleTrackingLureDelete(w http.ResponseWriter, s *Server, id string, uid string) {
-	_, err := s.query.DeleteQuery("lures", map[string]any{"id": id, "uid": uid})
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
+	handleTrackingDeleteGeneric(w, s, id, uid, "lures")
 }
 
 func handleTrackingLureDeleteBatch(w http.ResponseWriter, s *Server, id string, r *http.Request) {
-	payload, err := decodeAnyArray(r)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": "invalid payload"})
-		return
-	}
-	values := make([]any, 0, len(payload))
-	for _, item := range payload {
-		values = append(values, item)
-	}
-	_, err = s.query.DeleteWhereInQuery("lures", map[string]any{"id": id}, values, "uid")
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
+	handleTrackingDeleteBatchGeneric(w, s, id, r, "lures")
 }
 
 func handleTrackingLureUpsert(w http.ResponseWriter, s *Server, id string, r *http.Request) {
-	human, err := s.query.SelectOneQuery("humans", map[string]any{"id": id})
-	if err != nil || human == nil {
-		writeJSON(w, http.StatusOK, map[string]any{"status": "error", "message": "User not found"})
-		return
-	}
-	language := getStringValue(human["language"], s.cfg, "general.locale")
-	translator := s.i18n.Translator(language)
-	currentProfile := numberFromAnyOrDefault(human["current_profile_no"], 1)
-
-	rows, err := decodeJSONRows(r)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": "invalid payload"})
-		return
-	}
-
-	insert := make([]map[string]any, 0, len(rows))
-	for _, row := range rows {
-		cleanRow, err := cleanLureRow(s.cfg, id, currentProfile, row)
-		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": err.Error()})
-			return
-		}
-		insert = append(insert, cleanRow)
-	}
-
-	trackedRows, err := s.query.SelectAllQuery("lures", map[string]any{"id": id, "profile_no": currentProfile})
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-		return
-	}
-
-	updates := make([]map[string]any, 0)
-	alreadyPresent := make([]map[string]any, 0)
-	for i := len(insert) - 1; i >= 0; i-- {
-		toInsert := insert[i]
-		for _, existing := range trackedRows {
-			if intFromAny(existing["lure_id"]) != intFromAny(toInsert["lure_id"]) {
-				continue
-			}
-			diffKeys := diffGeneric(toInsert, existing)
-			if len(diffKeys) == 0 {
-				alreadyPresent = append(alreadyPresent, toInsert)
-				insert = append(insert[:i], insert[i+1:]...)
-				break
-			}
-			if len(diffKeys) == 1 && (containsString(diffKeys, "distance") || containsString(diffKeys, "template") || containsString(diffKeys, "clean")) {
-				clone := map[string]any{}
-				for key, value := range toInsert {
-					clone[key] = value
-				}
-				clone["uid"] = existing["uid"]
-				updates = append(updates, clone)
-				insert = append(insert[:i], insert[i+1:]...)
-				break
-			}
-		}
-	}
-
-	message := ""
-	total := len(alreadyPresent) + len(updates) + len(insert)
-	if total > 50 {
-		message = translator.TranslateFormat("I have made a lot of changes. See {0}{1} for details", "!", translator.Translate("tracked", false))
-	} else {
-		for _, row := range alreadyPresent {
-			message += translator.Translate("Unchanged: ", false) + tracking.LureRowText(s.cfg, translator, s.data, row) + "\n"
-		}
-		for _, row := range updates {
-			message += translator.Translate("Updated: ", false) + tracking.LureRowText(s.cfg, translator, s.data, row) + "\n"
-		}
-		for _, row := range insert {
-			message += translator.Translate("New: ", false) + tracking.LureRowText(s.cfg, translator, s.data, row) + "\n"
-		}
-	}
-
-	if len(updates) > 0 {
-		uids := make([]any, 0, len(updates))
-		insertUpdates := make([]map[string]any, 0, len(updates))
-		for _, row := range updates {
-			if row["uid"] != nil {
-				uids = append(uids, row["uid"])
-			}
-			clone := map[string]any{}
-			for key, value := range row {
-				if key == "uid" {
-					continue
-				}
-				clone[key] = value
-			}
-			insertUpdates = append(insertUpdates, clone)
-		}
-		if len(uids) > 0 {
-			_, err = s.query.DeleteWhereInQuery("lures", map[string]any{"id": id, "profile_no": currentProfile}, uids, "uid")
-			if err != nil {
-				writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-				return
-			}
-		}
-		insert = append(insert, insertUpdates...)
-	}
-
-	if len(insert) > 0 {
-		if _, err := s.query.InsertQuery("lures", insert); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-			return
-		}
-	}
-
-	trimmed := strings.TrimSpace(message)
-	sendTrackingMessage(s, human, trimmed, language)
-	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "message": trimmed})
+	handleTrackingUpsertGeneric(w, s, id, r, lureTrackingRouteConfig(s), func(translator *i18n.Translator, row map[string]any) string {
+		return tracking.LureRowText(s.cfg, translator, s.data, row)
+	})
 }
 
 func handleTrackingNestGet(w http.ResponseWriter, s *Server, id string) {
-	human, err := s.query.SelectOneQuery("humans", map[string]any{"id": id})
-	if err != nil || human == nil {
-		writeJSON(w, http.StatusOK, map[string]any{"status": "error", "message": "User not found"})
-		return
-	}
-	currentProfile := numberFromAnyOrDefault(human["current_profile_no"], 1)
-	rows, err := s.query.SelectAllQuery("nests", map[string]any{"id": id, "profile_no": currentProfile})
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "nest": rows})
+	handleTrackingGetGeneric(w, s, id, nestTrackingRouteConfig(s))
 }
 
 func handleTrackingNestDelete(w http.ResponseWriter, s *Server, id string, uid string) {
-	_, err := s.query.DeleteQuery("nests", map[string]any{"id": id, "uid": uid})
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
+	handleTrackingDeleteGeneric(w, s, id, uid, "nests")
 }
 
 func handleTrackingNestDeleteBatch(w http.ResponseWriter, s *Server, id string, r *http.Request) {
-	payload, err := decodeAnyArray(r)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": "invalid payload"})
-		return
-	}
-	values := make([]any, 0, len(payload))
-	for _, item := range payload {
-		values = append(values, item)
-	}
-	_, err = s.query.DeleteWhereInQuery("nests", map[string]any{"id": id}, values, "uid")
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
+	handleTrackingDeleteBatchGeneric(w, s, id, r, "nests")
 }
 
 func handleTrackingNestUpsert(w http.ResponseWriter, s *Server, id string, r *http.Request) {
-	human, err := s.query.SelectOneQuery("humans", map[string]any{"id": id})
-	if err != nil || human == nil {
-		writeJSON(w, http.StatusOK, map[string]any{"status": "error", "message": "User not found"})
-		return
-	}
-	language := getStringValue(human["language"], s.cfg, "general.locale")
-	translator := s.i18n.Translator(language)
-	currentProfile := numberFromAnyOrDefault(human["current_profile_no"], 1)
-
-	rows, err := decodeJSONRows(r)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": "invalid payload"})
-		return
-	}
-
-	insert := make([]map[string]any, 0, len(rows))
-	for _, row := range rows {
-		cleanRow, err := cleanNestRow(s.cfg, id, currentProfile, row)
-		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": err.Error()})
-			return
-		}
-		insert = append(insert, cleanRow)
-	}
-
-	trackedRows, err := s.query.SelectAllQuery("nests", map[string]any{"id": id, "profile_no": currentProfile})
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-		return
-	}
-
-	updates := make([]map[string]any, 0)
-	alreadyPresent := make([]map[string]any, 0)
-	for i := len(insert) - 1; i >= 0; i-- {
-		toInsert := insert[i]
-		for _, existing := range trackedRows {
-			if intFromAny(existing["pokemon_id"]) != intFromAny(toInsert["pokemon_id"]) {
-				continue
-			}
-			diffKeys := diffGeneric(toInsert, existing)
-			if len(diffKeys) == 0 {
-				alreadyPresent = append(alreadyPresent, toInsert)
-				insert = append(insert[:i], insert[i+1:]...)
-				break
-			}
-			if len(diffKeys) == 1 && (containsString(diffKeys, "distance") || containsString(diffKeys, "template") || containsString(diffKeys, "clean")) {
-				clone := map[string]any{}
-				for key, value := range toInsert {
-					clone[key] = value
-				}
-				clone["uid"] = existing["uid"]
-				updates = append(updates, clone)
-				insert = append(insert[:i], insert[i+1:]...)
-				break
-			}
-		}
-	}
-
-	message := ""
-	total := len(alreadyPresent) + len(updates) + len(insert)
-	if total > 50 {
-		message = translator.TranslateFormat("I have made a lot of changes. See {0}{1} for details", "!", translator.Translate("tracked", false))
-	} else {
-		for _, row := range alreadyPresent {
-			message += translator.Translate("Unchanged: ", false) + tracking.NestRowText(s.cfg, translator, s.data, row) + "\n"
-		}
-		for _, row := range updates {
-			message += translator.Translate("Updated: ", false) + tracking.NestRowText(s.cfg, translator, s.data, row) + "\n"
-		}
-		for _, row := range insert {
-			message += translator.Translate("New: ", false) + tracking.NestRowText(s.cfg, translator, s.data, row) + "\n"
-		}
-	}
-
-	if len(updates) > 0 {
-		uids := make([]any, 0, len(updates))
-		insertUpdates := make([]map[string]any, 0, len(updates))
-		for _, row := range updates {
-			if row["uid"] != nil {
-				uids = append(uids, row["uid"])
-			}
-			clone := map[string]any{}
-			for key, value := range row {
-				if key == "uid" {
-					continue
-				}
-				clone[key] = value
-			}
-			insertUpdates = append(insertUpdates, clone)
-		}
-		if len(uids) > 0 {
-			_, err = s.query.DeleteWhereInQuery("nests", map[string]any{"id": id, "profile_no": currentProfile}, uids, "uid")
-			if err != nil {
-				writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-				return
-			}
-		}
-		insert = append(insert, insertUpdates...)
-	}
-
-	if len(insert) > 0 {
-		if _, err := s.query.InsertQuery("nests", insert); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-			return
-		}
-	}
-
-	trimmed := strings.TrimSpace(message)
-	sendTrackingMessage(s, human, trimmed, language)
-	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "message": trimmed})
+	handleTrackingUpsertGeneric(w, s, id, r, nestTrackingRouteConfig(s), func(translator *i18n.Translator, row map[string]any) string {
+		return tracking.NestRowText(s.cfg, translator, s.data, row)
+	})
 }
 
 func handleTrackingGymGet(w http.ResponseWriter, s *Server, id string) {
-	human, err := s.query.SelectOneQuery("humans", map[string]any{"id": id})
-	if err != nil || human == nil {
-		writeJSON(w, http.StatusOK, map[string]any{"status": "error", "message": "User not found"})
-		return
-	}
-	language := getStringValue(human["language"], s.cfg, "general.locale")
-	translator := s.i18n.Translator(language)
-	currentProfile := numberFromAnyOrDefault(human["current_profile_no"], 1)
-	rows, err := s.query.SelectAllQuery("gym", map[string]any{"id": id, "profile_no": currentProfile})
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-		return
-	}
-	out := make([]map[string]any, 0, len(rows))
-	for _, row := range rows {
-		description := tracking.GymRowText(s.cfg, translator, s.data, row, s.scanner)
-		clone := map[string]any{}
-		for key, value := range row {
-			clone[key] = value
-		}
-		clone["description"] = description
-		out = append(out, clone)
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "gym": out})
+	handleTrackingGetGeneric(w, s, id, gymTrackingRouteConfig(s))
 }
 
 func handleTrackingGymDelete(w http.ResponseWriter, s *Server, id string, uid string) {
-	_, err := s.query.DeleteQuery("gym", map[string]any{"id": id, "uid": uid})
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
+	handleTrackingDeleteGeneric(w, s, id, uid, "gym")
 }
 
 func handleTrackingGymDeleteBatch(w http.ResponseWriter, s *Server, id string, r *http.Request) {
-	payload, err := decodeAnyArray(r)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": "invalid payload"})
-		return
-	}
-	values := make([]any, 0, len(payload))
-	for _, item := range payload {
-		values = append(values, item)
-	}
-	_, err = s.query.DeleteWhereInQuery("gym", map[string]any{"id": id}, values, "uid")
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
+	handleTrackingDeleteBatchGeneric(w, s, id, r, "gym")
 }
 
 func handleTrackingGymUpsert(w http.ResponseWriter, s *Server, id string, r *http.Request) {
-	human, err := s.query.SelectOneQuery("humans", map[string]any{"id": id})
-	if err != nil || human == nil {
-		writeJSON(w, http.StatusOK, map[string]any{"status": "error", "message": "User not found"})
-		return
-	}
-	language := getStringValue(human["language"], s.cfg, "general.locale")
-	translator := s.i18n.Translator(language)
-	currentProfile := numberFromAnyOrDefault(human["current_profile_no"], 1)
-
-	rows, err := decodeJSONRows(r)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": "invalid payload"})
-		return
-	}
-
-	insert := make([]map[string]any, 0, len(rows))
-	for _, row := range rows {
-		cleanRow, err := cleanGymRow(s.cfg, id, currentProfile, row)
-		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": err.Error()})
-			return
-		}
-		insert = append(insert, cleanRow)
-	}
-
-	trackedRows, err := s.query.SelectAllQuery("gym", map[string]any{"id": id, "profile_no": currentProfile})
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-		return
-	}
-
-	updates := make([]map[string]any, 0)
-	alreadyPresent := make([]map[string]any, 0)
-	for i := len(insert) - 1; i >= 0; i-- {
-		toInsert := insert[i]
-		for _, existing := range trackedRows {
-			if intFromAny(existing["team"]) != intFromAny(toInsert["team"]) {
-				continue
-			}
-			diffKeys := diffGeneric(toInsert, existing)
-			if len(diffKeys) == 0 {
-				alreadyPresent = append(alreadyPresent, toInsert)
-				insert = append(insert[:i], insert[i+1:]...)
-				break
-			}
-			if len(diffKeys) == 1 && (containsString(diffKeys, "distance") || containsString(diffKeys, "template") || containsString(diffKeys, "clean") || containsString(diffKeys, "slot_changes") || containsString(diffKeys, "battle_changes")) {
-				clone := map[string]any{}
-				for key, value := range toInsert {
-					clone[key] = value
-				}
-				clone["uid"] = existing["uid"]
-				updates = append(updates, clone)
-				insert = append(insert[:i], insert[i+1:]...)
-				break
-			}
-		}
-	}
-
-	message := ""
-	total := len(alreadyPresent) + len(updates) + len(insert)
-	if total > 50 {
-		message = translator.TranslateFormat("I have made a lot of changes. See {0}{1} for details", "!", translator.Translate("tracked", false))
-	} else {
-		for _, row := range alreadyPresent {
-			message += translator.Translate("Unchanged: ", false) + tracking.GymRowText(s.cfg, translator, s.data, row, s.scanner) + "\n"
-		}
-		for _, row := range updates {
-			message += translator.Translate("Updated: ", false) + tracking.GymRowText(s.cfg, translator, s.data, row, s.scanner) + "\n"
-		}
-		for _, row := range insert {
-			message += translator.Translate("New: ", false) + tracking.GymRowText(s.cfg, translator, s.data, row, s.scanner) + "\n"
-		}
-	}
-
-	if len(updates) > 0 {
-		uids := make([]any, 0, len(updates))
-		insertUpdates := make([]map[string]any, 0, len(updates))
-		for _, row := range updates {
-			if row["uid"] != nil {
-				uids = append(uids, row["uid"])
-			}
-			clone := map[string]any{}
-			for key, value := range row {
-				if key == "uid" {
-					continue
-				}
-				clone[key] = value
-			}
-			insertUpdates = append(insertUpdates, clone)
-		}
-		if len(uids) > 0 {
-			_, err = s.query.DeleteWhereInQuery("gym", map[string]any{"id": id, "profile_no": currentProfile}, uids, "uid")
-			if err != nil {
-				writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-				return
-			}
-		}
-		insert = append(insert, insertUpdates...)
-	}
-
-	if len(insert) > 0 {
-		if _, err := s.query.InsertQuery("gym", insert); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-			return
-		}
-	}
-
-	trimmed := strings.TrimSpace(message)
-	sendTrackingMessage(s, human, trimmed, language)
-	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "message": trimmed})
+	handleTrackingUpsertGeneric(w, s, id, r, gymTrackingRouteConfig(s), func(translator *i18n.Translator, row map[string]any) string {
+		return tracking.GymRowText(s.cfg, translator, s.data, row, s.scanner)
+	})
 }
 
 func handleTrackingMaxbattleGet(w http.ResponseWriter, s *Server, id string) {
-	human, err := s.query.SelectOneQuery("humans", map[string]any{"id": id})
-	if err != nil || human == nil {
-		writeJSON(w, http.StatusOK, map[string]any{"status": "error", "message": "User not found"})
-		return
-	}
-	language := getStringValue(human["language"], s.cfg, "general.locale")
-	translator := s.i18n.Translator(language)
-	currentProfile := numberFromAnyOrDefault(human["current_profile_no"], 1)
-	rows, err := s.query.SelectAllQuery("maxbattle", map[string]any{"id": id, "profile_no": currentProfile})
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-		return
-	}
-	out := make([]map[string]any, 0, len(rows))
-	for _, row := range rows {
-		description := tracking.MaxbattleRowText(s.cfg, translator, s.data, row)
-		clone := map[string]any{}
-		for key, value := range row {
-			clone[key] = value
-		}
-		clone["description"] = description
-		out = append(out, clone)
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "maxbattle": out})
+	handleTrackingGetGeneric(w, s, id, maxbattleTrackingRouteConfig(s))
 }
 
 func handleTrackingMaxbattleDelete(w http.ResponseWriter, s *Server, id string, uid string) {
-	_, err := s.query.DeleteQuery("maxbattle", map[string]any{"id": id, "uid": uid})
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
+	handleTrackingDeleteGeneric(w, s, id, uid, "maxbattle")
 }
 
 func handleTrackingMaxbattleDeleteBatch(w http.ResponseWriter, s *Server, id string, r *http.Request) {
-	payload, err := decodeAnyArray(r)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": "invalid payload"})
-		return
-	}
-	values := make([]any, 0, len(payload))
-	for _, item := range payload {
-		values = append(values, item)
-	}
-	_, err = s.query.DeleteWhereInQuery("maxbattle", map[string]any{"id": id}, values, "uid")
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
+	handleTrackingDeleteBatchGeneric(w, s, id, r, "maxbattle")
 }
 
 func handleTrackingMaxbattleUpsert(w http.ResponseWriter, s *Server, id string, r *http.Request) {
-	human, err := s.query.SelectOneQuery("humans", map[string]any{"id": id})
-	if err != nil || human == nil {
-		writeJSON(w, http.StatusOK, map[string]any{"status": "error", "message": "User not found"})
-		return
-	}
-	language := getStringValue(human["language"], s.cfg, "general.locale")
-	translator := s.i18n.Translator(language)
-	currentProfile := numberFromAnyOrDefault(human["current_profile_no"], 1)
-
-	rows, err := decodeJSONRows(r)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": "invalid payload"})
-		return
-	}
-
-	insert := make([]map[string]any, 0, len(rows))
-	for _, row := range rows {
-		cleanRow, err := cleanMaxbattleRow(s.cfg, id, currentProfile, row)
-		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": err.Error()})
-			return
-		}
-		insert = append(insert, cleanRow)
-	}
-
-	trackedRows, err := s.query.SelectAllQuery("maxbattle", map[string]any{"id": id, "profile_no": currentProfile})
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-		return
-	}
-
-	stationValue := func(row map[string]any) string {
-		return strings.TrimSpace(getString(row["station_id"]))
-	}
-
-	updates := make([]map[string]any, 0)
-	alreadyPresent := make([]map[string]any, 0)
-	for i := len(insert) - 1; i >= 0; i-- {
-		toInsert := insert[i]
-		for _, existing := range trackedRows {
-			if intFromAny(existing["pokemon_id"]) != intFromAny(toInsert["pokemon_id"]) {
-				continue
-			}
-			if intFromAny(existing["gmax"]) != intFromAny(toInsert["gmax"]) {
-				continue
-			}
-			if intFromAny(existing["level"]) != intFromAny(toInsert["level"]) {
-				continue
-			}
-			if intFromAny(existing["form"]) != intFromAny(toInsert["form"]) {
-				continue
-			}
-			if intFromAny(existing["move"]) != intFromAny(toInsert["move"]) {
-				continue
-			}
-			if intFromAny(existing["evolution"]) != intFromAny(toInsert["evolution"]) {
-				continue
-			}
-			if stationValue(existing) != stationValue(toInsert) {
-				continue
-			}
-
-			diffKeys := diffGeneric(toInsert, existing)
-			if len(diffKeys) == 0 {
-				alreadyPresent = append(alreadyPresent, toInsert)
-				insert = append(insert[:i], insert[i+1:]...)
-				break
-			}
-			if len(diffKeys) == 1 && (containsString(diffKeys, "distance") || containsString(diffKeys, "template") || containsString(diffKeys, "clean")) {
-				clone := map[string]any{}
-				for key, value := range toInsert {
-					clone[key] = value
-				}
-				clone["uid"] = existing["uid"]
-				updates = append(updates, clone)
-				insert = append(insert[:i], insert[i+1:]...)
-				break
-			}
-		}
-	}
-
-	message := ""
-	total := len(alreadyPresent) + len(updates) + len(insert)
-	if total > 50 {
-		message = translator.TranslateFormat("I have made a lot of changes. See {0}{1} for details", "!", translator.Translate("tracked", false))
-	} else {
-		for _, row := range alreadyPresent {
-			message += translator.Translate("Unchanged: ", false) + tracking.MaxbattleRowText(s.cfg, translator, s.data, row) + "\n"
-		}
-		for _, row := range updates {
-			message += translator.Translate("Updated: ", false) + tracking.MaxbattleRowText(s.cfg, translator, s.data, row) + "\n"
-		}
-		for _, row := range insert {
-			message += translator.Translate("New: ", false) + tracking.MaxbattleRowText(s.cfg, translator, s.data, row) + "\n"
-		}
-	}
-
-	if len(updates) > 0 {
-		uids := make([]any, 0, len(updates))
-		insertUpdates := make([]map[string]any, 0, len(updates))
-		for _, row := range updates {
-			if row["uid"] != nil {
-				uids = append(uids, row["uid"])
-			}
-			clone := map[string]any{}
-			for key, value := range row {
-				if key == "uid" {
-					continue
-				}
-				clone[key] = value
-			}
-			insertUpdates = append(insertUpdates, clone)
-		}
-		if len(uids) > 0 {
-			_, err = s.query.DeleteWhereInQuery("maxbattle", map[string]any{"id": id, "profile_no": currentProfile}, uids, "uid")
-			if err != nil {
-				writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-				return
-			}
-		}
-		insert = append(insert, insertUpdates...)
-	}
-
-	if len(insert) > 0 {
-		if _, err := s.query.InsertQuery("maxbattle", insert); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "Exception raised during execution"})
-			return
-		}
-	}
-
-	trimmed := strings.TrimSpace(message)
-	sendTrackingMessage(s, human, trimmed, language)
-	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "message": trimmed})
-}
-
-func cleanQuestRow(cfg *config.Config, id string, currentProfile int, row map[string]any) (map[string]any, error) {
-	defaultTemplate, _ := cfg.GetString("general.defaultTemplateName")
-	if defaultTemplate == "" {
-		defaultTemplate = "1"
-	}
-	rewardType := defaultInt(row["reward_type"], -1)
-	if rewardType != 3 && rewardType != 12 && rewardType != 4 && rewardType != 7 && rewardType != 2 {
-		return nil, fmt.Errorf("Unrecognised reward_type value")
-	}
-	newRow := map[string]any{
-		"id":          id,
-		"profile_no":  currentProfile,
-		"ping":        "",
-		"template":    getStringValue(row["template"], nil, ""),
-		"distance":    defaultInt(row["distance"], 0),
-		"clean":       defaultInt(row["clean"], 0),
-		"reward_type": rewardType,
-		"reward":      defaultInt(row["reward"], 0),
-		"amount":      defaultInt(row["amount"], 0),
-		"form":        defaultInt(row["form"], 0),
-	}
-	if newRow["template"] == "" {
-		newRow["template"] = defaultTemplate
-	}
-	return newRow, nil
-}
-
-func cleanInvasionRow(cfg *config.Config, id string, currentProfile int, row map[string]any) (map[string]any, error) {
-	if getString(row["grunt_type"]) == "" {
-		return nil, fmt.Errorf("Grunt type mandatory")
-	}
-	defaultTemplate, _ := cfg.GetString("general.defaultTemplateName")
-	if defaultTemplate == "" {
-		defaultTemplate = "1"
-	}
-	newRow := map[string]any{
-		"id":         id,
-		"profile_no": currentProfile,
-		"ping":       "",
-		"template":   getStringValue(row["template"], nil, ""),
-		"distance":   defaultInt(row["distance"], 0),
-		"clean":      defaultInt(row["clean"], 0),
-		"gender":     defaultInt(row["gender"], 0),
-		"grunt_type": getString(row["grunt_type"]),
-	}
-	if newRow["template"] == "" {
-		newRow["template"] = defaultTemplate
-	}
-	return newRow, nil
-}
-
-func cleanLureRow(cfg *config.Config, id string, currentProfile int, row map[string]any) (map[string]any, error) {
-	defaultTemplate, _ := cfg.GetString("general.defaultTemplateName")
-	if defaultTemplate == "" {
-		defaultTemplate = "1"
-	}
-	lureID := defaultInt(row["lure_id"], -1)
-	if lureID != 0 && lureID != 501 && lureID != 502 && lureID != 503 && lureID != 504 && lureID != 505 && lureID != 506 {
-		return nil, fmt.Errorf("Unrecognised lure_id value")
-	}
-	newRow := map[string]any{
-		"id":         id,
-		"profile_no": currentProfile,
-		"ping":       "",
-		"template":   getStringValue(row["template"], nil, ""),
-		"distance":   defaultInt(row["distance"], 0),
-		"clean":      defaultInt(row["clean"], 0),
-		"lure_id":    lureID,
-	}
-	if newRow["template"] == "" {
-		newRow["template"] = defaultTemplate
-	}
-	return newRow, nil
-}
-
-func cleanNestRow(cfg *config.Config, id string, currentProfile int, row map[string]any) (map[string]any, error) {
-	defaultTemplate, _ := cfg.GetString("general.defaultTemplateName")
-	if defaultTemplate == "" {
-		defaultTemplate = "1"
-	}
-	newRow := map[string]any{
-		"id":            id,
-		"profile_no":    currentProfile,
-		"ping":          "",
-		"template":      getStringValue(row["template"], nil, ""),
-		"distance":      defaultInt(row["distance"], 0),
-		"clean":         defaultInt(row["clean"], 0),
-		"pokemon_id":    defaultInt(row["pokemon_id"], 0),
-		"min_spawn_avg": defaultInt(row["min_spawn_avg"], 0),
-		"form":          defaultInt(row["form"], 0),
-	}
-	if newRow["template"] == "" {
-		newRow["template"] = defaultTemplate
-	}
-	return newRow, nil
-}
-
-func cleanGymRow(cfg *config.Config, id string, currentProfile int, row map[string]any) (map[string]any, error) {
-	defaultTemplate, _ := cfg.GetString("general.defaultTemplateName")
-	if defaultTemplate == "" {
-		defaultTemplate = "1"
-	}
-	team := defaultInt(row["team"], -1)
-	if team < 0 || team > 4 {
-		return nil, fmt.Errorf("Invalid team")
-	}
-	newRow := map[string]any{
-		"id":             id,
-		"profile_no":     currentProfile,
-		"ping":           "",
-		"template":       getStringValue(row["template"], nil, ""),
-		"distance":       defaultInt(row["distance"], 0),
-		"clean":          defaultInt(row["clean"], 0),
-		"team":           team,
-		"slot_changes":   defaultInt(row["slot_changes"], 0),
-		"battle_changes": defaultInt(row["battle_changes"], 0),
-		"gym_id":         row["gym_id"],
-	}
-	if newRow["template"] == "" {
-		newRow["template"] = defaultTemplate
-	}
-	return newRow, nil
-}
-
-func cleanMaxbattleRow(cfg *config.Config, id string, currentProfile int, row map[string]any) (map[string]any, error) {
-	defaultTemplate, _ := cfg.GetString("general.defaultTemplateName")
-	if defaultTemplate == "" {
-		defaultTemplate = "1"
-	}
-	pokemonID := defaultInt(row["pokemon_id"], 0)
-	if pokemonID != 9000 && pokemonID <= 0 {
-		return nil, fmt.Errorf("Invalid pokemon_id")
-	}
-	gmax := defaultInt(row["gmax"], 0)
-	if gmax != 0 && gmax != 1 {
-		return nil, fmt.Errorf("Invalid gmax")
-	}
-	move := defaultInt(row["move"], 9000)
-	evolution := defaultInt(row["evolution"], 9000)
-	stationID := strings.TrimSpace(getString(row["station_id"]))
-	var stationValue any
-	if stationID != "" {
-		stationValue = stationID
-	} else {
-		stationValue = nil
-	}
-	newRow := map[string]any{
-		"id":         id,
-		"profile_no": currentProfile,
-		"ping":       "",
-		"template":   getStringValue(row["template"], nil, ""),
-		"distance":   defaultInt(row["distance"], 0),
-		"clean":      defaultInt(row["clean"], 0),
-		"pokemon_id": pokemonID,
-		"gmax":       gmax,
-		"level":      defaultInt(row["level"], 0),
-		"form":       defaultInt(row["form"], 0),
-		"move":       move,
-		"evolution":  evolution,
-		"station_id": stationValue,
-	}
-	if newRow["template"] == "" {
-		newRow["template"] = defaultTemplate
-	}
-	return newRow, nil
-}
-
-func diffGeneric(candidate map[string]any, existing map[string]any) []string {
-	keys := []string{}
-	for key, value := range candidate {
-		if key == "uid" {
-			continue
-		}
-		if fmt.Sprintf("%v", value) != fmt.Sprintf("%v", existing[key]) {
-			keys = append(keys, key)
-		}
-	}
-	return keys
+	handleTrackingUpsertGeneric(w, s, id, r, maxbattleTrackingRouteConfig(s), func(translator *i18n.Translator, row map[string]any) string {
+		return tracking.MaxbattleRowText(s.cfg, translator, s.data, row)
+	})
 }

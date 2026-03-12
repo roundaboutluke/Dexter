@@ -103,6 +103,7 @@ func (d *Discord) handleAutocreate(s *discordgo.Session, m *discordgo.MessageCre
 		}
 	}
 
+	dirty := false
 	for _, channelDef := range selected.Definition.Channels {
 		channelName := formatTemplate(channelDef.ChannelName, formatArgs)
 		create := discordgo.GuildChannelCreateData{
@@ -158,13 +159,10 @@ func (d *Discord) handleAutocreate(s *discordgo.Session, m *discordgo.MessageCre
 			}
 		}
 
-		_, _ = ctx.Query.InsertQuery("humans", map[string]any{
-			"id":                   target.ID,
-			"type":                 target.Type,
-			"name":                 target.Name,
-			"area":                 "[]",
-			"community_membership": "[]",
-		})
+		if !d.insertAutocreateTarget(ctx, target) {
+			continue
+		}
+		dirty = true
 
 		for _, cmd := range channelDef.Commands {
 			cmdLine := formatTemplate(cmd, subArgs)
@@ -178,6 +176,23 @@ func (d *Discord) handleAutocreate(s *discordgo.Session, m *discordgo.MessageCre
 			_, _ = d.manager.Registry().Execute(&clone, cmdLine)
 		}
 	}
+	if dirty {
+		d.manager.RefreshAlertState()
+	}
+}
+
+func (d *Discord) insertAutocreateTarget(ctx *command.Context, target commandTarget) bool {
+	if ctx == nil || ctx.Query == nil {
+		return false
+	}
+	_, err := ctx.Query.InsertQuery("humans", map[string]any{
+		"id":                   target.ID,
+		"type":                 target.Type,
+		"name":                 target.Name,
+		"area":                 "[]",
+		"community_membership": "[]",
+	})
+	return err == nil
 }
 
 type commandTarget struct {

@@ -6,6 +6,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"poraclego/internal/alertstate"
+	"poraclego/internal/db"
 )
 
 // BackupCommand writes tracking backups (admin only).
@@ -80,16 +83,14 @@ func (c *RestoreCommand) Handle(ctx *Context, args []string) (string, error) {
 	if err := restoreBackup(ctx, backup, result.TargetID, result.ProfileNo); err != nil {
 		return "", err
 	}
-	if ctx.RefreshAlertCache != nil {
-		ctx.RefreshAlertCache()
-	}
+	ctx.MarkAlertStateDirty()
 	return "✅", nil
 }
 
 type backupPayload map[string][]map[string]any
 
 func buildBackup(ctx *Context, targetID string, profileNo int) (backupPayload, error) {
-	categories := []string{"monsters", "raid", "egg", "quest", "invasion", "weather", "lures", "gym", "forts", "nests"}
+	categories := alertstate.TrackedTables()
 	backup := backupPayload{}
 	for _, category := range categories {
 		rows, err := ctx.Query.SelectAllQuery(category, map[string]any{"id": targetID, "profile_no": profileNo})
@@ -174,22 +175,24 @@ func loadBackup(root, name string) (backupPayload, error) {
 }
 
 func restoreBackup(ctx *Context, payload backupPayload, targetID string, profileNo int) error {
-	for category, rows := range payload {
-		for _, row := range rows {
-			row["id"] = targetID
-			row["profile_no"] = profileNo
+	return withAlertStateTx(ctx, func(query *db.Query) error {
+		for category, rows := range payload {
+			for _, row := range rows {
+				row["id"] = targetID
+				row["profile_no"] = profileNo
+			}
+			if len(rows) == 0 {
+				continue
+			}
+			if _, err := query.DeleteQuery(category, map[string]any{"id": targetID, "profile_no": profileNo}); err != nil {
+				return err
+			}
+			if _, err := query.InsertOrUpdateQuery(category, rows); err != nil {
+				return err
+			}
 		}
-		if len(rows) == 0 {
-			continue
-		}
-		if _, err := ctx.Query.DeleteQuery(category, map[string]any{"id": targetID, "profile_no": profileNo}); err != nil {
-			return err
-		}
-		if _, err := ctx.Query.InsertOrUpdateQuery(category, rows); err != nil {
-			return err
-		}
-	}
-	return nil
+		return nil
+	})
 }
 
 func removeWord(args []string, target string) []string {

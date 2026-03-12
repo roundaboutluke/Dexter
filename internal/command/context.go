@@ -36,8 +36,11 @@ type Context struct {
 	Root          string
 	Scanner       *scanner.Client
 	Logs          logging.Loggers
-	// RefreshAlertCache triggers a reload of in-memory alert caches (e.g. fastMonsters).
+	// RefreshAlertCache triggers a reload of the full in-memory alert state snapshot.
 	RefreshAlertCache func()
+
+	alertStateDirty            bool
+	alertStateRefreshRequested bool
 
 	Platform    string
 	Language    string
@@ -113,4 +116,33 @@ func (c *Context) TransportLogger() *logging.Logger {
 	default:
 		return c.Logs.General
 	}
+}
+
+// MarkAlertStateDirty marks the current command execution as changing alert-state inputs.
+func (c *Context) MarkAlertStateDirty() {
+	if c == nil {
+		return
+	}
+	c.alertStateDirty = true
+}
+
+func (c *Context) resetAlertStateTracking() {
+	if c == nil {
+		return
+	}
+	c.alertStateDirty = false
+	c.alertStateRefreshRequested = false
+}
+
+func (c *Context) shouldRefreshAlertState() bool {
+	return c != nil && c.alertStateDirty
+}
+
+// RequestAlertStateRefresh triggers the refresh callback once for the current command execution.
+func (c *Context) RequestAlertStateRefresh() {
+	if c == nil || c.RefreshAlertCache == nil || c.alertStateRefreshRequested {
+		return
+	}
+	c.alertStateRefreshRequested = true
+	c.RefreshAlertCache()
 }

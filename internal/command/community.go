@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"poraclego/internal/community"
+	"poraclego/internal/db"
 )
 
 // CommunityCommand manages community membership (admin only).
@@ -68,14 +69,32 @@ func (c *CommunityCommand) Handle(ctx *Context, args []string) (string, error) {
 		if note != "" {
 			lines = append(lines, note)
 		}
-		for _, id := range targetIDs {
-			lines = append(lines, fmt.Sprintf("Clear target %s", id))
-			if _, err := ctx.Query.UpdateQuery("humans", map[string]any{
-				"community_membership": "[]",
-				"area_restriction":     nil,
-			}, map[string]any{"id": id}); err != nil {
-				return "", err
+		changed := false
+		err := withAlertStateTx(ctx, func(query *db.Query) error {
+			for _, id := range targetIDs {
+				human, err := query.SelectOneQuery("humans", map[string]any{"id": id})
+				if err != nil {
+					return err
+				}
+				if human == nil {
+					continue
+				}
+				lines = append(lines, fmt.Sprintf("Clear target %s", id))
+				if _, err := query.UpdateQuery("humans", map[string]any{
+					"community_membership": "[]",
+					"area_restriction":     nil,
+				}, map[string]any{"id": id}); err != nil {
+					return err
+				}
+				changed = true
 			}
+			return nil
+		})
+		if err != nil {
+			return "", err
+		}
+		if changed {
+			ctx.MarkAlertStateDirty()
 		}
 		lines = append(lines, "✅")
 		return strings.Join(lines, "\n"), nil
@@ -92,30 +111,44 @@ func (c *CommunityCommand) Handle(ctx *Context, args []string) (string, error) {
 		if note != "" {
 			lines = append(lines, note)
 		}
-		for _, id := range targetIDs {
-			human, err := ctx.Query.SelectOneQuery("humans", map[string]any{"id": id})
-			if err != nil || human == nil {
-				continue
+		changed := false
+		err := withAlertStateTx(ctx, func(query *db.Query) error {
+			for _, id := range targetIDs {
+				human, err := query.SelectOneQuery("humans", map[string]any{"id": id})
+				if err != nil {
+					return err
+				}
+				if human == nil {
+					continue
+				}
+				existing := []string{}
+				if raw, ok := human["community_membership"].(string); ok && raw != "" {
+					_ = json.Unmarshal([]byte(raw), &existing)
+				}
+				var updated []string
+				if command == "add" {
+					lines = append(lines, fmt.Sprintf("Add community %s to target %s %v", communityName, id, human["name"]))
+					updated = community.AddCommunity(ctx.Config, existing, communityName)
+				} else {
+					lines = append(lines, fmt.Sprintf("Remove community %s from target %s %v", communityName, id, human["name"]))
+					updated = community.RemoveCommunity(ctx.Config, existing, communityName)
+				}
+				restrictions := community.CalculateLocationRestrictions(ctx.Config, updated)
+				if _, err := query.UpdateQuery("humans", map[string]any{
+					"community_membership": toJSON(updated),
+					"area_restriction":     nullableString(toJSON(restrictions)),
+				}, map[string]any{"id": id}); err != nil {
+					return err
+				}
+				changed = true
 			}
-			existing := []string{}
-			if raw, ok := human["community_membership"].(string); ok && raw != "" {
-				_ = json.Unmarshal([]byte(raw), &existing)
-			}
-			var updated []string
-			if command == "add" {
-				lines = append(lines, fmt.Sprintf("Add community %s to target %s %v", communityName, id, human["name"]))
-				updated = community.AddCommunity(ctx.Config, existing, communityName)
-			} else {
-				lines = append(lines, fmt.Sprintf("Remove community %s from target %s %v", communityName, id, human["name"]))
-				updated = community.RemoveCommunity(ctx.Config, existing, communityName)
-			}
-			restrictions := community.CalculateLocationRestrictions(ctx.Config, updated)
-			if _, err := ctx.Query.UpdateQuery("humans", map[string]any{
-				"community_membership": toJSON(updated),
-				"area_restriction":     nullableString(toJSON(restrictions)),
-			}, map[string]any{"id": id}); err != nil {
-				return "", err
-			}
+			return nil
+		})
+		if err != nil {
+			return "", err
+		}
+		if changed {
+			ctx.MarkAlertStateDirty()
 		}
 		lines = append(lines, "✅")
 		return strings.Join(lines, "\n"), nil

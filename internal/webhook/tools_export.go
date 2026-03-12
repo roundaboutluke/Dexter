@@ -25,4 +25,3 @@ func BuildRenderDataForTool(p *Processor, hook *Hook, platform, language, target
 	}
 	return buildRenderData(p, hook, match), nil
 }
-
