@@ -158,7 +158,7 @@ func (d *Discord) handleProfileSet(s *discordgo.Session, i *discordgo.Interactio
 	update["area"] = selected["area"]
 	update["latitude"] = selected["latitude"]
 	update["longitude"] = selected["longitude"]
-	if _, err := d.manager.query.UpdateQuery("humans", update, map[string]any{"id": userID}); err != nil {
+	if err := d.persistSlashHumanUpdate(userID, update); err != nil {
 		d.respondEphemeral(s, i, "Failed to set profile.")
 		return
 	}

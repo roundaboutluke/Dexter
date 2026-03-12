@@ -97,7 +97,9 @@ func (d *Discord) handleProfileScheduleTime(s *discordgo.Session, i *discordgo.I
 		d.respondEphemeral(s, i, errText)
 		return
 	}
-	if _, err := d.manager.query.UpdateQuery("profiles", map[string]any{"active_hours": encodeScheduleEntries(entries)}, map[string]any{"id": userID, "profile_no": toInt(selected["profile_no"], 0)}); err != nil {
+	if err := d.persistSlashScheduleUpdates(userID, map[int][]scheduleEntry{
+		toInt(selected["profile_no"], 0): entries,
+	}); err != nil {
 		d.respondEphemeral(s, i, "Unable to save schedule.")
 		return
 	}
@@ -131,7 +133,9 @@ func (d *Discord) handleProfileScheduleRemove(s *discordgo.Session, i *discordgo
 		d.respondEphemeral(s, i, "Schedule entry not found.")
 		return
 	}
-	if _, err := d.manager.query.UpdateQuery("profiles", map[string]any{"active_hours": encodeScheduleEntries(updated)}, map[string]any{"id": userID, "profile_no": toInt(selected["profile_no"], 0)}); err != nil {
+	if err := d.persistSlashScheduleUpdates(userID, map[int][]scheduleEntry{
+		toInt(selected["profile_no"], 0): updated,
+	}); err != nil {
 		d.respondEphemeral(s, i, "Unable to save schedule.")
 		return
 	}
@@ -161,14 +165,12 @@ func (d *Discord) handleProfileScheduleRemoveGlobal(s *discordgo.Session, i *dis
 	}
 	selected := profileRowByNo(profiles, profileNo)
 	removed := false
+	updates := map[int][]scheduleEntry{}
 	if selected != nil {
 		entries := scheduleEntriesFromRaw(selected["active_hours"])
 		updated := removeScheduleEntry(entries, entry)
 		if len(updated) != len(entries) {
-			if _, err := d.manager.query.UpdateQuery("profiles", map[string]any{"active_hours": encodeScheduleEntries(updated)}, map[string]any{"id": userID, "profile_no": toInt(selected["profile_no"], 0)}); err != nil {
-				d.respondEphemeral(s, i, "Unable to save schedule.")
-				return
-			}
+			updates[toInt(selected["profile_no"], 0)] = updated
 			removed = true
 		}
 	}
@@ -179,16 +181,17 @@ func (d *Discord) handleProfileScheduleRemoveGlobal(s *discordgo.Session, i *dis
 			if len(updated) == len(entries) {
 				continue
 			}
-			if _, err := d.manager.query.UpdateQuery("profiles", map[string]any{"active_hours": encodeScheduleEntries(updated)}, map[string]any{"id": userID, "profile_no": toInt(row["profile_no"], 0)}); err != nil {
-				d.respondEphemeral(s, i, "Unable to save schedule.")
-				return
-			}
+			updates[toInt(row["profile_no"], 0)] = updated
 			removed = true
 			break
 		}
 	}
 	if !removed {
 		d.respondEphemeral(s, i, "Schedule entry not found.")
+		return
+	}
+	if err := d.persistSlashScheduleUpdates(userID, updates); err != nil {
+		d.respondEphemeral(s, i, "Unable to save schedule.")
 		return
 	}
 	embed, components, errText := d.buildProfileScheduleOverviewPayload(i)
@@ -215,7 +218,9 @@ func (d *Discord) handleProfileScheduleClear(s *discordgo.Session, i *discordgo.
 		d.respondEphemeral(s, i, "Profile not found.")
 		return
 	}
-	if _, err := d.manager.query.UpdateQuery("profiles", map[string]any{"active_hours": "[]"}, map[string]any{"id": userID, "profile_no": toInt(selected["profile_no"], 0)}); err != nil {
+	if err := d.persistSlashScheduleUpdates(userID, map[int][]scheduleEntry{
+		toInt(selected["profile_no"], 0): {},
+	}); err != nil {
 		d.respondEphemeral(s, i, "Unable to save schedule.")
 		return
 	}
@@ -281,7 +286,9 @@ func (d *Discord) handleProfileScheduleAssign(s *discordgo.Session, i *discordgo
 		d.respondEphemeral(s, i, errText)
 		return
 	}
-	if _, err := d.manager.query.UpdateQuery("profiles", map[string]any{"active_hours": encodeScheduleEntries(entries)}, map[string]any{"id": userID, "profile_no": toInt(selected["profile_no"], 0)}); err != nil {
+	if err := d.persistSlashScheduleUpdates(userID, map[int][]scheduleEntry{
+		toInt(selected["profile_no"], 0): entries,
+	}); err != nil {
 		d.respondEphemeral(s, i, "Unable to save schedule.")
 		return
 	}
@@ -385,19 +392,12 @@ func (d *Discord) handleProfileScheduleEditAssign(s *discordgo.Session, i *disco
 		d.respondEphemeral(s, i, "Profile not found.")
 		return
 	}
-	entries, errText := addScheduleEntryWithIgnore(profiles, selected, day, startMin, endMin, original.ProfileNo, original)
+	updates, errText := buildScheduleEditAssignUpdates(profiles, selected, original, day, startMin, endMin)
 	if errText != "" {
 		d.respondEphemeral(s, i, errText)
 		return
 	}
-	if original.ProfileNo != 0 {
-		if old := profileRowByNo(profiles, original.ProfileNo); old != nil {
-			oldEntries := scheduleEntriesFromRaw(old["active_hours"])
-			oldEntries = removeScheduleEntry(oldEntries, scheduleEntryValue(original))
-			_, _ = d.manager.query.UpdateQuery("profiles", map[string]any{"active_hours": encodeScheduleEntries(oldEntries)}, map[string]any{"id": userID, "profile_no": original.ProfileNo})
-		}
-	}
-	if _, err := d.manager.query.UpdateQuery("profiles", map[string]any{"active_hours": encodeScheduleEntries(entries)}, map[string]any{"id": userID, "profile_no": toInt(selected["profile_no"], 0)}); err != nil {
+	if err := d.persistSlashScheduleUpdates(userID, updates); err != nil {
 		d.respondEphemeral(s, i, "Unable to save schedule.")
 		return
 	}
@@ -447,7 +447,7 @@ func (d *Discord) handleProfileScheduleToggle(s *discordgo.Session, i *discordgo
 			}
 		}
 	}
-	if _, err := d.manager.query.UpdateQuery("humans", update, map[string]any{"id": userID}); err != nil {
+	if err := d.persistSlashHumanUpdate(userID, update); err != nil {
 		d.respondEphemeral(s, i, "Unable to update scheduler.")
 		return
 	}
