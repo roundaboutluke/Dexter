@@ -10,6 +10,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 
 	"poraclego/internal/config"
+	"poraclego/internal/i18n"
 )
 
 func profileRowByToken(rows []map[string]any, token string) map[string]any {
@@ -84,6 +85,10 @@ func parseProfileAreas(raw any) []string {
 }
 
 func profileHoursText(raw any) string {
+	return profileHoursTextLocalized(nil, raw)
+}
+
+func profileHoursTextLocalized(tr *i18n.Translator, raw any) string {
 	text := strings.TrimSpace(fmt.Sprintf("%v", raw))
 	if len(text) <= 2 {
 		return ""
@@ -92,7 +97,6 @@ func profileHoursText(raw any) string {
 	if err := json.Unmarshal([]byte(text), &times); err != nil || len(times) == 0 {
 		return ""
 	}
-	dayNames := []string{"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}
 	parts := []string{}
 	for _, entry := range times {
 		day := toInt(entry["day"], 0)
@@ -101,19 +105,23 @@ func profileHoursText(raw any) string {
 		}
 		hours := toInt(entry["hours"], 0)
 		mins := toInt(entry["mins"], 0)
-		parts = append(parts, fmt.Sprintf("%s %d:%02d", dayNames[day-1], hours, mins))
+		parts = append(parts, fmt.Sprintf("%s %d:%02d", localizedDayLabel(tr, day), hours, mins))
 	}
 	return strings.Join(parts, ", ")
 }
 
 func profileScheduleText(raw any) string {
+	return profileScheduleTextLocalized(nil, raw)
+}
+
+func profileScheduleTextLocalized(tr *i18n.Translator, raw any) string {
 	entries := scheduleEntriesFromRaw(raw)
 	if len(entries) == 0 {
 		return ""
 	}
 	lines := []string{}
 	for _, entry := range entries {
-		lines = append(lines, scheduleEntryLabel(entry))
+		lines = append(lines, scheduleEntryLabelLocalized(tr, entry))
 	}
 	return strings.Join(lines, "\n")
 }
@@ -171,13 +179,11 @@ func scheduleEntriesFromRaw(raw any) []scheduleEntry {
 }
 
 func scheduleEntryLabel(entry scheduleEntry) string {
-	day := []string{"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}[entry.Day-1]
-	start := fmt.Sprintf("%02d:%02d", entry.StartMin/60, entry.StartMin%60)
-	if entry.Legacy || entry.EndMin <= 0 {
-		return fmt.Sprintf("%s %s (switch)", day, start)
-	}
-	end := fmt.Sprintf("%02d:%02d", entry.EndMin/60, entry.EndMin%60)
-	return fmt.Sprintf("%s %s-%s", day, start, end)
+	return scheduleEntryLabelLocalized(nil, entry)
+}
+
+func scheduleEntryLabelLocalized(tr *i18n.Translator, entry scheduleEntry) string {
+	return localizedScheduleEntryLabel(tr, entry)
 }
 
 func scheduleEntryValue(entry scheduleEntry) string {
@@ -185,6 +191,10 @@ func scheduleEntryValue(entry scheduleEntry) string {
 }
 
 func scheduleRemoveOptions(raw any) []discordgo.SelectMenuOption {
+	return scheduleRemoveOptionsLocalized(nil, raw)
+}
+
+func scheduleRemoveOptionsLocalized(tr *i18n.Translator, raw any) []discordgo.SelectMenuOption {
 	entries := scheduleEntriesFromRaw(raw)
 	if len(entries) == 0 {
 		return nil
@@ -193,7 +203,7 @@ func scheduleRemoveOptions(raw any) []discordgo.SelectMenuOption {
 	for _, entry := range entries {
 		value := scheduleEntryValue(entry)
 		options = append(options, discordgo.SelectMenuOption{
-			Label: scheduleEntryLabel(entry),
+			Label: scheduleEntryLabelLocalized(tr, entry),
 			Value: value,
 		})
 		if len(options) >= 25 {
@@ -251,18 +261,19 @@ func encodeScheduleEntries(entries []scheduleEntry) string {
 }
 
 func scheduleRemoveOptionsGlobal(profiles []map[string]any) []discordgo.SelectMenuOption {
+	return scheduleRemoveOptionsGlobalLocalized(nil, profiles)
+}
+
+func scheduleRemoveOptionsGlobalLocalized(tr *i18n.Translator, profiles []map[string]any) []discordgo.SelectMenuOption {
 	options := []discordgo.SelectMenuOption{}
 	for _, profile := range profiles {
 		profileNo := toInt(profile["profile_no"], 0)
 		if profileNo == 0 {
 			continue
 		}
-		name := strings.TrimSpace(fmt.Sprintf("%v", profile["name"]))
-		if name == "" {
-			name = fmt.Sprintf("Profile %d", profileNo)
-		}
+		name := localizedProfileName(tr, profile)
 		for _, entry := range scheduleEntriesFromRaw(profile["active_hours"]) {
-			label := fmt.Sprintf("%s — %s", scheduleEntryLabel(entry), name)
+			label := fmt.Sprintf("%s — %s", scheduleEntryLabelLocalized(tr, entry), name)
 			value := fmt.Sprintf("%d|%s", profileNo, scheduleEntryValue(entry))
 			options = append(options, discordgo.SelectMenuOption{Label: label, Value: value})
 			if len(options) >= 25 {
@@ -274,22 +285,23 @@ func scheduleRemoveOptionsGlobal(profiles []map[string]any) []discordgo.SelectMe
 }
 
 func scheduleEditOptionsGlobal(profiles []map[string]any) []discordgo.SelectMenuOption {
+	return scheduleEditOptionsGlobalLocalized(nil, profiles)
+}
+
+func scheduleEditOptionsGlobalLocalized(tr *i18n.Translator, profiles []map[string]any) []discordgo.SelectMenuOption {
 	options := []discordgo.SelectMenuOption{}
 	for _, profile := range profiles {
 		profileNo := toInt(profile["profile_no"], 0)
 		if profileNo == 0 {
 			continue
 		}
-		name := strings.TrimSpace(fmt.Sprintf("%v", profile["name"]))
-		if name == "" {
-			name = fmt.Sprintf("Profile %d", profileNo)
-		}
+		name := localizedProfileName(tr, profile)
 		for _, entry := range scheduleEntriesFromRaw(profile["active_hours"]) {
 			if entry.Legacy {
 				continue
 			}
 			value := fmt.Sprintf("%d|%s", profileNo, scheduleEntryValue(entry))
-			label := fmt.Sprintf("%s — %s", scheduleEntryLabel(entry), name)
+			label := fmt.Sprintf("%s — %s", scheduleEntryLabelLocalized(tr, entry), name)
 			options = append(options, discordgo.SelectMenuOption{Label: label, Value: value})
 			if len(options) >= 25 {
 				return options
@@ -300,6 +312,10 @@ func scheduleEditOptionsGlobal(profiles []map[string]any) []discordgo.SelectMenu
 }
 
 func addScheduleEntry(allProfiles []map[string]any, selected map[string]any, day, startMin, endMin int) ([]scheduleEntry, string) {
+	return addScheduleEntryLocalized(nil, allProfiles, selected, day, startMin, endMin)
+}
+
+func addScheduleEntryLocalized(tr *i18n.Translator, allProfiles []map[string]any, selected map[string]any, day, startMin, endMin int) ([]scheduleEntry, string) {
 	if selected == nil {
 		return nil, "Profile not found."
 	}
@@ -307,7 +323,10 @@ func addScheduleEntry(allProfiles []map[string]any, selected map[string]any, day
 	if selectedNo == 0 {
 		return nil, "Profile not found."
 	}
-	if conflicts := scheduleConflicts(allProfiles, day, startMin, endMin, 0, scheduleEntry{}); len(conflicts) > 0 {
+	if conflicts := scheduleConflictsLocalized(tr, allProfiles, day, startMin, endMin, 0, scheduleEntry{}); len(conflicts) > 0 {
+		if tr != nil {
+			return nil, tr.TranslateFormat("That overlaps with existing schedules: {0}", strings.Join(conflicts, ", "))
+		}
 		return nil, fmt.Sprintf("That overlaps with existing schedules: %s", strings.Join(conflicts, ", "))
 	}
 	entries := scheduleEntriesFromRaw(selected["active_hours"])
@@ -322,6 +341,10 @@ func addScheduleEntry(allProfiles []map[string]any, selected map[string]any, day
 }
 
 func addScheduleEntriesForDays(allProfiles []map[string]any, selected map[string]any, days []int, startMin, endMin int) ([]scheduleEntry, string) {
+	return addScheduleEntriesForDaysLocalized(nil, allProfiles, selected, days, startMin, endMin)
+}
+
+func addScheduleEntriesForDaysLocalized(tr *i18n.Translator, allProfiles []map[string]any, selected map[string]any, days []int, startMin, endMin int) ([]scheduleEntry, string) {
 	if selected == nil {
 		return nil, "Profile not found."
 	}
@@ -330,9 +353,12 @@ func addScheduleEntriesForDays(allProfiles []map[string]any, selected map[string
 	}
 	conflicts := []string{}
 	for _, day := range days {
-		conflicts = append(conflicts, scheduleConflicts(allProfiles, day, startMin, endMin, 0, scheduleEntry{})...)
+		conflicts = append(conflicts, scheduleConflictsLocalized(tr, allProfiles, day, startMin, endMin, 0, scheduleEntry{})...)
 	}
 	if len(conflicts) > 0 {
+		if tr != nil {
+			return nil, tr.TranslateFormat("That overlaps with existing schedules: {0}", strings.Join(uniqueStrings(conflicts), ", "))
+		}
 		return nil, fmt.Sprintf("That overlaps with existing schedules: %s", strings.Join(uniqueStrings(conflicts), ", "))
 	}
 	entries := scheduleEntriesFromRaw(selected["active_hours"])
@@ -349,6 +375,10 @@ func addScheduleEntriesForDays(allProfiles []map[string]any, selected map[string
 }
 
 func addScheduleEntryWithIgnore(allProfiles []map[string]any, selected map[string]any, day, startMin, endMin int, ignoreProfileNo int, ignoreEntry scheduleEntry) ([]scheduleEntry, string) {
+	return addScheduleEntryWithIgnoreLocalized(nil, allProfiles, selected, day, startMin, endMin, ignoreProfileNo, ignoreEntry)
+}
+
+func addScheduleEntryWithIgnoreLocalized(tr *i18n.Translator, allProfiles []map[string]any, selected map[string]any, day, startMin, endMin int, ignoreProfileNo int, ignoreEntry scheduleEntry) ([]scheduleEntry, string) {
 	if selected == nil {
 		return nil, "Profile not found."
 	}
@@ -356,7 +386,10 @@ func addScheduleEntryWithIgnore(allProfiles []map[string]any, selected map[strin
 	if selectedNo == 0 {
 		return nil, "Profile not found."
 	}
-	if conflicts := scheduleConflicts(allProfiles, day, startMin, endMin, ignoreProfileNo, ignoreEntry); len(conflicts) > 0 {
+	if conflicts := scheduleConflictsLocalized(tr, allProfiles, day, startMin, endMin, ignoreProfileNo, ignoreEntry); len(conflicts) > 0 {
+		if tr != nil {
+			return nil, tr.TranslateFormat("That overlaps with existing schedules: {0}", strings.Join(conflicts, ", "))
+		}
 		return nil, fmt.Sprintf("That overlaps with existing schedules: %s", strings.Join(conflicts, ", "))
 	}
 	entries := scheduleEntriesFromRaw(selected["active_hours"])
@@ -371,13 +404,14 @@ func addScheduleEntryWithIgnore(allProfiles []map[string]any, selected map[strin
 }
 
 func scheduleConflicts(allProfiles []map[string]any, day, startMin, endMin int, ignoreProfileNo int, ignoreEntry scheduleEntry) []string {
+	return scheduleConflictsLocalized(nil, allProfiles, day, startMin, endMin, ignoreProfileNo, ignoreEntry)
+}
+
+func scheduleConflictsLocalized(tr *i18n.Translator, allProfiles []map[string]any, day, startMin, endMin int, ignoreProfileNo int, ignoreEntry scheduleEntry) []string {
 	conflicts := []string{}
 	for _, row := range allProfiles {
 		profileNo := toInt(row["profile_no"], 0)
-		name := strings.TrimSpace(fmt.Sprintf("%v", row["name"]))
-		if name == "" {
-			name = fmt.Sprintf("Profile %d", profileNo)
-		}
+		name := localizedProfileName(tr, row)
 		for _, entry := range scheduleEntriesFromRaw(row["active_hours"]) {
 			if entry.Legacy || entry.Day != day {
 				continue
@@ -386,7 +420,7 @@ func scheduleConflicts(allProfiles []map[string]any, day, startMin, endMin int, 
 				continue
 			}
 			if startMin < entry.EndMin && entry.StartMin < endMin {
-				conflicts = append(conflicts, fmt.Sprintf("%s %s", name, scheduleEntryLabel(entry)))
+				conflicts = append(conflicts, fmt.Sprintf("%s %s", name, scheduleEntryLabelLocalized(tr, entry)))
 			}
 		}
 	}
@@ -478,6 +512,10 @@ func joinDayList(days []int) string {
 }
 
 func labelDayList(days []int) string {
+	return labelDayListLocalized(nil, days)
+}
+
+func labelDayListLocalized(tr *i18n.Translator, days []int) string {
 	if len(days) == 0 {
 		return ""
 	}
@@ -486,7 +524,7 @@ func labelDayList(days []int) string {
 		if day < 1 || day > 7 {
 			continue
 		}
-		labels = append(labels, []string{"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}[day-1])
+		labels = append(labels, localizedDayLabel(tr, day))
 	}
 	return strings.Join(labels, ", ")
 }

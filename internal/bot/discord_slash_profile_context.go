@@ -222,7 +222,7 @@ func (d *Discord) userProfileNo(userID string) int {
 
 func (d *Discord) userLanguage(userID string) string {
 	if d.manager == nil || d.manager.query == nil || userID == "" {
-		return "en"
+		return d.configuredDefaultLocale()
 	}
 	row, err := d.manager.query.SelectOneQuery("humans", map[string]any{"id": userID})
 	if err == nil && row != nil {
@@ -230,7 +230,7 @@ func (d *Discord) userLanguage(userID string) string {
 			return lang
 		}
 	}
-	return "en"
+	return d.configuredDefaultLocale()
 }
 
 func floatPtr(value float64) *float64 {

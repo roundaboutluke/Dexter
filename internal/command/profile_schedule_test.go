@@ -69,6 +69,18 @@ func TestFormatProfileTimesAndParseScheduleRanges(t *testing.T) {
 	}
 }
 
+func TestFormatScheduleRangeLabelLocalized(t *testing.T) {
+	root := "/Users/pbx/PoracleJS/PoracleGo"
+	tr, err := i18n.NewTranslator(root, "fr")
+	if err != nil {
+		t.Fatalf("new translator: %v", err)
+	}
+
+	if got := formatScheduleRangeLabel(tr, 1, 9*60, 10*60); got != "Lundi 09:00-10:00" {
+		t.Fatalf("formatScheduleRangeLabel()=%q, want %q", got, "Lundi 09:00-10:00")
+	}
+}
+
 func testCommandTranslator(t *testing.T) *i18n.Translator {
 	t.Helper()
 	root := "/Users/pbx/PoracleJS/PoracleGo"

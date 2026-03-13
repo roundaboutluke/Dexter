@@ -129,24 +129,25 @@ func (d *Discord) handleProfileSelect(s *discordgo.Session, i *discordgo.Interac
 }
 
 func (d *Discord) handleProfileSet(s *discordgo.Session, i *discordgo.InteractionCreate, value string) {
+	tr := d.slashInteractionTranslator(i)
 	userID, _ := slashUser(i)
 	if userID == "" || d.manager == nil || d.manager.query == nil {
-		d.respondEphemeral(s, i, "Target is not registered.")
+		d.respondEphemeral(s, i, tr.Translate("Target is not registered.", false))
 		return
 	}
 	human, err := d.manager.query.SelectOneQuery("humans", map[string]any{"id": userID})
 	if err != nil || human == nil {
-		d.respondEphemeral(s, i, "Target is not registered.")
+		d.respondEphemeral(s, i, tr.Translate("Target is not registered.", false))
 		return
 	}
 	profiles, err := d.manager.query.SelectAllQuery("profiles", map[string]any{"id": userID})
 	if err != nil {
-		d.respondEphemeral(s, i, "Unable to load profiles.")
+		d.respondEphemeral(s, i, tr.Translate("Unable to load profiles.", false))
 		return
 	}
 	selected := profileRowByToken(profiles, value)
 	if selected == nil {
-		d.respondEphemeral(s, i, "Profile not found.")
+		d.respondEphemeral(s, i, tr.Translate("Profile not found.", false))
 		return
 	}
 	profileNo := toInt(selected["profile_no"], 0)
@@ -159,7 +160,7 @@ func (d *Discord) handleProfileSet(s *discordgo.Session, i *discordgo.Interactio
 	update["latitude"] = selected["latitude"]
 	update["longitude"] = selected["longitude"]
 	if err := d.persistSlashHumanUpdate(userID, update); err != nil {
-		d.respondEphemeral(s, i, "Failed to set profile.")
+		d.respondEphemeral(s, i, tr.Translate("Failed to set profile.", false))
 		return
 	}
 	embed, components, errText := d.buildProfilePayload(i, fmt.Sprintf("%d", profileNo))
@@ -171,23 +172,24 @@ func (d *Discord) handleProfileSet(s *discordgo.Session, i *discordgo.Interactio
 }
 
 func (d *Discord) handleProfileCreate(s *discordgo.Session, i *discordgo.InteractionCreate, name string) {
+	tr := d.slashInteractionTranslator(i)
 	name = strings.TrimSpace(name)
 	if name == "" || strings.EqualFold(name, "all") {
-		d.respondEphemeral(s, i, "That is not a valid profile name.")
+		d.respondEphemeral(s, i, tr.Translate("That is not a valid profile name.", false))
 		return
 	}
 	userID, _ := slashUser(i)
 	if userID == "" || d.manager == nil || d.manager.query == nil {
-		d.respondEphemeral(s, i, "Target is not registered.")
+		d.respondEphemeral(s, i, tr.Translate("Target is not registered.", false))
 		return
 	}
 	profiles, err := d.manager.query.SelectAllQuery("profiles", map[string]any{"id": userID})
 	if err != nil {
-		d.respondEphemeral(s, i, "Unable to load profiles.")
+		d.respondEphemeral(s, i, tr.Translate("Unable to load profiles.", false))
 		return
 	}
 	if profileNameExistsRows(profiles, name) {
-		d.respondEphemeral(s, i, "That profile name already exists.")
+		d.respondEphemeral(s, i, tr.Translate("That profile name already exists.", false))
 		return
 	}
 	_ = d.buildSlashReply(s, i, fmt.Sprintf("profile add %q", name))
@@ -200,9 +202,10 @@ func (d *Discord) handleProfileCreate(s *discordgo.Session, i *discordgo.Interac
 }
 
 func (d *Discord) handleLocationInput(s *discordgo.Session, i *discordgo.InteractionCreate, input string) {
+	tr := d.slashInteractionTranslator(i)
 	input = strings.TrimSpace(input)
 	if input == "" {
-		d.respondEphemeral(s, i, "Please provide an address or coordinates.")
+		d.respondEphemeral(s, i, tr.Translate("Please provide an address or coordinates.", false))
 		return
 	}
 	if strings.EqualFold(input, "remove") {
@@ -218,11 +221,11 @@ func (d *Discord) handleLocationInput(s *discordgo.Session, i *discordgo.Interac
 	if !ok {
 		parts := strings.Fields(input)
 		if len(parts) == 1 && !regexp.MustCompile(`^\d{1,5}$`).MatchString(parts[0]) {
-			d.respondEditMessage(s, i, "Oops, you need to specify more than just a city name to locate accurately your position", nil)
+			d.respondEditMessage(s, i, tr.Translate("Oops, you need to specify more than just a city name to locate accurately your position", false), nil)
 			return
 		}
 		if d.manager == nil || d.manager.cfg == nil {
-			d.respondEditMessage(s, i, "Geocoding is not configured.", nil)
+			d.respondEditMessage(s, i, tr.Translate("Geocoding is not configured.", false), nil)
 			return
 		}
 		geo := webhook.NewGeocoder(d.manager.cfg)
@@ -245,9 +248,9 @@ func (d *Discord) handleLocationInput(s *discordgo.Session, i *discordgo.Interac
 	}
 
 	mapLink := fmt.Sprintf("https://maps.google.com/maps?q=%s,%s", formatFloat(lat), formatFloat(lon))
-	description := fmt.Sprintf("I set your location to the following coordinates in%s:\n%s", placeConfirmation, mapLink)
+	description := tr.TranslateFormat("I set your location to the following coordinates in{0}:\n{1}", placeConfirmation, mapLink)
 	embed := &discordgo.MessageEmbed{
-		Title:       "Confirm location",
+		Title:       tr.Translate("Confirm location", false),
 		Description: description,
 	}
 	if d.manager != nil && d.manager.cfg != nil {
@@ -279,8 +282,8 @@ func (d *Discord) handleLocationInput(s *discordgo.Session, i *discordgo.Interac
 	d.setSlashState(i.Member, i.User, state)
 	components := []discordgo.MessageComponent{
 		discordgo.ActionsRow{Components: []discordgo.MessageComponent{
-			discordgo.Button{CustomID: slashConfirmButton, Label: "Verify", Style: discordgo.SuccessButton},
-			discordgo.Button{CustomID: slashCancelButton, Label: "Cancel", Style: discordgo.DangerButton},
+			discordgo.Button{CustomID: slashConfirmButton, Label: tr.Translate("Verify", false), Style: discordgo.SuccessButton},
+			discordgo.Button{CustomID: slashCancelButton, Label: tr.Translate("Cancel", false), Style: discordgo.DangerButton},
 		}},
 	}
 	if state.OriginMessageID != "" && state.OriginChannelID != "" {

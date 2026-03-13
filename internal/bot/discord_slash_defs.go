@@ -214,7 +214,7 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 	}
 	weatherOptions = append(weatherOptions, templateOptions()...)
 
-	return []*discordgo.ApplicationCommand{
+	commands := []*discordgo.ApplicationCommand{
 		{
 			Name:        "track",
 			Description: "Track Pokemon spawns",
@@ -438,6 +438,7 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 			},
 		},
 	}
+	return d.localizedSlashCommands(commands)
 }
 
 func (d *Discord) registerSlashCommands(s *discordgo.Session) {
@@ -488,7 +489,12 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 		deleteFor("")
 		return
 	}
+	logger := logging.Get().Discord
 	for _, cmd := range d.slashCommandDefinitions() {
-		_, _ = s.ApplicationCommandCreate(appID, "", cmd)
+		if _, err := s.ApplicationCommandCreate(appID, "", cmd); err != nil {
+			if logger != nil {
+				logger.Warnf("Slash command registration failed (command=%s): %v", cmd.Name, err)
+			}
+		}
 	}
 }

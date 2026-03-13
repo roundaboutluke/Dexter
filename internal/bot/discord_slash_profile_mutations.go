@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"poraclego/internal/db"
+	"poraclego/internal/i18n"
 )
 
 func (d *Discord) persistSlashHumanUpdate(userID string, update map[string]any) error {
@@ -45,6 +46,10 @@ func (d *Discord) persistSlashScheduleUpdates(userID string, updates map[int][]s
 }
 
 func buildScheduleEditAssignUpdates(profiles []map[string]any, selected map[string]any, original scheduleEntry, day, startMin, endMin int) (map[int][]scheduleEntry, string) {
+	return buildScheduleEditAssignUpdatesLocalized(nil, profiles, selected, original, day, startMin, endMin)
+}
+
+func buildScheduleEditAssignUpdatesLocalized(tr *i18n.Translator, profiles []map[string]any, selected map[string]any, original scheduleEntry, day, startMin, endMin int) (map[int][]scheduleEntry, string) {
 	if selected == nil {
 		return nil, "Profile not found."
 	}
@@ -52,7 +57,10 @@ func buildScheduleEditAssignUpdates(profiles []map[string]any, selected map[stri
 	if selectedNo == 0 {
 		return nil, "Profile not found."
 	}
-	if conflicts := scheduleConflicts(profiles, day, startMin, endMin, original.ProfileNo, original); len(conflicts) > 0 {
+	if conflicts := scheduleConflictsLocalized(tr, profiles, day, startMin, endMin, original.ProfileNo, original); len(conflicts) > 0 {
+		if tr != nil {
+			return nil, tr.TranslateFormat("That overlaps with existing schedules: {0}", strings.Join(conflicts, ", "))
+		}
 		return nil, fmt.Sprintf("That overlaps with existing schedules: %s", strings.Join(conflicts, ", "))
 	}
 

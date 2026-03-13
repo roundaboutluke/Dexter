@@ -70,7 +70,7 @@ func (s *Scheduler) notifyQuiet(human map[string]any, profiles []map[string]any)
 	next, ok := s.nextScheduleTime(human, profiles)
 	message := ""
 	if ok {
-		message = tr.TranslateFormat("Quiet hours enabled. Alerts paused until {0}. Adjust schedules with /profile.", formatScheduleTime(next))
+		message = tr.TranslateFormat("Quiet hours enabled. Alerts paused until {0}. Adjust schedules with /profile.", formatScheduleTime(tr, next))
 	} else {
 		message = tr.Translate("Quiet hours enabled. Alerts paused. Adjust schedules with /profile.", false)
 	}
@@ -104,9 +104,6 @@ func (s *Scheduler) notifyResume(human map[string]any, profile map[string]any) {
 	}
 	name := getString(human["name"])
 	profileName := getString(profile["name"])
-	if profileName == "" {
-		profileName = fmt.Sprintf("Profile %d", toInt(profile["profile_no"]))
-	}
 	lang := getString(human["language"])
 	if s.cfg != nil && lang == "" {
 		if fallback, ok := s.cfg.GetString("general.locale"); ok {
@@ -114,6 +111,9 @@ func (s *Scheduler) notifyResume(human map[string]any, profile map[string]any) {
 		}
 	}
 	tr := s.i18n.Translator(lang)
+	if profileName == "" {
+		profileName = tr.TranslateFormat("Profile {0}", toInt(profile["profile_no"]))
+	}
 	message := tr.TranslateFormat("Active hours started. Alerts resumed on {0}. Adjust schedules with /profile.", profileName)
 	job := dispatch.MessageJob{
 		Type:    targetType,

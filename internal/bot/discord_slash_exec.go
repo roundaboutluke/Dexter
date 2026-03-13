@@ -286,10 +286,10 @@ func (d *Discord) respondWithModal(s *discordgo.Session, i *discordgo.Interactio
 	}
 }
 
-func (d *Discord) respondWithScheduleModal(s *discordgo.Session, i *discordgo.InteractionCreate, customID, startPlaceholder, endPlaceholder, startValue, endValue string) {
+func (d *Discord) respondWithScheduleModal(s *discordgo.Session, i *discordgo.InteractionCreate, customID, title, startLabel, endLabel, startPlaceholder, endPlaceholder, startValue, endValue string) {
 	startInput := discordgo.TextInput{
 		CustomID:    "start",
-		Label:       "Start time (HH:MM)",
+		Label:       startLabel,
 		Style:       discordgo.TextInputShort,
 		Placeholder: startPlaceholder,
 		Value:       startValue,
@@ -297,7 +297,7 @@ func (d *Discord) respondWithScheduleModal(s *discordgo.Session, i *discordgo.In
 	}
 	endInput := discordgo.TextInput{
 		CustomID:    "end",
-		Label:       "End time (HH:MM)",
+		Label:       endLabel,
 		Style:       discordgo.TextInputShort,
 		Placeholder: endPlaceholder,
 		Value:       endValue,
@@ -307,7 +307,7 @@ func (d *Discord) respondWithScheduleModal(s *discordgo.Session, i *discordgo.In
 		Type: discordgo.InteractionResponseModal,
 		Data: &discordgo.InteractionResponseData{
 			CustomID: customID,
-			Title:    "Add schedule",
+			Title:    title,
 			Components: []discordgo.MessageComponent{
 				discordgo.ActionsRow{Components: []discordgo.MessageComponent{startInput}},
 				discordgo.ActionsRow{Components: []discordgo.MessageComponent{endInput}},
@@ -660,7 +660,7 @@ func (d *Discord) buildSlashContext(s *discordgo.Session, i *discordgo.Interacti
 			}
 		}
 	}
-	return d.manager.Context("discord", "", "/", userID, userName, i.ChannelID, channelName, isDM, isAdmin, roles, ".")
+	return d.manager.Context("discord", d.userLanguage(userID), "/", userID, userName, i.ChannelID, channelName, isDM, isAdmin, roles, ".")
 }
 
 func (d *Discord) buildSlashReply(s *discordgo.Session, i *discordgo.InteractionCreate, line string) string {

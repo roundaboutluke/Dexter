@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"poraclego/internal/i18n"
 )
 
 type activeHour struct {
@@ -156,8 +158,12 @@ func nextScheduleStart(now time.Time, ranges []scheduleRange) (time.Time, bool) 
 	return next, found
 }
 
-func formatScheduleTime(t time.Time) string {
-	return t.Format("Mon 15:04")
+func formatScheduleTime(tr *i18n.Translator, t time.Time) string {
+	day := []string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"}[isoWeekday(t.Weekday())-1]
+	if tr != nil {
+		day = tr.Translate(day, false)
+	}
+	return fmt.Sprintf("%s %02d:%02d", day, t.Hour(), t.Minute())
 }
 
 func isoWeekday(day time.Weekday) int {

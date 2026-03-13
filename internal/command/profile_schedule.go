@@ -301,7 +301,7 @@ func validateRangeSchedule(ctx *Context, tr *i18n.Translator, logic *profile.Log
 		for _, r := range parseScheduleRangesFromRaw(row["active_hours"]) {
 			name := strings.TrimSpace(fmt.Sprintf("%v", row["name"]))
 			if name == "" {
-				name = fmt.Sprintf("Profile %d", no)
+				name = tr.TranslateFormat("Profile {0}", no)
 			}
 			otherRanges = append(otherRanges, struct {
 				ProfileNo int
@@ -319,7 +319,7 @@ func validateRangeSchedule(ctx *Context, tr *i18n.Translator, logic *profile.Log
 				continue
 			}
 			if start < other.Range.EndMin && other.Range.StartMin < end {
-				return fmt.Sprintf("%s %s: %s", tr.Translate("That overlaps with existing schedules in", false), other.Name, formatScheduleRangeLabel(day, other.Range.StartMin, other.Range.EndMin))
+				return fmt.Sprintf("%s %s: %s", tr.Translate("That overlaps with existing schedules in", false), other.Name, formatScheduleRangeLabel(tr, day, other.Range.StartMin, other.Range.EndMin))
 			}
 		}
 	}
@@ -363,8 +363,11 @@ func sortScheduleRanges(ranges []profileScheduleRange) {
 	})
 }
 
-func formatScheduleRangeLabel(day, startMin, endMin int) string {
-	dayLabel := []string{"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}[day-1]
+func formatScheduleRangeLabel(tr *i18n.Translator, day, startMin, endMin int) string {
+	dayLabel := slashDayName(day)
+	if tr != nil {
+		dayLabel = tr.Translate(dayLabel, false)
+	}
 	return fmt.Sprintf("%s %02d:%02d-%02d:%02d", dayLabel, startMin/60, startMin%60, endMin/60, endMin%60)
 }
 
@@ -400,4 +403,12 @@ func formatProfileTimes(tr *i18n.Translator, hoursRaw string) []string {
 		out = append(out, fmt.Sprintf("    %s %d:%02d (switch)", tr.Translate(label, false), hours, mins))
 	}
 	return out
+}
+
+func slashDayName(day int) string {
+	names := []string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"}
+	if day < 1 || day > len(names) {
+		return ""
+	}
+	return names[day-1]
 }
