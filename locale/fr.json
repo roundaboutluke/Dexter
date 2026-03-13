@@ -678,5 +678,8 @@
 	"Confirmed": "Confirmé",
 	"No command to run.": "Aucune commande à exécuter.",
 	"That command is disabled.": "Cette commande est désactivée.",
-	"Done.": "Terminé."
+	"Done.": "Terminé.",
+	"New profile": "Nouveau profil",
+	"Profile name": "Nom du profil",
+	"Slash command expired. Please run the command again.": "La commande slash a expiré. Veuillez relancer la commande."
 }

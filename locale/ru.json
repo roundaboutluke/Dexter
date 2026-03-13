@@ -340,5 +340,8 @@
   "Confirmed":"Подтверждено",
   "No command to run.":"Нет команды для выполнения.",
   "That command is disabled.":"Эта команда отключена.",
-  "Done.":"Готово."
+  "Done.":"Готово.",
+  "New profile":"Новый профиль",
+  "Profile name":"Название профиля",
+  "Slash command expired. Please run the command again.":"Срок действия slash-команды истёк. Пожалуйста, запустите команду снова."
 }

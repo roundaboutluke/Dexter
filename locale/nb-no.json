@@ -216,5 +216,8 @@
   "Confirmed":"Bekreftet",
   "No command to run.":"Ingen kommando å kjøre.",
   "That command is disabled.":"Denne kommandoen er deaktivert.",
-  "Done.":"Ferdig."
+  "Done.":"Ferdig.",
+  "New profile":"Ny profil",
+  "Profile name":"Profilnavn",
+  "Slash command expired. Please run the command again.":"Slash-kommandoen er utløpt. Kjør kommandoen på nytt."
 }

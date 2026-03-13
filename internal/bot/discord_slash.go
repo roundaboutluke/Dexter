@@ -474,14 +474,15 @@ func (d *Discord) handleSlashComponent(s *discordgo.Session, i *discordgo.Intera
 		return
 	}
 	if data.CustomID == slashProfileCreate {
-		d.respondWithModal(s, i, slashProfileCreateMod, "New profile", "Profile name", "home")
+		title, label, placeholder := d.profileCreateModalText(i)
+		d.respondWithModal(s, i, slashProfileCreateMod, title, label, placeholder)
 		return
 	}
 
 	state := d.getSlashState(i.Member, i.User)
 	if state == nil || state.ExpiresAt.Before(time.Now()) {
 		d.clearSlashState(i.Member, i.User)
-		d.respondEphemeral(s, i, "Slash command expired. Please run the command again.")
+		d.respondEphemeral(s, i, d.slashExpiredText(i))
 		return
 	}
 
@@ -703,7 +704,7 @@ func (d *Discord) handleSlashModal(s *discordgo.Session, i *discordgo.Interactio
 	state := d.getSlashState(i.Member, i.User)
 	if state == nil || state.ExpiresAt.Before(time.Now()) {
 		d.clearSlashState(i.Member, i.User)
-		d.respondEphemeral(s, i, "Slash command expired. Please run the command again.")
+		d.respondEphemeral(s, i, d.slashExpiredText(i))
 		return
 	}
 	switch data.CustomID {

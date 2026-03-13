@@ -569,5 +569,8 @@
     "Confirmed":"Bestätigt",
     "No command to run.":"Kein Befehl zum Ausführen.",
     "That command is disabled.":"Dieser Befehl ist deaktiviert.",
-    "Done.":"Fertig."
+    "Done.":"Fertig.",
+    "New profile":"Neues Profil",
+    "Profile name":"Profilname",
+    "Slash command expired. Please run the command again.":"Slash-Befehl abgelaufen. Bitte führe den Befehl erneut aus."
 }

@@ -57,6 +57,10 @@ func (d *Discord) slashTextf(i *discordgo.InteractionCreate, key string, args ..
 	return d.slashInteractionTranslator(i).TranslateFormat(key, args...)
 }
 
+func (d *Discord) slashExpiredText(i *discordgo.InteractionCreate) string {
+	return d.slashText(i, "Slash command expired. Please run the command again.")
+}
+
 func localizedProfileLabel(tr *i18n.Translator, profileNo int) string {
 	if profileNo <= 0 {
 		return translateOrDefault(tr, "Profile")

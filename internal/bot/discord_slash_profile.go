@@ -59,9 +59,19 @@ func areaToggleOutcome(areas []string, area string, add bool, result slashExecut
 	return false, result.Reply
 }
 
+func profileLocationModalRemoveOutcome(human map[string]any, result slashExecutionResult) (bool, string, bool) {
+	refreshProfile, message := profileLocationOutcome(human, "remove", result)
+	return refreshProfile, message, true
+}
+
 func (d *Discord) profileLocationModalText(i *discordgo.InteractionCreate) (string, string, string) {
 	tr := d.slashInteractionTranslator(i)
 	return tr.Translate("Set location", false), tr.Translate("Address or coordinates", false), "51.5,-0.12"
+}
+
+func (d *Discord) profileCreateModalText(i *discordgo.InteractionCreate) (string, string, string) {
+	tr := d.slashInteractionTranslator(i)
+	return tr.Translate("New profile", false), tr.Translate("Profile name", false), "home"
 }
 
 func (d *Discord) handleAreaShow(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -313,16 +323,48 @@ func (d *Discord) handleProfileCreate(s *discordgo.Session, i *discordgo.Interac
 func (d *Discord) handleLocationInput(s *discordgo.Session, i *discordgo.InteractionCreate, input string) {
 	tr := d.slashInteractionTranslator(i)
 	input = strings.TrimSpace(input)
+	prev := d.getSlashState(i.Member, i.User)
 	if input == "" {
 		d.respondEphemeral(s, i, tr.Translate("Please provide an address or coordinates.", false))
 		return
 	}
 	if strings.EqualFold(input, "remove") {
-		d.executeSlashLineDeferred(s, i, "location remove")
+		d.respondDeferredEphemeral(s, i)
+		userID, _ := slashUser(i)
+		if userID == "" || d.manager == nil || d.manager.query == nil {
+			d.respondEditMessage(s, i, tr.Translate("Target is not registered.", false), nil)
+			d.clearSlashState(i.Member, i.User)
+			return
+		}
+		result := d.buildSlashExecutionResult(s, i, "location remove")
+		human, err := d.manager.query.SelectOneQuery("humans", map[string]any{"id": userID})
+		if err != nil {
+			d.respondEditMessage(s, i, tr.Translate("Target is not registered.", false), nil)
+			d.clearSlashState(i.Member, i.User)
+			return
+		}
+		refreshProfile, message, clearState := profileLocationModalRemoveOutcome(human, result)
+		if clearState {
+			defer d.clearSlashState(i.Member, i.User)
+		}
+		if !refreshProfile {
+			d.respondEditMessage(s, i, message, nil)
+			return
+		}
+		embed, components, errText := d.buildProfilePayload(i, "")
+		if errText != "" {
+			d.respondEditMessage(s, i, errText, nil)
+			return
+		}
+		if prev != nil && prev.OriginMessageID != "" && prev.OriginChannelID != "" {
+			d.updateMessageEmbed(s, prev.OriginChannelID, prev.OriginMessageID, embed, components)
+			_ = s.InteractionResponseDelete(i.Interaction)
+			return
+		}
+		d.respondEditComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, components)
 		return
 	}
 
-	prev := d.getSlashState(i.Member, i.User)
 	d.respondDeferredEphemeral(s, i)
 
 	lat, lon, ok := parseLatLonString(input)

@@ -159,6 +159,9 @@
         "Confirmed":"Bekräftat",
         "No command to run.":"Inget kommando att köra.",
         "That command is disabled.":"Det här kommandot är inaktiverat.",
-        "Done.":"Klart."
+        "Done.":"Klart.",
+        "New profile":"Ny profil",
+        "Profile name":"Profilnamn",
+        "Slash command expired. Please run the command again.":"Slash-kommandot har gått ut. Kör kommandot igen."
 
 }

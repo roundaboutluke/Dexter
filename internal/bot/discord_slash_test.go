@@ -449,6 +449,52 @@ func TestProfileLocationModalTextLocalized(t *testing.T) {
 	}
 }
 
+func TestProfileCreateModalTextLocalized(t *testing.T) {
+	env := newSlashMutationTestEnv(t, map[string][]map[string]any{
+		"humans": {{
+			"id":       "user-1",
+			"language": "fr",
+		}},
+	}, 0)
+	cfg := config.New(map[string]any{
+		"general": map[string]any{
+			"locale": "en",
+		},
+	})
+	env.discord.manager.cfg = cfg
+	env.discord.manager.i18n = i18n.NewFactory("/Users/pbx/PoracleJS/PoracleGo", cfg)
+
+	title, label, placeholder := env.discord.profileCreateModalText(slashTestInteraction("user-1"))
+	if title != "Nouveau profil" {
+		t.Fatalf("title=%q, want %q", title, "Nouveau profil")
+	}
+	if label != "Nom du profil" {
+		t.Fatalf("label=%q, want %q", label, "Nom du profil")
+	}
+	if placeholder != "home" {
+		t.Fatalf("placeholder=%q, want %q", placeholder, "home")
+	}
+}
+
+func TestSlashExpiredTextLocalized(t *testing.T) {
+	root := writeTestLocale(t, "fr", map[string]string{
+		"Slash command expired. Please run the command again.": "La commande slash a expire. Veuillez relancer la commande.",
+	})
+	cfg := config.New(map[string]any{
+		"general": map[string]any{
+			"locale": "fr",
+		},
+	})
+	d := &Discord{manager: &Manager{
+		cfg:  cfg,
+		i18n: i18n.NewFactory(root, cfg),
+	}}
+
+	if got := d.slashExpiredText(slashTestInteraction("user-1")); got != "La commande slash a expire. Veuillez relancer la commande." {
+		t.Fatalf("slashExpiredText()=%q, want %q", got, "La commande slash a expire. Veuillez relancer la commande.")
+	}
+}
+
 func TestProfileLocationOutcome(t *testing.T) {
 	successRefresh, successMessage := profileLocationOutcome(map[string]any{
 		"latitude":  51.5,
@@ -490,6 +536,42 @@ func TestProfileLocationOutcome(t *testing.T) {
 	}
 	if errorMessage != "error message" {
 		t.Fatalf("error message=%q, want %q", errorMessage, "error message")
+	}
+}
+
+func TestProfileLocationModalRemoveOutcome(t *testing.T) {
+	refreshProfile, message, clearState := profileLocationModalRemoveOutcome(map[string]any{
+		"latitude":  0,
+		"longitude": 0,
+	}, slashExecutionResult{
+		Status: slashExecutionSuccess,
+		Reply:  "Done.",
+	})
+	if !refreshProfile {
+		t.Fatal("expected cleared location state to refresh profile payload")
+	}
+	if message != "" {
+		t.Fatalf("message=%q, want empty", message)
+	}
+	if !clearState {
+		t.Fatal("expected modal remove path to clear slash state")
+	}
+
+	refreshProfile, message, clearState = profileLocationModalRemoveOutcome(map[string]any{
+		"latitude":  12.34,
+		"longitude": 56.78,
+	}, slashExecutionResult{
+		Status: slashExecutionBlocked,
+		Reply:  "blocked message",
+	})
+	if refreshProfile {
+		t.Fatal("expected blocked modal remove result to skip profile refresh")
+	}
+	if message != "blocked message" {
+		t.Fatalf("message=%q, want %q", message, "blocked message")
+	}
+	if !clearState {
+		t.Fatal("expected modal remove path to clear slash state after blocked result")
 	}
 }
 

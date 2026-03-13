@@ -144,5 +144,8 @@
 	"Confirmed":"Potwierdzono",
 	"No command to run.":"Brak polecenia do uruchomienia.",
 	"That command is disabled.":"To polecenie jest wyłączone.",
-	"Done.":"Gotowe."
+	"Done.":"Gotowe.",
+	"New profile":"Nowy profil",
+	"Profile name":"Nazwa profilu",
+	"Slash command expired. Please run the command again.":"Polecenie slash wygasło. Uruchom polecenie ponownie."
 }
