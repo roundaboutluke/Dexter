@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/bwmarrin/discordgo"
@@ -476,6 +477,36 @@ func TestProfileCreateModalTextLocalized(t *testing.T) {
 	}
 }
 
+func TestShippedLocalesCoverReviewedProfileKeys(t *testing.T) {
+	keys := []string{
+		"Delete",
+		"That is not a valid profile name.",
+		"That profile name already exists.",
+		"Schedule entry not found.",
+	}
+	locales := []string{"de", "fr", "it", "nb-no", "pl", "ru", "se"}
+
+	cfg := config.New(map[string]any{
+		"general": map[string]any{
+			"locale": "en",
+		},
+	})
+	factory := i18n.NewFactory("/Users/pbx/PoracleJS/PoracleGo", cfg)
+
+	for _, locale := range locales {
+		tr := factory.Translator(locale)
+		for _, key := range keys {
+			got := strings.TrimSpace(tr.Translate(key, false))
+			if got == "" {
+				t.Fatalf("locale=%q key=%q translated to empty string", locale, key)
+			}
+			if got == key {
+				t.Fatalf("locale=%q key=%q fell back to english", locale, key)
+			}
+		}
+	}
+}
+
 func TestSlashExpiredTextLocalized(t *testing.T) {
 	root := writeTestLocale(t, "fr", map[string]string{
 		"Slash command expired. Please run the command again.": "La commande slash a expire. Veuillez relancer la commande.",
@@ -572,6 +603,56 @@ func TestProfileLocationModalRemoveOutcome(t *testing.T) {
 	}
 	if !clearState {
 		t.Fatal("expected modal remove path to clear slash state after blocked result")
+	}
+}
+
+func TestBuildProfileDeletePayloadLocalizesDeleteButton(t *testing.T) {
+	env := newSlashMutationTestEnv(t, map[string][]map[string]any{
+		"humans": {{
+			"id":       "user-1",
+			"language": "fr",
+		}},
+		"profiles": {
+			{
+				"id":         "user-1",
+				"profile_no": 1,
+				"name":       "Maison",
+			},
+			{
+				"id":         "user-1",
+				"profile_no": 2,
+				"name":       "Travail",
+			},
+		},
+	}, 0)
+	cfg := config.New(map[string]any{
+		"general": map[string]any{
+			"locale": "en",
+		},
+	})
+	env.discord.manager.cfg = cfg
+	env.discord.manager.i18n = i18n.NewFactory("/Users/pbx/PoracleJS/PoracleGo", cfg)
+
+	_, components, errText := env.discord.buildProfileDeletePayload(slashTestInteraction("user-1"), "2")
+	if errText != "" {
+		t.Fatalf("buildProfileDeletePayload errText=%q", errText)
+	}
+	if len(components) == 0 {
+		t.Fatal("expected components")
+	}
+	row, ok := components[0].(discordgo.ActionsRow)
+	if !ok || len(row.Components) == 0 {
+		t.Fatalf("expected action row, got %#v", components[0])
+	}
+	button, ok := row.Components[0].(discordgo.Button)
+	if !ok {
+		t.Fatalf("expected button, got %#v", row.Components[0])
+	}
+	if button.Label == "Delete" {
+		t.Fatal("delete button label fell back to english")
+	}
+	if button.Label != "Supprimer" {
+		t.Fatalf("delete button label=%q, want %q", button.Label, "Supprimer")
 	}
 }
 

@@ -160,6 +160,10 @@
         "No command to run.":"Inget kommando att köra.",
         "That command is disabled.":"Det här kommandot är inaktiverat.",
         "Done.":"Klart.",
+        "Delete":"Ta bort",
+        "That is not a valid profile name.":"Det är inte ett giltigt profilnamn.",
+        "That profile name already exists.":"Det profilnamnet finns redan.",
+        "Schedule entry not found.":"Schemaposten hittades inte.",
         "New profile":"Ny profil",
         "Profile name":"Profilnamn",
         "Slash command expired. Please run the command again.":"Slash-kommandot har gått ut. Kör kommandot igen."

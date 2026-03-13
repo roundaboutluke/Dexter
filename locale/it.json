@@ -617,6 +617,10 @@
 	"No command to run.":"Nessun comando da eseguire.",
 	"That command is disabled.":"Questo comando è disabilitato.",
 	"Done.":"Fatto.",
+	"Delete":"Elimina",
+	"That is not a valid profile name.":"Questo non è un nome profilo valido.",
+	"That profile name already exists.":"Questo nome profilo esiste già.",
+	"Schedule entry not found.":"Voce di pianificazione non trovata.",
 	"New profile":"Nuovo profilo",
 	"Profile name":"Nome profilo",
 	"Slash command expired. Please run the command again.":"Il comando slash è scaduto. Esegui di nuovo il comando."

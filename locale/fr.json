@@ -679,6 +679,10 @@
 	"No command to run.": "Aucune commande à exécuter.",
 	"That command is disabled.": "Cette commande est désactivée.",
 	"Done.": "Terminé.",
+	"Delete": "Supprimer",
+	"That is not a valid profile name.": "Ce n'est pas un nom de profil valide.",
+	"That profile name already exists.": "Ce nom de profil existe déjà.",
+	"Schedule entry not found.": "Entrée d'horaire introuvable.",
 	"New profile": "Nouveau profil",
 	"Profile name": "Nom du profil",
 	"Slash command expired. Please run the command again.": "La commande slash a expiré. Veuillez relancer la commande."

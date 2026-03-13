@@ -145,6 +145,10 @@
 	"No command to run.":"Brak polecenia do uruchomienia.",
 	"That command is disabled.":"To polecenie jest wyłączone.",
 	"Done.":"Gotowe.",
+	"Delete":"Usuń",
+	"That is not a valid profile name.":"To nie jest prawidłowa nazwa profilu.",
+	"That profile name already exists.":"Ta nazwa profilu już istnieje.",
+	"Schedule entry not found.":"Nie znaleziono wpisu harmonogramu.",
 	"New profile":"Nowy profil",
 	"Profile name":"Nazwa profilu",
 	"Slash command expired. Please run the command again.":"Polecenie slash wygasło. Uruchom polecenie ponownie."

@@ -217,6 +217,10 @@
   "No command to run.":"Ingen kommando å kjøre.",
   "That command is disabled.":"Denne kommandoen er deaktivert.",
   "Done.":"Ferdig.",
+  "Delete":"Slett",
+  "That is not a valid profile name.":"Det er ikke et gyldig profilnavn.",
+  "That profile name already exists.":"Det profilnavnet finnes allerede.",
+  "Schedule entry not found.":"Tidsplanoppføring ble ikke funnet.",
   "New profile":"Ny profil",
   "Profile name":"Profilnavn",
   "Slash command expired. Please run the command again.":"Slash-kommandoen er utløpt. Kjør kommandoen på nytt."

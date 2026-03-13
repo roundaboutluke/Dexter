@@ -341,6 +341,10 @@
   "No command to run.":"Нет команды для выполнения.",
   "That command is disabled.":"Эта команда отключена.",
   "Done.":"Готово.",
+  "Delete":"Удалить",
+  "That is not a valid profile name.":"Это недопустимое имя профиля.",
+  "That profile name already exists.":"Такое имя профиля уже существует.",
+  "Schedule entry not found.":"Запись расписания не найдена.",
   "New profile":"Новый профиль",
   "Profile name":"Название профиля",
   "Slash command expired. Please run the command again.":"Срок действия slash-команды истёк. Пожалуйста, запустите команду снова."
