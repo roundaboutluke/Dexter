@@ -441,7 +441,42 @@ func TestProfileLocationModalTextLocalized(t *testing.T) {
 	}
 }
 
-func TestProfileLocationConfirmOutcomeReturnsBlockedMessage(t *testing.T) {
+func TestProfileLocationActionOutcome(t *testing.T) {
+	successRefresh, successMessage := profileLocationActionOutcome(slashExecutionResult{
+		Status: slashExecutionSuccess,
+		Reply:  "Done.",
+	})
+	if !successRefresh {
+		t.Fatal("expected success to refresh profile payload")
+	}
+	if successMessage != "" {
+		t.Fatalf("success message=%q, want empty", successMessage)
+	}
+
+	blockedRefresh, blockedMessage := profileLocationActionOutcome(slashExecutionResult{
+		Status: slashExecutionBlocked,
+		Reply:  "blocked message",
+	})
+	if blockedRefresh {
+		t.Fatal("expected blocked outcome to skip profile refresh")
+	}
+	if blockedMessage != "blocked message" {
+		t.Fatalf("blocked message=%q, want %q", blockedMessage, "blocked message")
+	}
+
+	errorRefresh, errorMessage := profileLocationActionOutcome(slashExecutionResult{
+		Status: slashExecutionError,
+		Reply:  "error message",
+	})
+	if errorRefresh {
+		t.Fatal("expected error outcome to skip profile refresh")
+	}
+	if errorMessage != "error message" {
+		t.Fatalf("error message=%q, want %q", errorMessage, "error message")
+	}
+}
+
+func TestDirectClearLocationUsesBlockedOutcomeMessage(t *testing.T) {
 	root := writeTestLocale(t, "fr", map[string]string{
 		"That command is disabled.": "Cette commande est desactivee.",
 	})
@@ -458,12 +493,56 @@ func TestProfileLocationConfirmOutcomeReturnsBlockedMessage(t *testing.T) {
 	}}
 
 	result := d.buildSlashExecutionResult(nil, slashTestInteraction("user-1"), "location remove")
-	refreshProfile, message := profileLocationConfirmOutcome(result)
+	refreshProfile, message := profileLocationActionOutcome(result)
 	if refreshProfile {
-		t.Fatal("expected location confirm to block profile refresh")
+		t.Fatal("expected clear-location blocked result to skip profile refresh")
 	}
 	if message != "Cette commande est desactivee." {
 		t.Fatalf("message=%q, want %q", message, "Cette commande est desactivee.")
+	}
+}
+
+func TestSlashConfirmCloseoutPayloadPreservesMessageAndClearsButtons(t *testing.T) {
+	embed := &discordgo.MessageEmbed{Title: "Ready"}
+	i := &discordgo.InteractionCreate{
+		Interaction: &discordgo.Interaction{
+			Message: &discordgo.Message{
+				Content: "Run this command",
+				Embeds:  []*discordgo.MessageEmbed{embed},
+				Components: []discordgo.MessageComponent{
+					discordgo.ActionsRow{Components: []discordgo.MessageComponent{
+						discordgo.Button{CustomID: "confirm", Label: "Verify", Style: discordgo.SuccessButton},
+					}},
+				},
+			},
+		},
+	}
+
+	text, embeds, components := slashConfirmCloseoutPayload(i)
+	if text != "Run this command" {
+		t.Fatalf("text=%q, want %q", text, "Run this command")
+	}
+	if len(embeds) != 1 || embeds[0] != embed {
+		t.Fatalf("embeds=%v, want preserved embed", embeds)
+	}
+	if len(components) != 0 {
+		t.Fatalf("components=%v, want empty", components)
+	}
+	if text == "Confirmed ✅" {
+		t.Fatal("closeout payload should not inject success text")
+	}
+}
+
+func TestSlashConfirmCloseoutPayloadFallsBackWithoutMessage(t *testing.T) {
+	text, embeds, components := slashConfirmCloseoutPayload(slashTestInteraction("user-1"))
+	if text != "" {
+		t.Fatalf("text=%q, want empty", text)
+	}
+	if embeds != nil {
+		t.Fatalf("embeds=%v, want nil", embeds)
+	}
+	if len(components) != 0 {
+		t.Fatalf("components=%v, want empty", components)
 	}
 }
 

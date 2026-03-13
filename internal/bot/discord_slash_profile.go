@@ -18,7 +18,7 @@ func profileDeleteConfirmFollowup(result slashExecutionResult) string {
 	return result.Reply
 }
 
-func profileLocationConfirmOutcome(result slashExecutionResult) (bool, string) {
+func profileLocationActionOutcome(result slashExecutionResult) (bool, string) {
 	if result.Success() {
 		return true, ""
 	}
@@ -28,10 +28,6 @@ func profileLocationConfirmOutcome(result slashExecutionResult) (bool, string) {
 func (d *Discord) profileLocationModalText(i *discordgo.InteractionCreate) (string, string, string) {
 	tr := d.slashInteractionTranslator(i)
 	return tr.Translate("Set location", false), tr.Translate("Address or coordinates", false), "51.5,-0.12"
-}
-
-func (d *Discord) slashConfirmedText(i *discordgo.InteractionCreate) string {
-	return d.slashText(i, "Confirmed") + " ✅"
 }
 
 func (d *Discord) handleAreaShow(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -53,7 +49,12 @@ func (d *Discord) handleProfileAreaShow(s *discordgo.Session, i *discordgo.Inter
 }
 
 func (d *Discord) handleProfileLocationClear(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	_ = d.buildSlashReply(s, i, "location remove")
+	result := d.buildSlashExecutionResult(s, i, "location remove")
+	refreshProfile, message := profileLocationActionOutcome(result)
+	if !refreshProfile {
+		d.respondEphemeral(s, i, message)
+		return
+	}
 	embed, components, errText := d.buildProfilePayload(i, "")
 	if errText != "" {
 		d.respondEphemeral(s, i, errText)

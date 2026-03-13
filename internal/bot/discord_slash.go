@@ -594,7 +594,7 @@ func (d *Discord) handleSlashComponent(s *discordgo.Session, i *discordgo.Intera
 		if state != nil && state.Command == "location" {
 			line := strings.TrimSpace(state.Command + " " + strings.Join(state.Args, " "))
 			result := d.buildSlashExecutionResult(s, i, line)
-			refreshProfile, message := profileLocationConfirmOutcome(result)
+			refreshProfile, message := profileLocationActionOutcome(result)
 			if !refreshProfile {
 				d.respondEphemeral(s, i, message)
 				return
@@ -610,7 +610,8 @@ func (d *Discord) handleSlashComponent(s *discordgo.Session, i *discordgo.Intera
 			return
 		}
 		// Clear the confirmation prompt buttons immediately, then send the command output as a follow-up.
-		d.respondUpdateComponentsEmbed(s, i, d.slashConfirmedText(i), nil, []discordgo.MessageComponent{})
+		text, embeds, components := slashConfirmCloseoutPayload(i)
+		d.respondUpdateComponentsEmbed(s, i, text, embeds, components)
 		line := ""
 		if state != nil {
 			line = strings.TrimSpace(state.Command + " " + strings.Join(state.Args, " "))
@@ -638,6 +639,13 @@ func (d *Discord) handleSlashComponent(s *discordgo.Session, i *discordgo.Intera
 		d.respondWithFiltersInput(s, i)
 		return
 	}
+}
+
+func slashConfirmCloseoutPayload(i *discordgo.InteractionCreate) (string, []*discordgo.MessageEmbed, []discordgo.MessageComponent) {
+	if i == nil || i.Message == nil {
+		return "", nil, []discordgo.MessageComponent{}
+	}
+	return i.Message.Content, i.Message.Embeds, []discordgo.MessageComponent{}
 }
 
 func (d *Discord) handleSlashModal(s *discordgo.Session, i *discordgo.InteractionCreate) {
