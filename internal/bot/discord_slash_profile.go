@@ -11,15 +11,49 @@ import (
 	"poraclego/internal/webhook"
 )
 
-func profileDeleteConfirmFollowup(result slashExecutionResult) string {
-	if result.Success() {
-		return ""
+func profileDeleteOutcome(profiles []map[string]any, profileValue string, result slashExecutionResult) (bool, string) {
+	if profileRowByToken(profiles, profileValue) == nil {
+		return true, ""
 	}
-	return result.Reply
+	return false, result.Reply
 }
 
-func profileLocationActionOutcome(result slashExecutionResult) (bool, string) {
-	if result.Success() {
+func profileLocationOutcome(human map[string]any, target string, result slashExecutionResult) (bool, string) {
+	if human != nil {
+		lat := formatFloat(toFloat(human["latitude"]))
+		lon := formatFloat(toFloat(human["longitude"]))
+		switch strings.ToLower(strings.TrimSpace(target)) {
+		case "", "remove":
+			if lat == "0" && lon == "0" {
+				return true, ""
+			}
+		default:
+			if targetLat, targetLon, ok := parseLatLonString(target); ok {
+				if lat == formatFloat(targetLat) && lon == formatFloat(targetLon) {
+					return true, ""
+				}
+			}
+		}
+	}
+	return false, result.Reply
+}
+
+func profileCreateOutcome(profiles []map[string]any, name string, result slashExecutionResult) (bool, string) {
+	if profileNameExistsRows(profiles, name) {
+		return true, ""
+	}
+	return false, result.Reply
+}
+
+func areaToggleOutcome(areas []string, area string, add bool, result slashExecutionResult) (bool, string) {
+	enabled := false
+	for _, current := range areas {
+		if strings.EqualFold(strings.TrimSpace(current), strings.TrimSpace(area)) {
+			enabled = true
+			break
+		}
+	}
+	if enabled == add {
 		return true, ""
 	}
 	return false, result.Reply
@@ -49,8 +83,18 @@ func (d *Discord) handleProfileAreaShow(s *discordgo.Session, i *discordgo.Inter
 }
 
 func (d *Discord) handleProfileLocationClear(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	userID, _ := slashUser(i)
+	if userID == "" || d.manager == nil || d.manager.query == nil {
+		d.respondEphemeral(s, i, d.slashText(i, "Target is not registered."))
+		return
+	}
 	result := d.buildSlashExecutionResult(s, i, "location remove")
-	refreshProfile, message := profileLocationActionOutcome(result)
+	human, err := d.manager.query.SelectOneQuery("humans", map[string]any{"id": userID})
+	if err != nil {
+		d.respondEphemeral(s, i, d.slashText(i, "Target is not registered."))
+		return
+	}
+	refreshProfile, message := profileLocationOutcome(human, "remove", result)
 	if !refreshProfile {
 		d.respondEphemeral(s, i, message)
 		return
@@ -73,9 +117,20 @@ func (d *Discord) handleProfileDeletePrompt(s *discordgo.Session, i *discordgo.I
 }
 
 func (d *Discord) handleProfileDeleteConfirm(s *discordgo.Session, i *discordgo.InteractionCreate, profileValue string) {
+	userID, _ := slashUser(i)
+	if userID == "" || d.manager == nil || d.manager.query == nil {
+		d.respondEphemeral(s, i, d.slashText(i, "Target is not registered."))
+		return
+	}
 	result := d.buildSlashExecutionResult(s, i, fmt.Sprintf("profile remove %s", profileValue))
-	if followup := profileDeleteConfirmFollowup(result); followup != "" {
-		d.respondEphemeral(s, i, followup)
+	profiles, err := d.manager.query.SelectAllQuery("profiles", map[string]any{"id": userID})
+	if err != nil {
+		d.respondEphemeral(s, i, d.slashText(i, "Unable to load profiles."))
+		return
+	}
+	refreshProfile, message := profileDeleteOutcome(profiles, profileValue, result)
+	if !refreshProfile {
+		d.respondEphemeral(s, i, message)
 		return
 	}
 	embed, components, errText := d.buildProfilePayload(i, "")
@@ -122,7 +177,26 @@ func (d *Discord) handleAreaShowToggle(s *discordgo.Session, i *discordgo.Intera
 	if add {
 		verb = "add"
 	}
-	_ = d.buildSlashReply(s, i, strings.TrimSpace(fmt.Sprintf("area %s %q", verb, area)))
+	userID, _ := slashUser(i)
+	if userID == "" || d.manager == nil || d.manager.query == nil {
+		d.respondEphemeral(s, i, d.slashText(i, "Target is not registered."))
+		return
+	}
+	result := d.buildSlashExecutionResult(s, i, strings.TrimSpace(fmt.Sprintf("area %s %q", verb, area)))
+	human, err := d.manager.query.SelectOneQuery("humans", map[string]any{"id": userID})
+	if err != nil {
+		d.respondEphemeral(s, i, d.slashText(i, "Unable to load areas."))
+		return
+	}
+	if human == nil {
+		d.respondEphemeral(s, i, d.slashText(i, "Target is not registered."))
+		return
+	}
+	refreshArea, message := areaToggleOutcome(parseAreaListFromHuman(human), area, add, result)
+	if !refreshArea {
+		d.respondEphemeral(s, i, message)
+		return
+	}
 	embed, components, errText := d.buildAreaShowPayload(i, area)
 	if errText != "" {
 		d.respondEphemeral(s, i, errText)
@@ -217,7 +291,17 @@ func (d *Discord) handleProfileCreate(s *discordgo.Session, i *discordgo.Interac
 		d.respondEphemeral(s, i, tr.Translate("That profile name already exists.", false))
 		return
 	}
-	_ = d.buildSlashReply(s, i, fmt.Sprintf("profile add %q", name))
+	result := d.buildSlashExecutionResult(s, i, fmt.Sprintf("profile add %q", name))
+	profiles, err = d.manager.query.SelectAllQuery("profiles", map[string]any{"id": userID})
+	if err != nil {
+		d.respondEphemeral(s, i, tr.Translate("Unable to load profiles.", false))
+		return
+	}
+	refreshProfile, message := profileCreateOutcome(profiles, name, result)
+	if !refreshProfile {
+		d.respondEphemeral(s, i, message)
+		return
+	}
 	embed, components, errText := d.buildProfilePayload(i, name)
 	if errText != "" {
 		d.respondEphemeral(s, i, errText)

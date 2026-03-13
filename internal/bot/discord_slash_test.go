@@ -371,7 +371,7 @@ func TestBuildSlashExecutionResultEmptyReplyUsesTranslatedDone(t *testing.T) {
 	}
 }
 
-func TestProfileDeleteConfirmFollowupSuppressesTranslatedSuccess(t *testing.T) {
+func TestProfileDeleteOutcomeSuppressesTranslatedSuccess(t *testing.T) {
 	root := writeTestLocale(t, "fr", map[string]string{
 		"Profile removed.": "Profil supprime.",
 	})
@@ -409,8 +409,16 @@ func TestProfileDeleteConfirmFollowupSuppressesTranslatedSuccess(t *testing.T) {
 	if result.Reply != "Profil supprime." {
 		t.Fatalf("reply=%q, want %q", result.Reply, "Profil supprime.")
 	}
-	if followup := profileDeleteConfirmFollowup(result); followup != "" {
-		t.Fatalf("followup=%q, want empty", followup)
+	profiles, err := env.query.SelectAllQuery("profiles", map[string]any{"id": "user-1"})
+	if err != nil {
+		t.Fatalf("load profiles: %v", err)
+	}
+	refreshProfile, message := profileDeleteOutcome(profiles, "2", result)
+	if !refreshProfile {
+		t.Fatal("expected removed profile state to refresh profile payload")
+	}
+	if message != "" {
+		t.Fatalf("message=%q, want empty", message)
 	}
 }
 
@@ -441,8 +449,11 @@ func TestProfileLocationModalTextLocalized(t *testing.T) {
 	}
 }
 
-func TestProfileLocationActionOutcome(t *testing.T) {
-	successRefresh, successMessage := profileLocationActionOutcome(slashExecutionResult{
+func TestProfileLocationOutcome(t *testing.T) {
+	successRefresh, successMessage := profileLocationOutcome(map[string]any{
+		"latitude":  51.5,
+		"longitude": -0.12,
+	}, "51.5,-0.12", slashExecutionResult{
 		Status: slashExecutionSuccess,
 		Reply:  "Done.",
 	})
@@ -453,7 +464,10 @@ func TestProfileLocationActionOutcome(t *testing.T) {
 		t.Fatalf("success message=%q, want empty", successMessage)
 	}
 
-	blockedRefresh, blockedMessage := profileLocationActionOutcome(slashExecutionResult{
+	blockedRefresh, blockedMessage := profileLocationOutcome(map[string]any{
+		"latitude":  0,
+		"longitude": 0,
+	}, "51.5,-0.12", slashExecutionResult{
 		Status: slashExecutionBlocked,
 		Reply:  "blocked message",
 	})
@@ -464,7 +478,10 @@ func TestProfileLocationActionOutcome(t *testing.T) {
 		t.Fatalf("blocked message=%q, want %q", blockedMessage, "blocked message")
 	}
 
-	errorRefresh, errorMessage := profileLocationActionOutcome(slashExecutionResult{
+	errorRefresh, errorMessage := profileLocationOutcome(map[string]any{
+		"latitude":  51.4,
+		"longitude": -0.11,
+	}, "51.5,-0.12", slashExecutionResult{
 		Status: slashExecutionError,
 		Reply:  "error message",
 	})
@@ -473,6 +490,36 @@ func TestProfileLocationActionOutcome(t *testing.T) {
 	}
 	if errorMessage != "error message" {
 		t.Fatalf("error message=%q, want %q", errorMessage, "error message")
+	}
+}
+
+func TestProfileCreateOutcomeUsesPostState(t *testing.T) {
+	refreshProfile, message := profileCreateOutcome([]map[string]any{{
+		"profile_no": 2,
+		"name":       "Work",
+	}}, "Work", slashExecutionResult{
+		Status: slashExecutionSuccess,
+		Reply:  "Profile added.",
+	})
+	if !refreshProfile {
+		t.Fatal("expected created profile state to refresh profile payload")
+	}
+	if message != "" {
+		t.Fatalf("message=%q, want empty", message)
+	}
+
+	refreshProfile, message = profileCreateOutcome([]map[string]any{{
+		"profile_no": 1,
+		"name":       "Home",
+	}}, "Work", slashExecutionResult{
+		Status: slashExecutionSuccess,
+		Reply:  "You do not have permission to execute this command",
+	})
+	if refreshProfile {
+		t.Fatal("expected missing profile state to skip profile refresh")
+	}
+	if message != "You do not have permission to execute this command" {
+		t.Fatalf("message=%q, want permission reply", message)
 	}
 }
 
@@ -493,12 +540,50 @@ func TestDirectClearLocationUsesBlockedOutcomeMessage(t *testing.T) {
 	}}
 
 	result := d.buildSlashExecutionResult(nil, slashTestInteraction("user-1"), "location remove")
-	refreshProfile, message := profileLocationActionOutcome(result)
+	refreshProfile, message := profileLocationOutcome(map[string]any{
+		"latitude":  12.34,
+		"longitude": 56.78,
+	}, "remove", result)
 	if refreshProfile {
 		t.Fatal("expected clear-location blocked result to skip profile refresh")
 	}
 	if message != "Cette commande est desactivee." {
 		t.Fatalf("message=%q, want %q", message, "Cette commande est desactivee.")
+	}
+}
+
+func TestAreaToggleOutcomeUsesDesiredPostState(t *testing.T) {
+	refreshArea, message := areaToggleOutcome([]string{"home"}, "home", true, slashExecutionResult{
+		Status: slashExecutionSuccess,
+		Reply:  "Added areas: home",
+	})
+	if !refreshArea {
+		t.Fatal("expected enabled area state to refresh area payload")
+	}
+	if message != "" {
+		t.Fatalf("message=%q, want empty", message)
+	}
+
+	refreshArea, message = areaToggleOutcome([]string{"home"}, "home", false, slashExecutionResult{
+		Status: slashExecutionSuccess,
+		Reply:  "Removed areas: home",
+	})
+	if refreshArea {
+		t.Fatal("expected still-enabled area state to skip area refresh on remove")
+	}
+	if message != "Removed areas: home" {
+		t.Fatalf("message=%q, want original reply", message)
+	}
+
+	refreshArea, message = areaToggleOutcome([]string{}, "home", false, slashExecutionResult{
+		Status: slashExecutionSuccess,
+		Reply:  "Removed areas: home",
+	})
+	if !refreshArea {
+		t.Fatal("expected missing area after remove to refresh area payload")
+	}
+	if message != "" {
+		t.Fatalf("message=%q, want empty", message)
 	}
 }
 

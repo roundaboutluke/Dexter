@@ -592,9 +592,23 @@ func (d *Discord) handleSlashComponent(s *discordgo.Session, i *discordgo.Intera
 		return
 	case slashConfirmButton:
 		if state != nil && state.Command == "location" {
+			userID, _ := slashUser(i)
+			if userID == "" || d.manager == nil || d.manager.query == nil {
+				d.respondEphemeral(s, i, d.slashText(i, "Target is not registered."))
+				return
+			}
 			line := strings.TrimSpace(state.Command + " " + strings.Join(state.Args, " "))
 			result := d.buildSlashExecutionResult(s, i, line)
-			refreshProfile, message := profileLocationActionOutcome(result)
+			human, err := d.manager.query.SelectOneQuery("humans", map[string]any{"id": userID})
+			if err != nil {
+				d.respondEphemeral(s, i, d.slashText(i, "Target is not registered."))
+				return
+			}
+			target := ""
+			if len(state.Args) > 0 {
+				target = state.Args[0]
+			}
+			refreshProfile, message := profileLocationOutcome(human, target, result)
 			if !refreshProfile {
 				d.respondEphemeral(s, i, message)
 				return
