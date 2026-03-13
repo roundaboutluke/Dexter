@@ -7,6 +7,7 @@ import (
 
 	"poraclego/internal/alertstate"
 	"poraclego/internal/db"
+	"poraclego/internal/logging"
 )
 
 func (d *Discord) onGuildMemberRemove(s *discordgo.Session, ev *discordgo.GuildMemberRemove) {
@@ -33,7 +34,13 @@ func (d *Discord) reconcileUser(s *discordgo.Session, userID string) {
 		return
 	}
 	removeInvalid, _ := d.manager.cfg.GetBool("reconciliation.discord.removeInvalidUsers")
-	info := d.loadDiscordUserInfo(s, userID)
+	info, complete := d.loadDiscordUserInfoState(s, userID)
+	if !complete {
+		if logger := logging.Get().Discord; logger != nil {
+			logger.Warnf("Reconciliation (Discord) Skipping single-user reconcile for %s due to incomplete guild/member load", userID)
+		}
+		return
+	}
 	human, err := d.manager.query.SelectOneQuery("humans", map[string]any{"id": userID})
 	if err != nil {
 		return
@@ -71,7 +78,7 @@ func (d *Discord) removeSubscribedRoles(s *discordgo.Session, userID string) {
 		return
 	}
 	for guildID, entry := range rolesByGuild {
-		member, err := s.GuildMember(guildID, userID)
+		member, err := d.fetchGuildMemberByID(s, guildID, userID)
 		if err != nil || member == nil {
 			continue
 		}
