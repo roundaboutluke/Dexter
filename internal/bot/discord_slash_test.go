@@ -5,13 +5,16 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 
 	"poraclego/internal/command"
 	"poraclego/internal/config"
 	"poraclego/internal/dts"
+	"poraclego/internal/geofence"
 	"poraclego/internal/i18n"
 )
 
@@ -801,6 +804,388 @@ func TestSlashConfirmCloseoutPayloadFallsBackWithoutMessage(t *testing.T) {
 	}
 }
 
+func TestAreaMapRequestUsesFencePathHash(t *testing.T) {
+	d := &Discord{manager: &Manager{
+		fences: &geofence.Store{Fences: []geofence.Fence{
+			{Name: "Home", Path: [][]float64{{51.5, -0.1}, {51.6, -0.1}, {51.6, -0.2}}},
+			{Name: "Work", Path: [][]float64{{40.0, -73.0}, {40.1, -73.0}, {40.1, -73.1}}},
+		}},
+	}}
+
+	homeA := d.areaMapRequest("Home")
+	homeB := d.areaMapRequest("home")
+	work := d.areaMapRequest("Work")
+	if homeA == nil || homeB == nil || work == nil {
+		t.Fatal("expected map requests for known fences")
+	}
+	if homeA.Key != homeB.Key {
+		t.Fatalf("same fence key mismatch: %q vs %q", homeA.Key, homeB.Key)
+	}
+	if homeA.Key == work.Key {
+		t.Fatalf("different fence paths should not share cache key: %q", homeA.Key)
+	}
+}
+
+func TestBuildAreaShowPayloadStateUsesCacheAndMissesWithoutImage(t *testing.T) {
+	env := newSlashMutationTestEnv(t, map[string][]map[string]any{
+		"humans": {{
+			"id":   "user-1",
+			"area": `["Home"]`,
+		}},
+	}, 0)
+	env.discord.manager.cfg = config.New(map[string]any{
+		"geocoding": map[string]any{
+			"staticProvider":    "tileservercache",
+			"staticProviderURL": "https://tiles.example",
+		},
+	})
+	env.discord.manager.fences = &geofence.Store{Fences: []geofence.Fence{{
+		Name: "Home",
+		Path: [][]float64{{51.5, -0.1}, {51.6, -0.1}, {51.6, -0.2}},
+	}}}
+
+	embed, _, mapReq, errText := env.discord.buildAreaShowPayloadState(slashTestInteraction("user-1"), "Home")
+	if errText != "" {
+		t.Fatalf("buildAreaShowPayloadState errText=%q", errText)
+	}
+	if mapReq == nil {
+		t.Fatal("expected map request for known area")
+	}
+	if embed.Image != nil {
+		t.Fatalf("expected uncached area render to omit image, got %#v", embed.Image)
+	}
+
+	env.discord.ensureSlashMapState()
+	env.discord.mapCache[mapReq.Key] = slashMapCacheEntry{
+		URL:       "https://tiles.example/pregenerated/home.png",
+		ExpiresAt: time.Now().Add(slashAreaMapSuccessTTL),
+	}
+	embed, _, _, errText = env.discord.buildAreaShowPayloadState(slashTestInteraction("user-1"), "Home")
+	if errText != "" {
+		t.Fatalf("cached buildAreaShowPayloadState errText=%q", errText)
+	}
+	if embed.Image == nil || embed.Image.URL != "https://tiles.example/pregenerated/home.png" {
+		t.Fatalf("cached area image=%#v, want pregenerated URL", embed.Image)
+	}
+}
+
+func TestBuildProfilePayloadStateUsesCacheAndMissesWithoutImage(t *testing.T) {
+	env := newSlashMutationTestEnv(t, map[string][]map[string]any{
+		"humans": {{
+			"id": "user-1",
+		}},
+		"profiles": {{
+			"id":         "user-1",
+			"profile_no": 1,
+			"name":       "Home",
+			"area":       `["Home"]`,
+		}},
+	}, 0)
+	env.discord.manager.cfg = config.New(map[string]any{
+		"geocoding": map[string]any{
+			"staticProvider":    "tileservercache",
+			"staticProviderURL": "https://tiles.example",
+		},
+	})
+	env.discord.manager.fences = &geofence.Store{Fences: []geofence.Fence{{
+		Name: "Home",
+		Path: [][]float64{{51.5, -0.1}, {51.6, -0.1}, {51.6, -0.2}},
+	}}}
+
+	embed, _, mapReq, errText := env.discord.buildProfilePayloadState(slashTestInteraction("user-1"), "1")
+	if errText != "" {
+		t.Fatalf("buildProfilePayloadState errText=%q", errText)
+	}
+	if mapReq == nil {
+		t.Fatal("expected profile map request")
+	}
+	if embed.Image != nil {
+		t.Fatalf("expected uncached profile render to omit image, got %#v", embed.Image)
+	}
+
+	env.discord.ensureSlashMapState()
+	env.discord.mapCache[mapReq.Key] = slashMapCacheEntry{
+		URL:       "https://tiles.example/pregenerated/profile.png",
+		ExpiresAt: time.Now().Add(slashAreaMapSuccessTTL),
+	}
+	embed, _, _, errText = env.discord.buildProfilePayloadState(slashTestInteraction("user-1"), "1")
+	if errText != "" {
+		t.Fatalf("cached buildProfilePayloadState errText=%q", errText)
+	}
+	if embed.Image == nil || embed.Image.URL != "https://tiles.example/pregenerated/profile.png" {
+		t.Fatalf("cached profile image=%#v, want pregenerated URL", embed.Image)
+	}
+}
+
+func TestQueueSlashMapResolutionCoalescesInFlightRequests(t *testing.T) {
+	d := &Discord{manager: &Manager{
+		cfg: config.New(map[string]any{
+			"geocoding": map[string]any{
+				"staticProvider":    "tileservercache",
+				"staticProviderURL": "https://tiles.example",
+			},
+		}),
+	}}
+	gen := &slashMapStubGenerator{
+		started: make(chan string, 2),
+		release: make(chan struct{}),
+		urls: map[string]string{
+			"area:home": "https://tiles.example/pregenerated/home.png",
+		},
+	}
+	d.mapGenerator = gen
+
+	req := &slashMapRequest{Key: "area:home", Kind: "area", Area: "Home"}
+	d.queueSlashMapResolution(nil, req)
+	d.queueSlashMapResolution(nil, req)
+
+	select {
+	case got := <-gen.started:
+		if got != req.Key {
+			t.Fatalf("started key=%q, want %q", got, req.Key)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for slash map job start")
+	}
+	if calls := gen.callCount(); calls != 1 {
+		t.Fatalf("generator calls=%d, want 1", calls)
+	}
+
+	close(gen.release)
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if url, ok := d.slashMapCacheStatus(req); ok && url == "https://tiles.example/pregenerated/home.png" {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("expected resolved map URL to be cached")
+}
+
+func TestQueueSlashMapResolutionAppliesFailureBackoff(t *testing.T) {
+	d := &Discord{manager: &Manager{
+		cfg: config.New(map[string]any{
+			"geocoding": map[string]any{
+				"staticProvider":    "tileservercache",
+				"staticProviderURL": "https://tiles.example",
+			},
+		}),
+	}}
+	gen := &slashMapStubGenerator{
+		started: make(chan string, 2),
+		release: make(chan struct{}),
+		errs: map[string]error{
+			"area:home": errSlashMapStubFailure,
+		},
+	}
+	d.mapGenerator = gen
+
+	req := &slashMapRequest{Key: "area:home", Kind: "area", Area: "Home"}
+	d.queueSlashMapResolution(nil, req)
+	select {
+	case <-gen.started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for failing slash map job start")
+	}
+	close(gen.release)
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		d.ensureSlashMapState()
+		d.mapMu.Lock()
+		entry := d.mapCache[req.Key]
+		d.mapMu.Unlock()
+		if !entry.RetryAfter.IsZero() {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	before := gen.callCount()
+	d.queueSlashMapResolution(nil, req)
+	time.Sleep(50 * time.Millisecond)
+	if after := gen.callCount(); after != before {
+		t.Fatalf("expected backoff to suppress retry, calls=%d -> %d", before, after)
+	}
+}
+
+func TestQueueSlashMapResolutionRegeneratesExpiredSuccess(t *testing.T) {
+	d := &Discord{manager: &Manager{
+		cfg: config.New(map[string]any{
+			"geocoding": map[string]any{
+				"staticProvider":    "tileservercache",
+				"staticProviderURL": "https://tiles.example",
+			},
+		}),
+	}}
+	gen := &slashMapStubGenerator{
+		started: make(chan string, 1),
+		release: make(chan struct{}),
+		urls: map[string]string{
+			"location:51.5,-0.12": "https://tiles.example/pregenerated/location.png",
+		},
+	}
+	d.mapGenerator = gen
+	req := &slashMapRequest{Key: "location:51.5,-0.12", Kind: "location", Latitude: 51.5, Longitude: -0.12}
+
+	d.ensureSlashMapState()
+	d.mapCache[req.Key] = slashMapCacheEntry{
+		URL:       "https://tiles.example/pregenerated/stale-location.png",
+		ExpiresAt: time.Now().Add(-time.Second),
+	}
+
+	d.queueSlashMapResolution(nil, req)
+	select {
+	case got := <-gen.started:
+		if got != req.Key {
+			t.Fatalf("started key=%q, want %q", got, req.Key)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for regeneration after expired cache entry")
+	}
+	close(gen.release)
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if url, ok := d.slashMapCacheStatus(req); ok && url == "https://tiles.example/pregenerated/location.png" {
+			d.mapMu.Lock()
+			entry := d.mapCache[req.Key]
+			d.mapMu.Unlock()
+			if !entry.ExpiresAt.After(time.Now()) {
+				t.Fatal("expected regenerated cache entry to have a fresh expiry")
+			}
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("expected expired success entry to regenerate")
+}
+
+func TestSlashMapCacheStatusPrunesExpiredEntries(t *testing.T) {
+	d := &Discord{}
+	req := &slashMapRequest{Key: "area:home", Kind: "area", Area: "Home"}
+	d.ensureSlashMapState()
+	d.mapCache[req.Key] = slashMapCacheEntry{
+		URL:       "https://tiles.example/pregenerated/home.png",
+		ExpiresAt: time.Now().Add(-time.Second),
+	}
+	d.mapCache["failed"] = slashMapCacheEntry{
+		RetryAfter: time.Now().Add(-time.Second),
+	}
+
+	if url, ok := d.slashMapCacheStatus(req); ok || url != "" {
+		t.Fatalf("expired success entry should miss, got (%q, %v)", url, ok)
+	}
+	d.mapMu.Lock()
+	_, hasSuccess := d.mapCache[req.Key]
+	_, hasFailure := d.mapCache["failed"]
+	d.mapMu.Unlock()
+	if hasSuccess || hasFailure {
+		t.Fatalf("expected expired cache entries to be pruned, success=%v failure=%v", hasSuccess, hasFailure)
+	}
+}
+
+func TestPrepareSlashMapPatchSkipsStaleRevision(t *testing.T) {
+	d := &Discord{}
+	target := channelRenderTarget("chan-1", "msg-1")
+	embedA := &discordgo.MessageEmbed{Title: "Area A"}
+	embedB := &discordgo.MessageEmbed{Title: "Area B"}
+
+	revA := d.captureSlashRender(target, &slashMapRequest{Key: "area:a"}, embedA)
+	revB := d.captureSlashRender(target, &slashMapRequest{Key: "area:b"}, embedB)
+
+	if _, ok := d.prepareSlashMapPatch(target, "area:a", revA, "https://tiles.example/a.png"); ok {
+		t.Fatal("expected stale map patch to be rejected")
+	}
+	patch, ok := d.prepareSlashMapPatch(target, "area:b", revB, "https://tiles.example/b.png")
+	if !ok {
+		t.Fatal("expected latest map patch to be accepted")
+	}
+	if patch == nil || patch.ChannelEdit == nil || patch.ChannelEdit.Embeds == nil || len(*patch.ChannelEdit.Embeds) != 1 {
+		t.Fatalf("unexpected edit payload: %#v", patch)
+	}
+	if got := (*patch.ChannelEdit.Embeds)[0].Image.URL; got != "https://tiles.example/b.png" {
+		t.Fatalf("patched image=%q, want %q", got, "https://tiles.example/b.png")
+	}
+}
+
+func TestPrepareSlashMapPatchSupportsOriginalInteractionTarget(t *testing.T) {
+	d := &Discord{}
+	msg := &discordgo.Message{ID: "msg-1"}
+	target := originalInteractionRenderTarget(slashTestInteraction("user-1"), msg)
+	rev := d.captureSlashRender(target, &slashMapRequest{Key: "location:51.5,-0.12"}, &discordgo.MessageEmbed{Title: "Confirm location"})
+
+	patch, ok := d.prepareSlashMapPatch(target, "location:51.5,-0.12", rev, "https://tiles.example/pregenerated/location.png")
+	if !ok {
+		t.Fatal("expected original interaction patch to be accepted")
+	}
+	if patch == nil || patch.WebhookEdit == nil || patch.ChannelEdit != nil {
+		t.Fatalf("unexpected original interaction patch: %#v", patch)
+	}
+	if got := (*patch.WebhookEdit.Embeds)[0].Image.URL; got != "https://tiles.example/pregenerated/location.png" {
+		t.Fatalf("patched image=%q, want pregenerated location URL", got)
+	}
+}
+
+func TestRegisterSuccessfulSlashRenderSkipsFailedPrimaryEdit(t *testing.T) {
+	d := &Discord{}
+	ok := d.registerSuccessfulSlashRender(nil, &discordgo.Message{ChannelID: "chan-1", ID: "msg-1"}, errSlashMapStubFailure, &slashMapRequest{Key: "area:a"}, &discordgo.MessageEmbed{Title: "Area A"})
+	if ok {
+		t.Fatal("expected failed primary edit not to register render state")
+	}
+	d.renderMu.Lock()
+	renderCount := len(d.renderState)
+	d.renderMu.Unlock()
+	d.mapMu.Lock()
+	jobCount := len(d.mapJobs)
+	d.mapMu.Unlock()
+	if renderCount != 0 || jobCount != 0 {
+		t.Fatalf("expected no render state or jobs after failed edit, renders=%d jobs=%d", renderCount, jobCount)
+	}
+}
+
+func TestBuildLocationConfirmPayloadStateUsesCacheAndMissesWithoutImage(t *testing.T) {
+	d := &Discord{manager: &Manager{
+		cfg: config.New(map[string]any{
+			"geocoding": map[string]any{
+				"staticProvider":    "tileservercache",
+				"staticProviderURL": "https://tiles.example",
+			},
+		}),
+	}}
+	embed, _, mapReq := d.buildLocationConfirmPayloadState(slashTestInteraction("user-1"), 51.5, -0.12, "")
+	if mapReq == nil {
+		t.Fatal("expected location map request")
+	}
+	if embed.Image != nil {
+		t.Fatalf("expected uncached location preview to omit image, got %#v", embed.Image)
+	}
+
+	d.ensureSlashMapState()
+	d.mapCache[mapReq.Key] = slashMapCacheEntry{
+		URL:       "https://tiles.example/pregenerated/location.png",
+		ExpiresAt: time.Now().Add(slashLocationMapTTL),
+	}
+	embed, _, _ = d.buildLocationConfirmPayloadState(slashTestInteraction("user-1"), 51.5, -0.12, "")
+	if embed.Image == nil || embed.Image.URL != "https://tiles.example/pregenerated/location.png" {
+		t.Fatalf("expected cached location preview image, got %#v", embed.Image)
+	}
+}
+
+func TestClearSlashRenderMessageRemovesOriginalInteractionRender(t *testing.T) {
+	d := &Discord{}
+	msg := &discordgo.Message{ID: "msg-1"}
+	target := originalInteractionRenderTarget(slashTestInteraction("user-1"), msg)
+	rev := d.captureSlashRender(target, &slashMapRequest{Key: "location:51.5,-0.12"}, &discordgo.MessageEmbed{Title: "Confirm location"})
+	if rev == 0 {
+		t.Fatal("expected preview render state to be captured")
+	}
+	d.clearSlashRenderMessage(msg)
+	if _, ok := d.prepareSlashMapPatch(target, "location:51.5,-0.12", rev, "https://tiles.example/pregenerated/location.png"); ok {
+		t.Fatal("expected cleared preview render state to reject late patch")
+	}
+}
+
 func findSlashCommand(commands []*discordgo.ApplicationCommand, name string) *discordgo.ApplicationCommand {
 	for _, cmd := range commands {
 		if cmd != nil && cmd.Name == name {
@@ -835,6 +1220,52 @@ type slashStubHandler struct {
 	calls int
 }
 
+var errSlashMapStubFailure = &slashMapStubError{text: "slash map stub failure"}
+
+type slashMapStubError struct {
+	text string
+}
+
+func (e *slashMapStubError) Error() string {
+	return e.text
+}
+
+type slashMapStubGenerator struct {
+	mu      sync.Mutex
+	calls   int
+	started chan string
+	release chan struct{}
+	urls    map[string]string
+	errs    map[string]error
+}
+
+func (g *slashMapStubGenerator) Generate(req *slashMapRequest) (string, error) {
+	g.mu.Lock()
+	g.calls++
+	g.mu.Unlock()
+	if g.started != nil {
+		g.started <- req.Key
+	}
+	if g.release != nil {
+		<-g.release
+	}
+	if g.errs != nil {
+		if err := g.errs[req.Key]; err != nil {
+			return "", err
+		}
+	}
+	if g.urls != nil {
+		return g.urls[req.Key], nil
+	}
+	return "", nil
+}
+
+func (g *slashMapStubGenerator) callCount() int {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.calls
+}
+
 func (h *slashStubHandler) Name() string { return h.name }
 
 func (h *slashStubHandler) Handle(_ *command.Context, _ []string) (string, error) {
@@ -848,6 +1279,8 @@ func (h *slashStubHandler) Handle(_ *command.Context, _ []string) (string, error
 func slashTestInteraction(userID string) *discordgo.InteractionCreate {
 	return &discordgo.InteractionCreate{
 		Interaction: &discordgo.Interaction{
+			AppID: "app-1",
+			Token: "token-1",
 			Member: &discordgo.Member{
 				User: &discordgo.User{ID: userID, Username: "tester"},
 			},

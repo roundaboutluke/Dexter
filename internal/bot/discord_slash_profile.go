@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
-	"poraclego/internal/tileserver"
+	"poraclego/internal/logging"
 	"poraclego/internal/webhook"
 )
 
@@ -72,6 +72,28 @@ func (d *Discord) profileLocationModalText(i *discordgo.InteractionCreate) (stri
 func (d *Discord) profileCreateModalText(i *discordgo.InteractionCreate) (string, string, string) {
 	tr := d.slashInteractionTranslator(i)
 	return tr.Translate("New profile", false), tr.Translate("Profile name", false), "home"
+}
+
+func (d *Discord) buildLocationConfirmPayloadState(i *discordgo.InteractionCreate, lat, lon float64, placeConfirmation string) (*discordgo.MessageEmbed, []discordgo.MessageComponent, *slashMapRequest) {
+	tr := d.slashInteractionTranslator(i)
+	mapLink := fmt.Sprintf("https://maps.google.com/maps?q=%s,%s", formatFloat(lat), formatFloat(lon))
+	description := tr.TranslateFormat("I set your location to the following coordinates in{0}:\n{1}", placeConfirmation, mapLink)
+	embed := &discordgo.MessageEmbed{
+		Title:       tr.Translate("Confirm location", false),
+		Description: description,
+	}
+	mapReq := d.locationMapRequest(lat, lon)
+	if !d.locationMapsEnabled() {
+		mapReq = nil
+	}
+	d.applySlashMapImage(embed, mapReq)
+	components := []discordgo.MessageComponent{
+		discordgo.ActionsRow{Components: []discordgo.MessageComponent{
+			discordgo.Button{CustomID: slashConfirmButton, Label: tr.Translate("Verify", false), Style: discordgo.SuccessButton},
+			discordgo.Button{CustomID: slashCancelButton, Label: tr.Translate("Cancel", false), Style: discordgo.DangerButton},
+		}},
+	}
+	return embed, components, mapReq
 }
 
 func (d *Discord) handleAreaShow(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -140,9 +162,9 @@ func (d *Discord) handleProfileDeleteCancel(s *discordgo.Session, i *discordgo.I
 	d.respondProfilePayload(s, i, profileValue)
 }
 
-func (d *Discord) updateMessageEmbed(s *discordgo.Session, channelID, messageID string, embed *discordgo.MessageEmbed, components []discordgo.MessageComponent) {
+func (d *Discord) updateMessageEmbed(s *discordgo.Session, channelID, messageID string, embed *discordgo.MessageEmbed, components []discordgo.MessageComponent) (*discordgo.Message, error) {
 	if s == nil || channelID == "" || messageID == "" {
-		return
+		return nil, fmt.Errorf("missing message target")
 	}
 	edit := &discordgo.MessageEdit{
 		ID:         messageID,
@@ -150,7 +172,14 @@ func (d *Discord) updateMessageEmbed(s *discordgo.Session, channelID, messageID 
 		Embeds:     &[]*discordgo.MessageEmbed{embed},
 		Components: &components,
 	}
-	_, _ = s.ChannelMessageEditComplex(edit)
+	msg, err := s.ChannelMessageEditComplex(edit)
+	if err != nil {
+		if logger := logging.Get().Discord; logger != nil {
+			logger.Warnf("Discord message edit failed (channel=%q message=%q): %v", channelID, messageID, err)
+		}
+		return nil, err
+	}
+	return msg, nil
 }
 
 func (d *Discord) handleAreaShowSelect(s *discordgo.Session, i *discordgo.InteractionCreate, area string) {
@@ -198,7 +227,7 @@ func (d *Discord) respondProfilePayload(s *discordgo.Session, i *discordgo.Inter
 	case discordgo.InteractionModalSubmit:
 		d.respondDeferredEphemeral(s, i)
 	}
-	embed, components, errText := d.buildProfilePayload(i, selected)
+	embed, components, mapReq, errText := d.buildProfilePayloadState(i, selected)
 	if errText != "" {
 		if i.Type == discordgo.InteractionApplicationCommand || i.Type == discordgo.InteractionMessageComponent || i.Type == discordgo.InteractionModalSubmit {
 			d.respondEditMessage(s, i, errText, nil)
@@ -208,11 +237,13 @@ func (d *Discord) respondProfilePayload(s *discordgo.Session, i *discordgo.Inter
 		return
 	}
 	if i.Type == discordgo.InteractionModalSubmit && i.Message != nil {
-		d.updateMessageEmbed(s, i.Message.ChannelID, i.Message.ID, embed, components)
+		msg, err := d.updateMessageEmbed(s, i.Message.ChannelID, i.Message.ID, embed, components)
+		d.registerSuccessfulSlashRender(s, msg, err, mapReq, embed)
 		_ = s.InteractionResponseDelete(i.Interaction)
 		return
 	}
-	d.respondEditComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, components)
+	msg, err := d.respondEditComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, components)
+	d.registerSuccessfulSlashRender(s, msg, err, mapReq, embed)
 }
 
 func (d *Discord) handleProfileSelect(s *discordgo.Session, i *discordgo.InteractionCreate, value string) {
@@ -299,7 +330,7 @@ func (d *Discord) respondAreaPayload(s *discordgo.Session, i *discordgo.Interact
 	case discordgo.InteractionModalSubmit:
 		d.respondDeferredEphemeral(s, i)
 	}
-	embed, components, errText := d.buildAreaShowPayload(i, selected)
+	embed, components, mapReq, errText := d.buildAreaShowPayloadState(i, selected)
 	if errText != "" {
 		if i.Type == discordgo.InteractionMessageComponent || i.Type == discordgo.InteractionModalSubmit {
 			d.respondEditMessage(s, i, errText, nil)
@@ -309,12 +340,14 @@ func (d *Discord) respondAreaPayload(s *discordgo.Session, i *discordgo.Interact
 		return
 	}
 	if i.Type == discordgo.InteractionModalSubmit && i.Message != nil {
-		d.updateMessageEmbed(s, i.Message.ChannelID, i.Message.ID, embed, components)
+		msg, err := d.updateMessageEmbed(s, i.Message.ChannelID, i.Message.ID, embed, components)
+		d.registerSuccessfulSlashRender(s, msg, err, mapReq, embed)
 		_ = s.InteractionResponseDelete(i.Interaction)
 		return
 	}
 	if i.Type == discordgo.InteractionMessageComponent || i.Type == discordgo.InteractionModalSubmit {
-		d.respondEditComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, components)
+		msg, err := d.respondEditComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, components)
+		d.registerSuccessfulSlashRender(s, msg, err, mapReq, embed)
 		return
 	}
 	d.respondEphemeralComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, components)
@@ -351,17 +384,19 @@ func (d *Discord) handleLocationInput(s *discordgo.Session, i *discordgo.Interac
 			d.respondEditMessage(s, i, message, nil)
 			return
 		}
-		embed, components, errText := d.buildProfilePayload(i, "")
+		embed, components, mapReq, errText := d.buildProfilePayloadState(i, "")
 		if errText != "" {
 			d.respondEditMessage(s, i, errText, nil)
 			return
 		}
 		if prev != nil && prev.OriginMessageID != "" && prev.OriginChannelID != "" {
-			d.updateMessageEmbed(s, prev.OriginChannelID, prev.OriginMessageID, embed, components)
+			msg, err := d.updateMessageEmbed(s, prev.OriginChannelID, prev.OriginMessageID, embed, components)
+			d.registerSuccessfulSlashRender(s, msg, err, mapReq, embed)
 			_ = s.InteractionResponseDelete(i.Interaction)
 			return
 		}
-		d.respondEditComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, components)
+		msg, err := d.respondEditComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, components)
+		d.registerSuccessfulSlashRender(s, msg, err, mapReq, embed)
 		return
 	}
 
@@ -398,28 +433,7 @@ func (d *Discord) handleLocationInput(s *discordgo.Session, i *discordgo.Interac
 		return
 	}
 
-	mapLink := fmt.Sprintf("https://maps.google.com/maps?q=%s,%s", formatFloat(lat), formatFloat(lon))
-	description := tr.TranslateFormat("I set your location to the following coordinates in{0}:\n{1}", placeConfirmation, mapLink)
-	embed := &discordgo.MessageEmbed{
-		Title:       tr.Translate("Confirm location", false),
-		Description: description,
-	}
-	if d.manager != nil && d.manager.cfg != nil {
-		if provider, _ := d.manager.cfg.GetString("geocoding.staticProvider"); strings.EqualFold(provider, "tileservercache") {
-			opts := tileserver.GetOptions(d.manager.cfg, "location")
-			if !strings.EqualFold(opts.Type, "none") {
-				client := tileserver.NewClient(d.manager.cfg)
-				if staticMap, err := tileserver.GenerateConfiguredLocationTile(client, d.manager.cfg, lat, lon); err == nil && staticMap != "" {
-					embed.Image = &discordgo.MessageEmbedImage{URL: staticMap}
-				}
-			}
-		}
-	}
-	if embed.Image == nil && d.manager != nil && d.manager.cfg != nil {
-		if fallback := fallbackStaticMap(d.manager.cfg); fallback != "" {
-			embed.Image = &discordgo.MessageEmbedImage{URL: fallback}
-		}
-	}
+	embed, components, mapReq := d.buildLocationConfirmPayloadState(i, lat, lon, placeConfirmation)
 	state := &slashBuilderState{
 		Command:   "location",
 		Args:      []string{fmt.Sprintf("%s,%s", formatFloat(lat), formatFloat(lon))},
@@ -431,18 +445,14 @@ func (d *Discord) handleLocationInput(s *discordgo.Session, i *discordgo.Interac
 		state.OriginChannelID = prev.OriginChannelID
 	}
 	d.setSlashState(i.Member, i.User, state)
-	components := []discordgo.MessageComponent{
-		discordgo.ActionsRow{Components: []discordgo.MessageComponent{
-			discordgo.Button{CustomID: slashConfirmButton, Label: tr.Translate("Verify", false), Style: discordgo.SuccessButton},
-			discordgo.Button{CustomID: slashCancelButton, Label: tr.Translate("Cancel", false), Style: discordgo.DangerButton},
-		}},
-	}
 	if state.OriginMessageID != "" && state.OriginChannelID != "" {
-		d.updateMessageEmbed(s, state.OriginChannelID, state.OriginMessageID, embed, components)
+		msg, err := d.updateMessageEmbed(s, state.OriginChannelID, state.OriginMessageID, embed, components)
+		d.registerSuccessfulSlashRender(s, msg, err, mapReq, embed)
 		_ = s.InteractionResponseDelete(i.Interaction)
 		return
 	}
-	d.respondEditComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, components)
+	msg, err := d.respondEditComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, components)
+	d.registerSuccessfulSlashInteractionRender(s, i, msg, err, mapReq, embed)
 }
 
 func (d *Discord) handleSlashProfile(s *discordgo.Session, i *discordgo.InteractionCreate) {

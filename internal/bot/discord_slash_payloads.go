@@ -6,28 +6,32 @@ import (
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
-	"poraclego/internal/tileserver"
 )
 
 func (d *Discord) buildAreaShowPayload(i *discordgo.InteractionCreate, selected string) (*discordgo.MessageEmbed, []discordgo.MessageComponent, string) {
+	embed, components, _, errText := d.buildAreaShowPayloadState(i, selected)
+	return embed, components, errText
+}
+
+func (d *Discord) buildAreaShowPayloadState(i *discordgo.InteractionCreate, selected string) (*discordgo.MessageEmbed, []discordgo.MessageComponent, *slashMapRequest, string) {
 	tr := d.slashInteractionTranslator(i)
 	if d.manager == nil || d.manager.fences == nil {
-		return nil, nil, tr.Translate("No available areas found.", false)
+		return nil, nil, nil, tr.Translate("No available areas found.", false)
 	}
 	areas := selectableAreaNames(d.manager.fences.Fences)
 	if len(areas) == 0 {
-		return nil, nil, tr.Translate("No available areas found.", false)
+		return nil, nil, nil, tr.Translate("No available areas found.", false)
 	}
 	userID, _ := slashUser(i)
 	if userID == "" || d.manager.query == nil {
-		return nil, nil, tr.Translate("Target is not registered.", false)
+		return nil, nil, nil, tr.Translate("Target is not registered.", false)
 	}
 	human, err := d.manager.query.SelectOneQuery("humans", map[string]any{"id": userID})
 	if err != nil {
-		return nil, nil, tr.Translate("Unable to load areas.", false)
+		return nil, nil, nil, tr.Translate("Unable to load areas.", false)
 	}
 	if human == nil {
-		return nil, nil, tr.Translate("Target is not registered.", false)
+		return nil, nil, nil, tr.Translate("Target is not registered.", false)
 	}
 	enabledAreas := parseAreaListFromHuman(human)
 	enabledSet := map[string]bool{}
@@ -46,18 +50,6 @@ func (d *Discord) buildAreaShowPayload(i *discordgo.InteractionCreate, selected 
 		}
 	}
 
-	provider, _ := d.manager.cfg.GetString("geocoding.staticProvider")
-	var url string
-	if strings.EqualFold(provider, "tileservercache") {
-		client := tileserver.NewClient(d.manager.cfg)
-		if staticMap, err := tileserver.GenerateGeofenceTile(d.manager.fences.Fences, client, d.manager.cfg, selected); err == nil {
-			url = staticMap
-		}
-	}
-	if url == "" {
-		url = fallbackStaticMap(d.manager.cfg)
-	}
-
 	enabled := enabledSet[strings.ToLower(selected)]
 	title := tr.TranslateFormat("Area: {0}", selected)
 	if enabled {
@@ -66,9 +58,8 @@ func (d *Discord) buildAreaShowPayload(i *discordgo.InteractionCreate, selected 
 	embed := &discordgo.MessageEmbed{
 		Title: title,
 	}
-	if url != "" {
-		embed.Image = &discordgo.MessageEmbedImage{URL: url}
-	}
+	mapReq := d.areaMapRequest(selected)
+	d.applySlashMapImage(embed, mapReq)
 
 	min := 1
 	options := make([]discordgo.SelectMenuOption, 0, len(areas))
@@ -105,29 +96,34 @@ func (d *Discord) buildAreaShowPayload(i *discordgo.InteractionCreate, selected 
 			discordgo.Button{CustomID: slashProfileAreaBack, Label: tr.Translate("Back to Profiles", false), Style: discordgo.SecondaryButton},
 		}},
 	}
-	return embed, components, ""
+	return embed, components, mapReq, ""
 }
 
 func (d *Discord) buildProfilePayload(i *discordgo.InteractionCreate, selected string) (*discordgo.MessageEmbed, []discordgo.MessageComponent, string) {
+	embed, components, _, errText := d.buildProfilePayloadState(i, selected)
+	return embed, components, errText
+}
+
+func (d *Discord) buildProfilePayloadState(i *discordgo.InteractionCreate, selected string) (*discordgo.MessageEmbed, []discordgo.MessageComponent, *slashMapRequest, string) {
 	tr := d.slashInteractionTranslator(i)
 	if d.manager == nil || d.manager.query == nil {
-		return nil, nil, tr.Translate("Target is not registered.", false)
+		return nil, nil, nil, tr.Translate("Target is not registered.", false)
 	}
 	userID, _ := slashUser(i)
 	if userID == "" {
-		return nil, nil, tr.Translate("Target is not registered.", false)
+		return nil, nil, nil, tr.Translate("Target is not registered.", false)
 	}
 	human, err := d.manager.query.SelectOneQuery("humans", map[string]any{"id": userID})
 	if err != nil || human == nil {
-		return nil, nil, tr.Translate("Target is not registered.", false)
+		return nil, nil, nil, tr.Translate("Target is not registered.", false)
 	}
 	profiles, err := d.manager.query.SelectAllQuery("profiles", map[string]any{"id": userID})
 	if err != nil {
-		return nil, nil, tr.Translate("Unable to load profiles.", false)
+		return nil, nil, nil, tr.Translate("Unable to load profiles.", false)
 	}
 	if len(profiles) == 0 {
-		embed, components := d.buildProfileEmptyPayload(human)
-		return embed, components, ""
+		embed, components, mapReq := d.buildProfileEmptyPayloadState(human)
+		return embed, components, mapReq, ""
 	}
 	sort.Slice(profiles, func(i, j int) bool {
 		return toInt(profiles[i]["profile_no"], 0) < toInt(profiles[j]["profile_no"], 0)
@@ -186,26 +182,8 @@ func (d *Discord) buildProfilePayload(i *discordgo.InteractionCreate, selected s
 			{Name: tr.Translate("Schedule", false), Value: hoursText, Inline: false},
 		},
 	}
-
-	if d.manager != nil && d.manager.cfg != nil {
-		if provider, _ := d.manager.cfg.GetString("geocoding.staticProvider"); strings.EqualFold(provider, "tileservercache") {
-			client := tileserver.NewClient(d.manager.cfg)
-			if lat != 0 || lon != 0 {
-				if staticMap, err := tileserver.GenerateConfiguredLocationTile(client, d.manager.cfg, lat, lon); err == nil && staticMap != "" {
-					embed.Image = &discordgo.MessageEmbedImage{URL: staticMap}
-				}
-			} else if len(areas) > 0 && d.manager.fences != nil {
-				if staticMap, err := tileserver.GenerateGeofenceTile(d.manager.fences.Fences, client, d.manager.cfg, areas[0]); err == nil && staticMap != "" {
-					embed.Image = &discordgo.MessageEmbedImage{URL: staticMap}
-				}
-			}
-		}
-	}
-	if embed.Image == nil && d.manager != nil && d.manager.cfg != nil {
-		if fallback := fallbackStaticMap(d.manager.cfg); fallback != "" {
-			embed.Image = &discordgo.MessageEmbedImage{URL: fallback}
-		}
-	}
+	mapReq := d.profileMapRequest(lat, lon, areas)
+	d.applySlashMapImage(embed, mapReq)
 
 	options := make([]discordgo.SelectMenuOption, 0, len(profiles))
 	for _, row := range profiles {
@@ -258,10 +236,15 @@ func (d *Discord) buildProfilePayload(i *discordgo.InteractionCreate, selected s
 	components = append(components, discordgo.ActionsRow{Components: []discordgo.MessageComponent{
 		discordgo.Button{CustomID: slashProfileScheduleOverview, Label: tr.Translate("Scheduler", false), Style: discordgo.PrimaryButton},
 	}})
-	return embed, components, ""
+	return embed, components, mapReq, ""
 }
 
 func (d *Discord) buildProfileEmptyPayload(human map[string]any) (*discordgo.MessageEmbed, []discordgo.MessageComponent) {
+	embed, components, _ := d.buildProfileEmptyPayloadState(human)
+	return embed, components
+}
+
+func (d *Discord) buildProfileEmptyPayloadState(human map[string]any) (*discordgo.MessageEmbed, []discordgo.MessageComponent, *slashMapRequest) {
 	tr := d.slashTranslator(d.resolvedHumanLanguage(human))
 	areas := parseAreaListFromHuman(human)
 	areaText := tr.Translate("None", false)
@@ -283,26 +266,8 @@ func (d *Discord) buildProfileEmptyPayload(human map[string]any) (*discordgo.Mes
 			{Name: tr.Translate("Areas", false), Value: areaText, Inline: false},
 		},
 	}
-
-	if d.manager != nil && d.manager.cfg != nil {
-		if provider, _ := d.manager.cfg.GetString("geocoding.staticProvider"); strings.EqualFold(provider, "tileservercache") {
-			client := tileserver.NewClient(d.manager.cfg)
-			if lat != 0 || lon != 0 {
-				if staticMap, err := tileserver.GenerateConfiguredLocationTile(client, d.manager.cfg, lat, lon); err == nil && staticMap != "" {
-					embed.Image = &discordgo.MessageEmbedImage{URL: staticMap}
-				}
-			} else if len(areas) > 0 && d.manager.fences != nil {
-				if staticMap, err := tileserver.GenerateGeofenceTile(d.manager.fences.Fences, client, d.manager.cfg, areas[0]); err == nil && staticMap != "" {
-					embed.Image = &discordgo.MessageEmbedImage{URL: staticMap}
-				}
-			}
-		}
-	}
-	if embed.Image == nil && d.manager != nil && d.manager.cfg != nil {
-		if fallback := fallbackStaticMap(d.manager.cfg); fallback != "" {
-			embed.Image = &discordgo.MessageEmbedImage{URL: fallback}
-		}
-	}
+	mapReq := d.profileMapRequest(lat, lon, areas)
+	d.applySlashMapImage(embed, mapReq)
 
 	clearDisabled := lat == 0 && lon == 0
 	components := []discordgo.MessageComponent{
@@ -315,7 +280,7 @@ func (d *Discord) buildProfileEmptyPayload(human map[string]any) (*discordgo.Mes
 			discordgo.Button{CustomID: slashProfileLocationClear, Label: tr.Translate("Clear Location", false), Style: discordgo.DangerButton, Disabled: clearDisabled},
 		}},
 	}
-	return embed, components
+	return embed, components, mapReq
 }
 
 func (d *Discord) buildProfileDeletePayload(i *discordgo.InteractionCreate, selected string) (*discordgo.MessageEmbed, []discordgo.MessageComponent, string) {

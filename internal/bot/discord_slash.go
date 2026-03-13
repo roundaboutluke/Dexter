@@ -593,6 +593,7 @@ func (d *Discord) handleSlashComponent(s *discordgo.Session, i *discordgo.Intera
 		return
 	case slashConfirmButton:
 		if state != nil && state.Command == "location" {
+			d.clearSlashRenderMessage(i.Message)
 			userID, _ := slashUser(i)
 			if userID == "" || d.manager == nil || d.manager.query == nil {
 				d.respondEphemeral(s, i, d.slashText(i, "Target is not registered."))
@@ -614,13 +615,7 @@ func (d *Discord) handleSlashComponent(s *discordgo.Session, i *discordgo.Intera
 				d.respondEphemeral(s, i, message)
 				return
 			}
-			embed, components, errText := d.buildProfilePayload(i, "")
-			if errText != "" {
-				d.respondEphemeral(s, i, errText)
-				d.clearSlashState(i.Member, i.User)
-				return
-			}
-			d.respondUpdateComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, components)
+			d.respondProfilePayload(s, i, "")
 			d.clearSlashState(i.Member, i.User)
 			return
 		}
@@ -637,12 +632,8 @@ func (d *Discord) handleSlashComponent(s *discordgo.Session, i *discordgo.Intera
 		return
 	case slashCancelButton:
 		if state != nil && state.Command == "location" {
-			embed, components, errText := d.buildProfilePayload(i, "")
-			if errText != "" {
-				d.respondEphemeral(s, i, errText)
-			} else {
-				d.respondUpdateComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, components)
-			}
+			d.clearSlashRenderMessage(i.Message)
+			d.respondProfilePayload(s, i, "")
 			d.clearSlashState(i.Member, i.User)
 			return
 		}

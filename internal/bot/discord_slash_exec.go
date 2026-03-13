@@ -89,7 +89,7 @@ func (d *Discord) respondEphemeralComponentsEmbed(s *discordgo.Session, i *disco
 	d.respondComponentsEmbed(s, i, text, embeds, components, true)
 }
 
-func (d *Discord) respondEditMessage(s *discordgo.Session, i *discordgo.InteractionCreate, text string, embeds []*discordgo.MessageEmbed) {
+func (d *Discord) respondEditMessage(s *discordgo.Session, i *discordgo.InteractionCreate, text string, embeds []*discordgo.MessageEmbed) (*discordgo.Message, error) {
 	content := text
 	var embedPtr *[]*discordgo.MessageEmbed
 	if embeds != nil {
@@ -99,11 +99,14 @@ func (d *Discord) respondEditMessage(s *discordgo.Session, i *discordgo.Interact
 		Content: &content,
 		Embeds:  embedPtr,
 	}
-	if _, err := s.InteractionResponseEdit(i.Interaction, edit); err != nil {
+	msg, err := s.InteractionResponseEdit(i.Interaction, edit)
+	if err != nil {
 		if logger := logging.Get().Discord; logger != nil {
 			logger.Warnf("Discord interaction edit failed: %v", err)
 		}
+		return nil, err
 	}
+	return msg, nil
 }
 
 func (d *Discord) followupEphemeralSlashReply(s *discordgo.Session, i *discordgo.InteractionCreate, reply string) {
@@ -191,7 +194,7 @@ func (d *Discord) sendSpecialSlashFollowup(s *discordgo.Session, i *discordgo.In
 	return false
 }
 
-func (d *Discord) respondEditComponentsEmbed(s *discordgo.Session, i *discordgo.InteractionCreate, text string, embeds []*discordgo.MessageEmbed, components []discordgo.MessageComponent) {
+func (d *Discord) respondEditComponentsEmbed(s *discordgo.Session, i *discordgo.InteractionCreate, text string, embeds []*discordgo.MessageEmbed, components []discordgo.MessageComponent) (*discordgo.Message, error) {
 	content := text
 	var embedPtr *[]*discordgo.MessageEmbed
 	if embeds != nil {
@@ -206,11 +209,14 @@ func (d *Discord) respondEditComponentsEmbed(s *discordgo.Session, i *discordgo.
 		Embeds:     embedPtr,
 		Components: componentPtr,
 	}
-	if _, err := s.InteractionResponseEdit(i.Interaction, edit); err != nil {
+	msg, err := s.InteractionResponseEdit(i.Interaction, edit)
+	if err != nil {
 		if logger := logging.Get().Discord; logger != nil {
 			logger.Warnf("Discord interaction edit failed: %v", err)
 		}
+		return nil, err
 	}
+	return msg, nil
 }
 
 func (d *Discord) respondUpdateComponentsEmbed(s *discordgo.Session, i *discordgo.InteractionCreate, text string, embeds []*discordgo.MessageEmbed, components []discordgo.MessageComponent) {
