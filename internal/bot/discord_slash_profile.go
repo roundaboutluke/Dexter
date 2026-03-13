@@ -84,12 +84,7 @@ func (d *Discord) handleAreaShow(s *discordgo.Session, i *discordgo.InteractionC
 }
 
 func (d *Discord) handleProfileAreaShow(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	embed, components, errText := d.buildAreaShowPayload(i, "")
-	if errText != "" {
-		d.respondEphemeral(s, i, errText)
-		return
-	}
-	d.respondUpdateComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, components)
+	d.respondAreaPayload(s, i, "")
 }
 
 func (d *Discord) handleProfileLocationClear(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -109,12 +104,7 @@ func (d *Discord) handleProfileLocationClear(s *discordgo.Session, i *discordgo.
 		d.respondEphemeral(s, i, message)
 		return
 	}
-	embed, components, errText := d.buildProfilePayload(i, "")
-	if errText != "" {
-		d.respondEphemeral(s, i, errText)
-		return
-	}
-	d.respondUpdateComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, components)
+	d.respondProfilePayload(s, i, "")
 }
 
 func (d *Discord) handleProfileDeletePrompt(s *discordgo.Session, i *discordgo.InteractionCreate, profileValue string) {
@@ -143,21 +133,11 @@ func (d *Discord) handleProfileDeleteConfirm(s *discordgo.Session, i *discordgo.
 		d.respondEphemeral(s, i, message)
 		return
 	}
-	embed, components, errText := d.buildProfilePayload(i, "")
-	if errText != "" {
-		d.respondEphemeral(s, i, errText)
-		return
-	}
-	d.respondUpdateComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, components)
+	d.respondProfilePayload(s, i, "")
 }
 
 func (d *Discord) handleProfileDeleteCancel(s *discordgo.Session, i *discordgo.InteractionCreate, profileValue string) {
-	embed, components, errText := d.buildProfilePayload(i, profileValue)
-	if errText != "" {
-		d.respondEphemeral(s, i, errText)
-		return
-	}
-	d.respondUpdateComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, components)
+	d.respondProfilePayload(s, i, profileValue)
 }
 
 func (d *Discord) updateMessageEmbed(s *discordgo.Session, channelID, messageID string, embed *discordgo.MessageEmbed, components []discordgo.MessageComponent) {
@@ -174,12 +154,7 @@ func (d *Discord) updateMessageEmbed(s *discordgo.Session, channelID, messageID 
 }
 
 func (d *Discord) handleAreaShowSelect(s *discordgo.Session, i *discordgo.InteractionCreate, area string) {
-	embed, components, errText := d.buildAreaShowPayload(i, area)
-	if errText != "" {
-		d.respondEphemeral(s, i, errText)
-		return
-	}
-	d.respondUpdateComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, components)
+	d.respondAreaPayload(s, i, area)
 }
 
 func (d *Discord) handleAreaShowToggle(s *discordgo.Session, i *discordgo.InteractionCreate, area string, add bool) {
@@ -207,34 +182,41 @@ func (d *Discord) handleAreaShowToggle(s *discordgo.Session, i *discordgo.Intera
 		d.respondEphemeral(s, i, message)
 		return
 	}
-	embed, components, errText := d.buildAreaShowPayload(i, area)
-	if errText != "" {
-		d.respondEphemeral(s, i, errText)
-		return
-	}
-	d.respondUpdateComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, components)
+	d.respondAreaPayload(s, i, area)
 }
 
 func (d *Discord) handleProfileShow(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	embed, components, errText := d.buildProfilePayload(i, "")
+	d.respondProfilePayload(s, i, "")
+}
+
+func (d *Discord) respondProfilePayload(s *discordgo.Session, i *discordgo.InteractionCreate, selected string) {
+	switch i.Type {
+	case discordgo.InteractionApplicationCommand:
+		d.respondDeferred(s, i)
+	case discordgo.InteractionMessageComponent:
+		d.respondDeferredUpdate(s, i)
+	case discordgo.InteractionModalSubmit:
+		d.respondDeferredEphemeral(s, i)
+	}
+	embed, components, errText := d.buildProfilePayload(i, selected)
 	if errText != "" {
-		d.respondEphemeral(s, i, errText)
+		if i.Type == discordgo.InteractionApplicationCommand || i.Type == discordgo.InteractionMessageComponent || i.Type == discordgo.InteractionModalSubmit {
+			d.respondEditMessage(s, i, errText, nil)
+		} else {
+			d.respondEphemeral(s, i, errText)
+		}
 		return
 	}
-	if i.Type == discordgo.InteractionApplicationCommand {
-		d.respondComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, components, false)
+	if i.Type == discordgo.InteractionModalSubmit && i.Message != nil {
+		d.updateMessageEmbed(s, i.Message.ChannelID, i.Message.ID, embed, components)
+		_ = s.InteractionResponseDelete(i.Interaction)
 		return
 	}
-	d.respondUpdateComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, components)
+	d.respondEditComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, components)
 }
 
 func (d *Discord) handleProfileSelect(s *discordgo.Session, i *discordgo.InteractionCreate, value string) {
-	embed, components, errText := d.buildProfilePayload(i, value)
-	if errText != "" {
-		d.respondEphemeral(s, i, errText)
-		return
-	}
-	d.respondUpdateComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, components)
+	d.respondProfilePayload(s, i, value)
 }
 
 func (d *Discord) handleProfileSet(s *discordgo.Session, i *discordgo.InteractionCreate, value string) {
@@ -272,12 +254,7 @@ func (d *Discord) handleProfileSet(s *discordgo.Session, i *discordgo.Interactio
 		d.respondEphemeral(s, i, tr.Translate("Failed to set profile.", false))
 		return
 	}
-	embed, components, errText := d.buildProfilePayload(i, fmt.Sprintf("%d", profileNo))
-	if errText != "" {
-		d.respondEphemeral(s, i, errText)
-		return
-	}
-	d.respondUpdateComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, components)
+	d.respondProfilePayload(s, i, fmt.Sprintf("%d", profileNo))
 }
 
 func (d *Discord) handleProfileCreate(s *discordgo.Session, i *discordgo.InteractionCreate, name string) {
@@ -312,12 +289,35 @@ func (d *Discord) handleProfileCreate(s *discordgo.Session, i *discordgo.Interac
 		d.respondEphemeral(s, i, message)
 		return
 	}
-	embed, components, errText := d.buildProfilePayload(i, name)
+	d.respondProfilePayload(s, i, name)
+}
+
+func (d *Discord) respondAreaPayload(s *discordgo.Session, i *discordgo.InteractionCreate, selected string) {
+	switch i.Type {
+	case discordgo.InteractionMessageComponent:
+		d.respondDeferredUpdate(s, i)
+	case discordgo.InteractionModalSubmit:
+		d.respondDeferredEphemeral(s, i)
+	}
+	embed, components, errText := d.buildAreaShowPayload(i, selected)
 	if errText != "" {
-		d.respondEphemeral(s, i, errText)
+		if i.Type == discordgo.InteractionMessageComponent || i.Type == discordgo.InteractionModalSubmit {
+			d.respondEditMessage(s, i, errText, nil)
+		} else {
+			d.respondEphemeral(s, i, errText)
+		}
 		return
 	}
-	d.respondUpdateComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, components)
+	if i.Type == discordgo.InteractionModalSubmit && i.Message != nil {
+		d.updateMessageEmbed(s, i.Message.ChannelID, i.Message.ID, embed, components)
+		_ = s.InteractionResponseDelete(i.Interaction)
+		return
+	}
+	if i.Type == discordgo.InteractionMessageComponent || i.Type == discordgo.InteractionModalSubmit {
+		d.respondEditComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, components)
+		return
+	}
+	d.respondEphemeralComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, components)
 }
 
 func (d *Discord) handleLocationInput(s *discordgo.Session, i *discordgo.InteractionCreate, input string) {

@@ -116,12 +116,7 @@ func (d *Discord) handleProfileScheduleTime(s *discordgo.Session, i *discordgo.I
 		d.respondEphemeral(s, i, tr.Translate("Unable to save schedule.", false))
 		return
 	}
-	embed, components, errText := d.buildProfilePayload(i, "")
-	if errText != "" {
-		d.respondEphemeral(s, i, errText)
-		return
-	}
-	d.respondUpdateComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, components)
+	d.respondProfilePayload(s, i, "")
 }
 
 func (d *Discord) handleProfileScheduleRemove(s *discordgo.Session, i *discordgo.InteractionCreate, profileToken, value string) {
@@ -153,12 +148,7 @@ func (d *Discord) handleProfileScheduleRemove(s *discordgo.Session, i *discordgo
 		d.respondEphemeral(s, i, tr.Translate("Unable to save schedule.", false))
 		return
 	}
-	embed, components, errText := d.buildProfilePayload(i, "")
-	if errText != "" {
-		d.respondEphemeral(s, i, errText)
-		return
-	}
-	d.respondUpdateComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, components)
+	d.respondProfilePayload(s, i, "")
 }
 
 func (d *Discord) handleProfileScheduleRemoveGlobal(s *discordgo.Session, i *discordgo.InteractionCreate, value string) {
@@ -240,12 +230,7 @@ func (d *Discord) handleProfileScheduleClear(s *discordgo.Session, i *discordgo.
 		d.respondEphemeral(s, i, tr.Translate("Unable to save schedule.", false))
 		return
 	}
-	embed, components, errText := d.buildProfilePayload(i, "")
-	if errText != "" {
-		d.respondEphemeral(s, i, errText)
-		return
-	}
-	d.respondUpdateComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, components)
+	d.respondProfilePayload(s, i, "")
 }
 
 func (d *Discord) handleProfileScheduleAddGlobal(s *discordgo.Session, i *discordgo.InteractionCreate) {

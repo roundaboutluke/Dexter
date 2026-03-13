@@ -53,6 +53,17 @@ func (d *Discord) respondDeferred(s *discordgo.Session, i *discordgo.Interaction
 	}
 }
 
+func (d *Discord) respondDeferredUpdate(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	response := &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseDeferredMessageUpdate,
+	}
+	if err := s.InteractionRespond(i.Interaction, response); err != nil {
+		if logger := logging.Get().Discord; logger != nil {
+			logger.Warnf("Discord deferred interaction update failed: %v", err)
+		}
+	}
+}
+
 func (d *Discord) respondComponentsEmbed(s *discordgo.Session, i *discordgo.InteractionCreate, text string, embeds []*discordgo.MessageEmbed, components []discordgo.MessageComponent, ephemeral bool) {
 	flags := discordgo.MessageFlags(0)
 	if ephemeral {
@@ -195,7 +206,11 @@ func (d *Discord) respondEditComponentsEmbed(s *discordgo.Session, i *discordgo.
 		Embeds:     embedPtr,
 		Components: componentPtr,
 	}
-	_, _ = s.InteractionResponseEdit(i.Interaction, edit)
+	if _, err := s.InteractionResponseEdit(i.Interaction, edit); err != nil {
+		if logger := logging.Get().Discord; logger != nil {
+			logger.Warnf("Discord interaction edit failed: %v", err)
+		}
+	}
 }
 
 func (d *Discord) respondUpdateComponentsEmbed(s *discordgo.Session, i *discordgo.InteractionCreate, text string, embeds []*discordgo.MessageEmbed, components []discordgo.MessageComponent) {

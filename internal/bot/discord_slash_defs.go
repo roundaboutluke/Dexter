@@ -397,8 +397,8 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 						{Name: "fort", Value: "fort"},
 					},
 				},
-				{Type: discordgo.ApplicationCommandOptionString, Name: "profile", Description: "Choose which profile to remove from", Autocomplete: true},
 				{Type: discordgo.ApplicationCommandOptionString, Name: "tracking", Description: "Choose what to remove", Required: true, Autocomplete: true},
+				{Type: discordgo.ApplicationCommandOptionString, Name: "profile", Description: "Choose which profile to remove from", Autocomplete: true},
 			},
 		},
 		{

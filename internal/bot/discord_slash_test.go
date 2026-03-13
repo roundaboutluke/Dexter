@@ -73,6 +73,13 @@ func TestSlashCommandDefinitionsProfileAndHelpOptions(t *testing.T) {
 	if removeProfile == nil || !removeProfile.Autocomplete || removeProfile.Required {
 		t.Fatal("remove profile option should exist, autocomplete, and remain optional")
 	}
+	removeTracking := findSlashOption(remove.Options, "tracking")
+	if removeTracking == nil || !removeTracking.Autocomplete || !removeTracking.Required {
+		t.Fatal("remove tracking option should exist, autocomplete, and remain required")
+	}
+	if len(remove.Options) < 3 || remove.Options[1].Name != "tracking" || remove.Options[2].Name != "profile" {
+		t.Fatal("remove command should place required tracking before optional profile")
+	}
 
 	help := findSlashCommand(commands, "help")
 	if help == nil {
