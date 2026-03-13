@@ -11,6 +11,23 @@ import (
 	"poraclego/internal/logging"
 )
 
+type slashExecutionStatus string
+
+const (
+	slashExecutionSuccess slashExecutionStatus = "success"
+	slashExecutionBlocked slashExecutionStatus = "blocked"
+	slashExecutionError   slashExecutionStatus = "error"
+)
+
+type slashExecutionResult struct {
+	Status slashExecutionStatus
+	Reply  string
+}
+
+func (r slashExecutionResult) Success() bool {
+	return r.Status == slashExecutionSuccess
+}
+
 func (d *Discord) respondDeferredEphemeral(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	response := &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
@@ -575,27 +592,24 @@ func profileDisplayName(row map[string]any) string {
 
 func (d *Discord) executeSlashCommand(s *discordgo.Session, i *discordgo.InteractionCreate, state *slashBuilderState) {
 	if state == nil {
-		d.respondEphemeral(s, i, "No command to run.")
+		d.respondEphemeral(s, i, d.buildSlashExecutionResult(s, i, "").Reply)
 		return
 	}
 	line := strings.TrimSpace(state.Command + " " + strings.Join(state.Args, " "))
 	if line == "" {
-		d.respondEphemeral(s, i, "No command to run.")
+		d.respondEphemeral(s, i, d.buildSlashExecutionResult(s, i, "").Reply)
 		return
 	}
 	d.executeSlashLineDeferred(s, i, line)
 }
 
 func (d *Discord) executeSlashLine(s *discordgo.Session, i *discordgo.InteractionCreate, line string) {
-	reply := d.buildSlashReply(s, i, line)
-	if reply == "" {
-		reply = "Done."
-	}
-	if d.sendSpecialSlashReply(s, i, reply) {
+	result := d.buildSlashExecutionResult(s, i, line)
+	if d.sendSpecialSlashReply(s, i, result.Reply) {
 		return
 	}
 	const discordLimit = 1900
-	chunks := splitDiscordMessage(reply, discordLimit)
+	chunks := splitDiscordMessage(result.Reply, discordLimit)
 	d.respondEphemeral(s, i, chunks[0])
 	for _, chunk := range chunks[1:] {
 		content := chunk
@@ -610,15 +624,12 @@ func (d *Discord) executeSlashLine(s *discordgo.Session, i *discordgo.Interactio
 
 func (d *Discord) executeSlashLineDeferred(s *discordgo.Session, i *discordgo.InteractionCreate, line string) {
 	d.respondDeferredEphemeral(s, i)
-	reply := d.buildSlashReply(s, i, line)
-	if reply == "" {
-		reply = "Done."
-	}
-	if d.sendSpecialSlashReply(s, i, reply) {
+	result := d.buildSlashExecutionResult(s, i, line)
+	if d.sendSpecialSlashReply(s, i, result.Reply) {
 		return
 	}
 	const discordLimit = 1900
-	chunks := splitDiscordMessage(reply, discordLimit)
+	chunks := splitDiscordMessage(result.Reply, discordLimit)
 	d.respondEditMessage(s, i, chunks[0], nil)
 	for _, chunk := range chunks[1:] {
 		content := chunk
@@ -663,28 +674,58 @@ func (d *Discord) buildSlashContext(s *discordgo.Session, i *discordgo.Interacti
 	return d.manager.Context("discord", d.userLanguage(userID), "/", userID, userName, i.ChannelID, channelName, isDM, isAdmin, roles, ".")
 }
 
-func (d *Discord) buildSlashReply(s *discordgo.Session, i *discordgo.InteractionCreate, line string) string {
+func (d *Discord) buildSlashExecutionResult(s *discordgo.Session, i *discordgo.InteractionCreate, line string) slashExecutionResult {
+	line = strings.TrimSpace(line)
 	if line == "" {
-		return "No command to run."
+		return slashExecutionResult{
+			Status: slashExecutionBlocked,
+			Reply:  d.slashText(i, "No command to run."),
+		}
 	}
 	ctx := d.buildSlashContext(s, i)
 	if ctx == nil {
-		return "No command to run."
+		return slashExecutionResult{
+			Status: slashExecutionBlocked,
+			Reply:  d.slashText(i, "No command to run."),
+		}
 	}
 	tokens := splitQuotedArgs(line)
-	if len(tokens) > 0 {
+	if len(tokens) > 0 && ctx.Config != nil {
 		if disabled, ok := ctx.Config.GetStringSlice("general.disabledCommands"); ok {
 			if containsString(disabled, tokens[0]) {
-				return "That command is disabled."
+				return slashExecutionResult{
+					Status: slashExecutionBlocked,
+					Reply:  d.slashText(i, "That command is disabled."),
+				}
 			}
 		}
 	}
-	reply, err := d.manager.Registry().Execute(ctx, line)
+	registry := d.manager.Registry()
+	if registry == nil {
+		return slashExecutionResult{
+			Status: slashExecutionBlocked,
+			Reply:  d.slashText(i, "No command to run."),
+		}
+	}
+	reply, err := registry.Execute(ctx, line)
 	if err != nil {
-		return err.Error()
+		return slashExecutionResult{
+			Status: slashExecutionError,
+			Reply:  err.Error(),
+		}
 	}
 	if reply == "" {
-		return "Done."
+		return slashExecutionResult{
+			Status: slashExecutionSuccess,
+			Reply:  d.slashText(i, "Done."),
+		}
 	}
-	return reply
+	return slashExecutionResult{
+		Status: slashExecutionSuccess,
+		Reply:  reply,
+	}
+}
+
+func (d *Discord) buildSlashReply(s *discordgo.Session, i *discordgo.InteractionCreate, line string) string {
+	return d.buildSlashExecutionResult(s, i, line).Reply
 }

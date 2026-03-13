@@ -11,6 +11,29 @@ import (
 	"poraclego/internal/webhook"
 )
 
+func profileDeleteConfirmFollowup(result slashExecutionResult) string {
+	if result.Success() {
+		return ""
+	}
+	return result.Reply
+}
+
+func profileLocationConfirmOutcome(result slashExecutionResult) (bool, string) {
+	if result.Success() {
+		return true, ""
+	}
+	return false, result.Reply
+}
+
+func (d *Discord) profileLocationModalText(i *discordgo.InteractionCreate) (string, string, string) {
+	tr := d.slashInteractionTranslator(i)
+	return tr.Translate("Set location", false), tr.Translate("Address or coordinates", false), "51.5,-0.12"
+}
+
+func (d *Discord) slashConfirmedText(i *discordgo.InteractionCreate) string {
+	return d.slashText(i, "Confirmed") + " ✅"
+}
+
 func (d *Discord) handleAreaShow(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	embed, components, errText := d.buildAreaShowPayload(i, "")
 	if errText != "" {
@@ -49,16 +72,17 @@ func (d *Discord) handleProfileDeletePrompt(s *discordgo.Session, i *discordgo.I
 }
 
 func (d *Discord) handleProfileDeleteConfirm(s *discordgo.Session, i *discordgo.InteractionCreate, profileValue string) {
-	reply := d.buildSlashReply(s, i, fmt.Sprintf("profile remove %s", profileValue))
+	result := d.buildSlashExecutionResult(s, i, fmt.Sprintf("profile remove %s", profileValue))
+	if followup := profileDeleteConfirmFollowup(result); followup != "" {
+		d.respondEphemeral(s, i, followup)
+		return
+	}
 	embed, components, errText := d.buildProfilePayload(i, "")
 	if errText != "" {
 		d.respondEphemeral(s, i, errText)
 		return
 	}
 	d.respondUpdateComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, components)
-	if reply != "" && !strings.EqualFold(reply, "done.") && !strings.EqualFold(reply, "profile removed.") {
-		d.respondEphemeral(s, i, reply)
-	}
 }
 
 func (d *Discord) handleProfileDeleteCancel(s *discordgo.Session, i *discordgo.InteractionCreate, profileValue string) {

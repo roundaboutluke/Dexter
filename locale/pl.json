@@ -138,5 +138,11 @@
 	"Please do not mix switch and range schedules in the same command.":"Nie mieszaj przełączeń i zakresów harmonogramu w tej samej komendzie.",
 	"That overlaps with existing schedules in":"To nachodzi na istniejące harmonogramy w",
 	"Valid commands are `{0}profile schedule status`, `{0}profile schedule enable`, `{0}profile schedule disable`, `{0}profile schedule toggle`":"Prawidłowe komendy to `{0}profile schedule status`, `{0}profile schedule enable`, `{0}profile schedule disable`, `{0}profile schedule toggle`",
-	"I set your location to the following coordinates in{0}:\n{1}":"Ustawiłem twoją lokalizację na następujące współrzędne w{0}:\n{1}"
+	"I set your location to the following coordinates in{0}:\n{1}":"Ustawiłem twoją lokalizację na następujące współrzędne w{0}:\n{1}",
+	"Set location":"Ustaw lokalizację",
+	"Address or coordinates":"Adres lub współrzędne",
+	"Confirmed":"Potwierdzono",
+	"No command to run.":"Brak polecenia do uruchomienia.",
+	"That command is disabled.":"To polecenie jest wyłączone.",
+	"Done.":"Gotowe."
 }

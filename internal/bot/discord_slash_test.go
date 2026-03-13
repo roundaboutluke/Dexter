@@ -1,12 +1,14 @@
 package bot
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/bwmarrin/discordgo"
 
+	"poraclego/internal/command"
 	"poraclego/internal/config"
 	"poraclego/internal/dts"
 	"poraclego/internal/i18n"
@@ -285,6 +287,186 @@ func TestBuildProfileScheduleDayPayloadLocalizesDayOptions(t *testing.T) {
 	}
 }
 
+func TestBuildSlashExecutionResultEmptyCommandUsesConfiguredFallbackLocale(t *testing.T) {
+	root := writeTestLocale(t, "fr", map[string]string{
+		"No command to run.": "Aucune commande a executer.",
+	})
+	env := newSlashMutationTestEnv(t, map[string][]map[string]any{
+		"humans": {{
+			"id": "user-1",
+		}},
+	}, 0)
+	cfg := config.New(map[string]any{
+		"general": map[string]any{
+			"locale": "fr",
+		},
+	})
+	env.discord.manager.cfg = cfg
+	env.discord.manager.i18n = i18n.NewFactory(root, cfg)
+	env.discord.manager.registry = command.NewRegistry()
+
+	result := env.discord.buildSlashExecutionResult(nil, slashTestInteraction("user-1"), "")
+	if result.Status != slashExecutionBlocked {
+		t.Fatalf("status=%q, want %q", result.Status, slashExecutionBlocked)
+	}
+	if result.Reply != "Aucune commande a executer." {
+		t.Fatalf("reply=%q, want %q", result.Reply, "Aucune commande a executer.")
+	}
+}
+
+func TestBuildSlashExecutionResultDisabledCommandLocalized(t *testing.T) {
+	root := writeTestLocale(t, "fr", map[string]string{
+		"That command is disabled.": "Cette commande est desactivee.",
+	})
+	cfg := config.New(map[string]any{
+		"general": map[string]any{
+			"locale":           "fr",
+			"disabledCommands": []string{"noop"},
+		},
+	})
+	registry := command.NewRegistry()
+	handler := &slashStubHandler{name: "noop", reply: "unexpected"}
+	registry.Register(handler)
+	d := &Discord{manager: &Manager{
+		cfg:      cfg,
+		i18n:     i18n.NewFactory(root, cfg),
+		registry: registry,
+	}}
+
+	result := d.buildSlashExecutionResult(nil, slashTestInteraction("user-1"), "noop")
+	if result.Status != slashExecutionBlocked {
+		t.Fatalf("status=%q, want %q", result.Status, slashExecutionBlocked)
+	}
+	if result.Reply != "Cette commande est desactivee." {
+		t.Fatalf("reply=%q, want %q", result.Reply, "Cette commande est desactivee.")
+	}
+	if handler.calls != 0 {
+		t.Fatalf("handler calls=%d, want 0", handler.calls)
+	}
+}
+
+func TestBuildSlashExecutionResultEmptyReplyUsesTranslatedDone(t *testing.T) {
+	root := writeTestLocale(t, "fr", map[string]string{
+		"Done.": "Termine.",
+	})
+	cfg := config.New(map[string]any{
+		"general": map[string]any{
+			"locale": "fr",
+		},
+	})
+	registry := command.NewRegistry()
+	registry.Register(&slashStubHandler{name: "noop"})
+	d := &Discord{manager: &Manager{
+		cfg:      cfg,
+		i18n:     i18n.NewFactory(root, cfg),
+		registry: registry,
+	}}
+
+	result := d.buildSlashExecutionResult(nil, slashTestInteraction("user-1"), "noop")
+	if result.Status != slashExecutionSuccess {
+		t.Fatalf("status=%q, want %q", result.Status, slashExecutionSuccess)
+	}
+	if result.Reply != "Termine." {
+		t.Fatalf("reply=%q, want %q", result.Reply, "Termine.")
+	}
+}
+
+func TestProfileDeleteConfirmFollowupSuppressesTranslatedSuccess(t *testing.T) {
+	root := writeTestLocale(t, "fr", map[string]string{
+		"Profile removed.": "Profil supprime.",
+	})
+	env := newSlashMutationTestEnv(t, map[string][]map[string]any{
+		"humans": {{
+			"id":       "user-1",
+			"language": "fr",
+		}},
+		"profiles": {
+			{
+				"id":         "user-1",
+				"profile_no": 1,
+				"name":       "Maison",
+			},
+			{
+				"id":         "user-1",
+				"profile_no": 2,
+				"name":       "Travail",
+			},
+		},
+	}, 0)
+	cfg := config.New(map[string]any{
+		"general": map[string]any{
+			"locale": "en",
+		},
+	})
+	env.discord.manager.cfg = cfg
+	env.discord.manager.i18n = i18n.NewFactory(root, cfg)
+	env.discord.manager.registry = command.NewRegistry()
+
+	result := env.discord.buildSlashExecutionResult(nil, slashTestInteraction("user-1"), "profile remove 2")
+	if result.Status != slashExecutionSuccess {
+		t.Fatalf("status=%q, want %q", result.Status, slashExecutionSuccess)
+	}
+	if result.Reply != "Profil supprime." {
+		t.Fatalf("reply=%q, want %q", result.Reply, "Profil supprime.")
+	}
+	if followup := profileDeleteConfirmFollowup(result); followup != "" {
+		t.Fatalf("followup=%q, want empty", followup)
+	}
+}
+
+func TestProfileLocationModalTextLocalized(t *testing.T) {
+	env := newSlashMutationTestEnv(t, map[string][]map[string]any{
+		"humans": {{
+			"id":       "user-1",
+			"language": "fr",
+		}},
+	}, 0)
+	cfg := config.New(map[string]any{
+		"general": map[string]any{
+			"locale": "en",
+		},
+	})
+	env.discord.manager.cfg = cfg
+	env.discord.manager.i18n = i18n.NewFactory("/Users/pbx/PoracleJS/PoracleGo", cfg)
+
+	title, label, placeholder := env.discord.profileLocationModalText(slashTestInteraction("user-1"))
+	if title != "Définir la position" {
+		t.Fatalf("title=%q, want %q", title, "Définir la position")
+	}
+	if label != "Adresse ou coordonnées" {
+		t.Fatalf("label=%q, want %q", label, "Adresse ou coordonnées")
+	}
+	if placeholder != "51.5,-0.12" {
+		t.Fatalf("placeholder=%q, want %q", placeholder, "51.5,-0.12")
+	}
+}
+
+func TestProfileLocationConfirmOutcomeReturnsBlockedMessage(t *testing.T) {
+	root := writeTestLocale(t, "fr", map[string]string{
+		"That command is disabled.": "Cette commande est desactivee.",
+	})
+	cfg := config.New(map[string]any{
+		"general": map[string]any{
+			"locale":           "fr",
+			"disabledCommands": []string{"location"},
+		},
+	})
+	d := &Discord{manager: &Manager{
+		cfg:      cfg,
+		i18n:     i18n.NewFactory(root, cfg),
+		registry: command.NewRegistry(),
+	}}
+
+	result := d.buildSlashExecutionResult(nil, slashTestInteraction("user-1"), "location remove")
+	refreshProfile, message := profileLocationConfirmOutcome(result)
+	if refreshProfile {
+		t.Fatal("expected location confirm to block profile refresh")
+	}
+	if message != "Cette commande est desactivee." {
+		t.Fatalf("message=%q, want %q", message, "Cette commande est desactivee.")
+	}
+}
+
 func findSlashCommand(commands []*discordgo.ApplicationCommand, name string) *discordgo.ApplicationCommand {
 	for _, cmd := range commands {
 		if cmd != nil && cmd.Name == name {
@@ -310,4 +492,48 @@ func hasChoiceValue(choices []*discordgo.ApplicationCommandOptionChoice, value s
 		}
 	}
 	return false
+}
+
+type slashStubHandler struct {
+	name  string
+	reply string
+	err   error
+	calls int
+}
+
+func (h *slashStubHandler) Name() string { return h.name }
+
+func (h *slashStubHandler) Handle(_ *command.Context, _ []string) (string, error) {
+	h.calls++
+	if h.err != nil {
+		return "", h.err
+	}
+	return h.reply, nil
+}
+
+func slashTestInteraction(userID string) *discordgo.InteractionCreate {
+	return &discordgo.InteractionCreate{
+		Interaction: &discordgo.Interaction{
+			Member: &discordgo.Member{
+				User: &discordgo.User{ID: userID, Username: "tester"},
+			},
+		},
+	}
+}
+
+func writeTestLocale(t *testing.T, locale string, entries map[string]string) string {
+	t.Helper()
+	root := t.TempDir()
+	localeDir := filepath.Join(root, "locale")
+	if err := os.MkdirAll(localeDir, 0o755); err != nil {
+		t.Fatalf("mkdir locale dir: %v", err)
+	}
+	data, err := json.Marshal(entries)
+	if err != nil {
+		t.Fatalf("marshal locale: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(localeDir, locale+".json"), data, 0o644); err != nil {
+		t.Fatalf("write locale file: %v", err)
+	}
+	return root
 }

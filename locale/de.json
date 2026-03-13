@@ -563,5 +563,11 @@
     "Please do not mix switch and range schedules in the same command.":"Bitte mische Schalt- und Bereichszeitpläne nicht im selben Befehl.",
     "That overlaps with existing schedules in":"Das überschneidet sich mit vorhandenen Zeitplänen in",
     "Valid commands are `{0}profile schedule status`, `{0}profile schedule enable`, `{0}profile schedule disable`, `{0}profile schedule toggle`":"Gültige Befehle sind `{0}profile schedule status`, `{0}profile schedule enable`, `{0}profile schedule disable`, `{0}profile schedule toggle`",
-    "I set your location to the following coordinates in{0}:\n{1}":"Ich habe deinen Standort auf die folgenden Koordinaten in{0} gesetzt:\n{1}"
+    "I set your location to the following coordinates in{0}:\n{1}":"Ich habe deinen Standort auf die folgenden Koordinaten in{0} gesetzt:\n{1}",
+    "Set location":"Standort festlegen",
+    "Address or coordinates":"Adresse oder Koordinaten",
+    "Confirmed":"Bestätigt",
+    "No command to run.":"Kein Befehl zum Ausführen.",
+    "That command is disabled.":"Dieser Befehl ist deaktiviert.",
+    "Done.":"Fertig."
 }

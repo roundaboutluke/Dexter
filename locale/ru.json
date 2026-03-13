@@ -334,5 +334,11 @@
   "Area: {0}":"Зона: {0}",
   "Select area":"Выберите зону",
   "That overlaps with existing schedules: {0}":"Это пересекается с существующими расписаниями: {0}",
-  "switch":"переключение"
+  "switch":"переключение",
+  "Set location":"Указать местоположение",
+  "Address or coordinates":"Адрес или координаты",
+  "Confirmed":"Подтверждено",
+  "No command to run.":"Нет команды для выполнения.",
+  "That command is disabled.":"Эта команда отключена.",
+  "Done.":"Готово."
 }

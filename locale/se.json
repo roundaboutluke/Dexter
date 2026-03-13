@@ -153,6 +153,12 @@
         "Please do not mix switch and range schedules in the same command.":"Blanda inte byte- och intervallscheman i samma kommando.",
         "That overlaps with existing schedules in":"Detta överlappar med befintliga scheman i",
         "Valid commands are `{0}profile schedule status`, `{0}profile schedule enable`, `{0}profile schedule disable`, `{0}profile schedule toggle`":"Giltiga kommandon är `{0}profile schedule status`, `{0}profile schedule enable`, `{0}profile schedule disable`, `{0}profile schedule toggle`",
-        "I set your location to the following coordinates in{0}:\n{1}":"Jag ställde in din plats till följande koordinater i{0}:\n{1}"
+        "I set your location to the following coordinates in{0}:\n{1}":"Jag ställde in din plats till följande koordinater i{0}:\n{1}",
+        "Set location":"Ange plats",
+        "Address or coordinates":"Adress eller koordinater",
+        "Confirmed":"Bekräftat",
+        "No command to run.":"Inget kommando att köra.",
+        "That command is disabled.":"Det här kommandot är inaktiverat.",
+        "Done.":"Klart."
 
 }

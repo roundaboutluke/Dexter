@@ -210,5 +210,11 @@
   "Please do not mix switch and range schedules in the same command.":"Ikke bland bytte- og intervalltidsplaner i samme kommando.",
   "That overlaps with existing schedules in":"Dette overlapper med eksisterende tidsplaner i",
   "Valid commands are `{0}profile schedule status`, `{0}profile schedule enable`, `{0}profile schedule disable`, `{0}profile schedule toggle`":"Gyldige kommandoer er `{0}profile schedule status`, `{0}profile schedule enable`, `{0}profile schedule disable`, `{0}profile schedule toggle`",
-  "I set your location to the following coordinates in{0}:\n{1}":"Jeg satte stedet ditt til følgende koordinater i{0}:\n{1}"
+  "I set your location to the following coordinates in{0}:\n{1}":"Jeg satte stedet ditt til følgende koordinater i{0}:\n{1}",
+  "Set location":"Angi posisjon",
+  "Address or coordinates":"Adresse eller koordinater",
+  "Confirmed":"Bekreftet",
+  "No command to run.":"Ingen kommando å kjøre.",
+  "That command is disabled.":"Denne kommandoen er deaktivert.",
+  "Done.":"Ferdig."
 }

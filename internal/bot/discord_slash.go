@@ -379,7 +379,8 @@ func (d *Discord) handleSlashComponent(s *discordgo.Session, i *discordgo.Intera
 			OriginMessageID: i.Message.ID,
 			OriginChannelID: i.ChannelID,
 		})
-		d.respondWithModal(s, i, slashProfileLocationMod, "Set location", "Address or coordinates", "51.5,-0.12")
+		title, label, placeholder := d.profileLocationModalText(i)
+		d.respondWithModal(s, i, slashProfileLocationMod, title, label, placeholder)
 		return
 	}
 	if data.CustomID == slashProfileLocationClear {
@@ -592,27 +593,30 @@ func (d *Discord) handleSlashComponent(s *discordgo.Session, i *discordgo.Intera
 	case slashConfirmButton:
 		if state != nil && state.Command == "location" {
 			line := strings.TrimSpace(state.Command + " " + strings.Join(state.Args, " "))
-			_ = d.buildSlashReply(s, i, line)
+			result := d.buildSlashExecutionResult(s, i, line)
+			refreshProfile, message := profileLocationConfirmOutcome(result)
+			if !refreshProfile {
+				d.respondEphemeral(s, i, message)
+				return
+			}
 			embed, components, errText := d.buildProfilePayload(i, "")
 			if errText != "" {
 				d.respondEphemeral(s, i, errText)
-			} else {
-				d.respondUpdateComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, components)
+				d.clearSlashState(i.Member, i.User)
+				return
 			}
+			d.respondUpdateComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, components)
 			d.clearSlashState(i.Member, i.User)
 			return
 		}
 		// Clear the confirmation prompt buttons immediately, then send the command output as a follow-up.
-		d.respondUpdateComponentsEmbed(s, i, "Confirmed ✅", nil, []discordgo.MessageComponent{})
+		d.respondUpdateComponentsEmbed(s, i, d.slashConfirmedText(i), nil, []discordgo.MessageComponent{})
 		line := ""
 		if state != nil {
 			line = strings.TrimSpace(state.Command + " " + strings.Join(state.Args, " "))
 		}
-		reply := d.buildSlashReply(s, i, line)
-		if reply == "" {
-			reply = "Done."
-		}
-		d.followupEphemeralSlashReply(s, i, reply)
+		result := d.buildSlashExecutionResult(s, i, line)
+		d.followupEphemeralSlashReply(s, i, result.Reply)
 		d.clearSlashState(i.Member, i.User)
 		return
 	case slashCancelButton:
