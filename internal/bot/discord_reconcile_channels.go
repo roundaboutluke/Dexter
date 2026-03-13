@@ -7,6 +7,7 @@ import (
 
 	"poraclego/internal/community"
 	"poraclego/internal/db"
+	"poraclego/internal/logging"
 )
 
 func (d *Discord) onChannelDelete(s *discordgo.Session, ev *discordgo.ChannelDelete) {
@@ -51,20 +52,43 @@ func (d *Discord) syncDiscordChannels(s *discordgo.Session, syncNames, syncNotes
 		return false
 	}
 	changed := false
+	logger := logging.Get().Discord
 	for _, row := range rows {
 		channelID := getString(row["id"])
 		if channelID == "" {
 			continue
 		}
-		channel, err := s.Channel(channelID)
-		if err != nil || channel == nil {
-			if removeInvalid {
-				if updated, err := d.manager.query.UpdateQuery("humans", map[string]any{
+		channel, err := d.fetchChannelByID(s, channelID)
+		if err != nil {
+			info := classifyDiscordFetchError(err)
+			if info.permanentNotFound {
+				if !removeInvalid {
+					if logger != nil {
+						logger.Infof("Reconciliation (Discord) Missing channel %s %s but unregisterMissingChannels is disabled (%s)", channelID, getString(row["name"]), info.summary())
+					}
+					continue
+				}
+				if updated, updateErr := d.manager.query.UpdateQuery("humans", map[string]any{
 					"admin_disable": 1,
 					"disabled_date": time.Now(),
-				}, map[string]any{"id": channelID}); err == nil && updated > 0 {
+				}, map[string]any{"id": channelID}); updateErr == nil && updated > 0 {
 					changed = true
+					if logger != nil {
+						logger.Infof("Reconciliation (Discord) Disable channel %s %s (%s)", channelID, getString(row["name"]), info.summary())
+					}
+				} else if updateErr != nil && logger != nil {
+					logger.Warnf("Reconciliation (Discord) Failed to disable missing channel %s %s: %v", channelID, getString(row["name"]), updateErr)
 				}
+				continue
+			}
+			if logger != nil {
+				logger.Warnf("Reconciliation (Discord) Problem accessing channel %s %s (%s): %v", channelID, getString(row["name"]), info.summary(), err)
+			}
+			continue
+		}
+		if channel == nil {
+			if logger != nil {
+				logger.Warnf("Reconciliation (Discord) Problem accessing channel %s %s: nil channel result", channelID, getString(row["name"]))
 			}
 			continue
 		}

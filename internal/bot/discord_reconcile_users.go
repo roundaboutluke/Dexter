@@ -11,6 +11,7 @@ import (
 
 	"poraclego/internal/community"
 	"poraclego/internal/db"
+	"poraclego/internal/logging"
 )
 
 type discordUserInfo struct {
@@ -19,14 +20,39 @@ type discordUserInfo struct {
 }
 
 func (d *Discord) loadDiscordUserInfo(s *discordgo.Session, userID string) *discordUserInfo {
-	if s == nil || userID == "" || d.manager == nil || d.manager.cfg == nil {
+	info, complete := d.loadDiscordUserInfoState(s, userID)
+	if !complete {
 		return nil
 	}
+	return info
+}
+
+func (d *Discord) loadDiscordUserInfoState(s *discordgo.Session, userID string) (*discordUserInfo, bool) {
+	if s == nil || userID == "" || d.manager == nil || d.manager.cfg == nil {
+		return nil, false
+	}
+	logger := logging.Get().Discord
 	guilds, _ := d.manager.cfg.GetStringSlice("discord.guilds")
 	info := discordUserInfo{}
 	for _, guildID := range guilds {
-		member, err := s.GuildMember(guildID, userID)
-		if err != nil || member == nil || member.User == nil || member.User.Bot {
+		member, err := d.fetchGuildMemberByID(s, guildID, userID)
+		if err != nil {
+			fetch := classifyDiscordFetchError(err)
+			if fetch.permanentNotFound {
+				continue
+			}
+			if logger != nil {
+				logger.Warnf("Reconciliation (Discord) Problem loading user %s from guild %s (%s): %v", userID, guildID, fetch.summary(), err)
+			}
+			return nil, false
+		}
+		if member == nil {
+			if logger != nil {
+				logger.Warnf("Reconciliation (Discord) Problem loading user %s from guild %s: nil member result", userID, guildID)
+			}
+			return nil, false
+		}
+		if member.User == nil || member.User.Bot {
 			continue
 		}
 		if info.name == "" {
@@ -39,9 +65,9 @@ func (d *Discord) loadDiscordUserInfo(s *discordgo.Session, userID string) *disc
 		info.roles = append(info.roles, member.Roles...)
 	}
 	if info.name == "" && len(info.roles) == 0 {
-		return nil
+		return nil, true
 	}
-	return &info
+	return &info, true
 }
 
 func (d *Discord) userHasAccess(s *discordgo.Session, userID string) bool {
@@ -75,6 +101,7 @@ func (d *Discord) syncDiscordRole(s *discordgo.Session, registerNewUsers, syncNa
 	if err != nil {
 		return false
 	}
+	logger := logging.Get().Discord
 	admins, _ := d.manager.cfg.GetStringSlice("discord.admins")
 	usersToCheck := []map[string]any{}
 	for _, row := range users {
@@ -83,7 +110,13 @@ func (d *Discord) syncDiscordRole(s *discordgo.Session, registerNewUsers, syncNa
 		}
 		usersToCheck = append(usersToCheck, row)
 	}
-	discordUsers := d.loadAllGuildUsers(s)
+	discordUsers, complete := d.loadAllGuildUsers(s)
+	if !complete {
+		if logger != nil {
+			logger.Warnf("Reconciliation (Discord) Skipping full user role sync due to incomplete guild/member load")
+		}
+		return false
+	}
 	checked := map[string]bool{}
 	changed := false
 	for _, row := range usersToCheck {
@@ -107,13 +140,18 @@ func (d *Discord) syncDiscordRole(s *discordgo.Session, registerNewUsers, syncNa
 	return changed
 }
 
-func (d *Discord) loadAllGuildUsers(s *discordgo.Session) map[string]discordUserInfo {
+func (d *Discord) loadAllGuildUsers(s *discordgo.Session) (map[string]discordUserInfo, bool) {
 	userList := map[string]discordUserInfo{}
+	logger := logging.Get().Discord
 	guilds, _ := d.manager.cfg.GetStringSlice("discord.guilds")
 	for _, guildID := range guilds {
 		members, err := d.loadGuildMembers(s, guildID)
 		if err != nil {
-			continue
+			if logger != nil {
+				info := classifyDiscordFetchError(err)
+				logger.Warnf("Reconciliation (Discord) Problem loading guild members for %s (%s): %v", guildID, info.summary(), err)
+			}
+			return nil, false
 		}
 		for _, member := range members {
 			if member == nil || member.User == nil || member.User.Bot {
@@ -132,11 +170,11 @@ func (d *Discord) loadAllGuildUsers(s *discordgo.Session) map[string]discordUser
 			userList[member.User.ID] = info
 		}
 	}
-	return userList
+	return userList, true
 }
 
 func (d *Discord) loadGuildMembers(s *discordgo.Session, guildID string) ([]*discordgo.Member, error) {
-	return d.loadGuildMembersREST(s, guildID)
+	return d.fetchGuildMembersForGuild(s, guildID)
 }
 
 func (d *Discord) loadGuildMembersREST(s *discordgo.Session, guildID string) ([]*discordgo.Member, error) {
@@ -183,30 +221,19 @@ func (d *Discord) reconcileSingleUser(s *discordgo.Session, userID string, remov
 	if len(guilds) == 0 {
 		return
 	}
-	info := discordUserInfo{}
-	for _, guildID := range guilds {
-		member, err := s.GuildMember(guildID, userID)
-		if err != nil || member == nil || member.User == nil || member.User.Bot {
-			continue
-		}
-		if info.name == "" {
-			if member.Nick != "" {
-				info.name = stripNonASCII(member.Nick)
-			} else {
-				info.name = stripNonASCII(member.User.Username)
-			}
-		}
-		info.roles = append(info.roles, member.Roles...)
+	info, complete := d.loadDiscordUserInfoState(s, userID)
+	if !complete {
+		return
 	}
 	human, err := d.manager.query.SelectOneQuery("humans", map[string]any{"id": userID})
 	if err != nil {
 		return
 	}
 	changed := false
-	if info.name == "" && len(info.roles) == 0 {
+	if info == nil {
 		changed = d.reconcileDiscordUser(userID, human, nil, false, removeInvalidUsers)
 	} else {
-		changed = d.reconcileDiscordUser(userID, human, &info, false, removeInvalidUsers)
+		changed = d.reconcileDiscordUser(userID, human, info, false, removeInvalidUsers)
 	}
 	if changed {
 		d.manager.RefreshAlertState()

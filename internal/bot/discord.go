@@ -23,6 +23,10 @@ type Discord struct {
 	slashMu sync.Mutex
 	slash   map[string]*slashBuilderState
 
+	channelFetcher     func(*discordgo.Session, string) (*discordgo.Channel, error)
+	guildMemberFetcher func(*discordgo.Session, string, string) (*discordgo.Member, error)
+	guildMembersLoader func(*discordgo.Session, string) ([]*discordgo.Member, error)
+
 	greetMu             sync.Mutex
 	lastGreetingMinute  int64
 	greetingCountMinute int
