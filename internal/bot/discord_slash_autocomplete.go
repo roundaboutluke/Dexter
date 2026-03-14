@@ -146,17 +146,12 @@ func (d *Discord) autocompletePokemonFormChoices(query, pokemon string) []*disco
 }
 
 func (d *Discord) autocompleteLanguageChoices(query string) []*discordgo.ApplicationCommandOptionChoice {
-	if d.manager == nil || d.manager.cfg == nil {
+	if d.manager == nil || d.manager.i18n == nil {
 		return nil
 	}
 	query = strings.ToLower(strings.TrimSpace(query))
-
-	raw, ok := d.manager.cfg.Get("general.availableLanguages")
-	if !ok {
-		return nil
-	}
-	available, ok := raw.(map[string]any)
-	if !ok || len(available) == 0 {
+	available := d.manager.i18n.EffectiveLanguages()
+	if len(available) == 0 {
 		return nil
 	}
 
@@ -174,7 +169,7 @@ func (d *Discord) autocompleteLanguageChoices(query string) []*discordgo.Applica
 		label string
 	}
 	entries := make([]entry, 0, len(available))
-	for key := range available {
+	for _, key := range available {
 		k := strings.ToLower(strings.TrimSpace(key))
 		if k == "" {
 			continue

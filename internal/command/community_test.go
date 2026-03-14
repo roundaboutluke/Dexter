@@ -256,7 +256,7 @@ func (c *communityStubConn) ExecContext(_ context.Context, query string, args []
 	if c.state.failExecAt > 0 && c.state.execCount == c.state.failExecAt {
 		return nil, fmt.Errorf("forced exec failure")
 	}
-	affected, err := communityApplyUpdate(c.tables(), query, plainArgs)
+	affected, err := communityApplyExec(c.tables(), query, plainArgs)
 	if err != nil {
 		return nil, err
 	}
@@ -351,6 +351,17 @@ func cloneCommunityTables(input map[string][]map[string]any) map[string][]map[st
 	return out
 }
 
+func communityApplyExec(tables map[string][]map[string]any, query string, args []any) (int64, error) {
+	switch {
+	case strings.HasPrefix(query, "UPDATE "):
+		return communityApplyUpdate(tables, query, args)
+	case strings.HasPrefix(query, "INSERT INTO "):
+		return communityApplyInsert(tables, query, args)
+	default:
+		return 0, fmt.Errorf("unsupported exec query %q", query)
+	}
+}
+
 func communityApplyUpdate(tables map[string][]map[string]any, query string, args []any) (int64, error) {
 	rest := strings.TrimSpace(strings.TrimPrefix(query, "UPDATE "))
 	setIndex := strings.Index(rest, " SET ")
@@ -392,6 +403,46 @@ func communityApplyUpdate(tables map[string][]map[string]any, query string, args
 		affected++
 	}
 	return affected, nil
+}
+
+func communityApplyInsert(tables map[string][]map[string]any, query string, args []any) (int64, error) {
+	rest := strings.TrimSpace(strings.TrimPrefix(query, "INSERT INTO "))
+	open := strings.Index(rest, "(")
+	if open <= 0 {
+		return 0, fmt.Errorf("invalid insert query %q", query)
+	}
+	table := strings.TrimSpace(rest[:open])
+	afterOpen := rest[open+1:]
+	close := strings.Index(afterOpen, ")")
+	if close < 0 {
+		return 0, fmt.Errorf("invalid insert query %q", query)
+	}
+	columnTokens := strings.Split(afterOpen[:close], ",")
+	columns := make([]string, 0, len(columnTokens))
+	for _, token := range columnTokens {
+		columns = append(columns, strings.Trim(token, "` "))
+	}
+	if len(columns) == 0 {
+		return 0, fmt.Errorf("invalid insert query %q", query)
+	}
+	valuesPart := strings.TrimSpace(afterOpen[close+1:])
+	if !strings.HasPrefix(valuesPart, "VALUES ") {
+		return 0, fmt.Errorf("invalid insert query %q", query)
+	}
+	rowCount := strings.Count(valuesPart, "(")
+	if rowCount == 0 || len(args) != rowCount*len(columns) {
+		return 0, fmt.Errorf("invalid insert args for %q", query)
+	}
+	argIndex := 0
+	for range rowCount {
+		row := map[string]any{}
+		for _, column := range columns {
+			row[column] = args[argIndex]
+			argIndex++
+		}
+		tables[table] = append(tables[table], row)
+	}
+	return int64(rowCount), nil
 }
 
 func communityApplyQuery(tables map[string][]map[string]any, query string, args []any) ([][]driver.Value, []string, error) {

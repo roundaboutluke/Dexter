@@ -1,6 +1,10 @@
 package bot
 
 import (
+	"encoding/json"
+	"fmt"
+	"strings"
+
 	"github.com/bwmarrin/discordgo"
 	"poraclego/internal/logging"
 )
@@ -441,6 +445,163 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 	return d.localizedSlashCommands(commands)
 }
 
+type slashCommandSyncStats struct {
+	Created   int
+	Updated   int
+	Unchanged int
+	Failed    int
+}
+
+func normalizedSlashCommandType(kind discordgo.ApplicationCommandType) discordgo.ApplicationCommandType {
+	if kind == 0 {
+		return discordgo.ChatApplicationCommand
+	}
+	return kind
+}
+
+func slashCommandKey(cmd *discordgo.ApplicationCommand) string {
+	if cmd == nil {
+		return ""
+	}
+	name := strings.ToLower(strings.TrimSpace(cmd.Name))
+	if name == "" {
+		return ""
+	}
+	return fmt.Sprintf("%d:%s", normalizedSlashCommandType(cmd.Type), name)
+}
+
+func slashCommandSignature(cmd *discordgo.ApplicationCommand) string {
+	if cmd == nil {
+		return ""
+	}
+	raw, err := json.Marshal(cmd)
+	if err != nil {
+		return ""
+	}
+	payload := map[string]any{}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return ""
+	}
+	normalizeSlashCommandPayload(payload)
+	raw, err = json.Marshal(payload)
+	if err != nil {
+		return ""
+	}
+	return string(raw)
+}
+
+func normalizeSlashCommandPayload(payload map[string]any) {
+	normalizeSlashCommandMap(payload)
+	for _, key := range []string{
+		"id",
+		"application_id",
+		"guild_id",
+		"version",
+		"default_permission",
+		"default_member_permissions",
+		"dm_permission",
+		"nsfw",
+	} {
+		delete(payload, key)
+	}
+	if kind, ok := payload["type"].(float64); !ok || kind == 0 {
+		payload["type"] = float64(discordgo.ChatApplicationCommand)
+	}
+}
+
+func normalizeSlashCommandMap(payload map[string]any) {
+	for key, value := range payload {
+		cleaned, keep := normalizeSlashCommandPayloadValue(key, value)
+		if !keep {
+			delete(payload, key)
+			continue
+		}
+		payload[key] = cleaned
+	}
+}
+
+func normalizeSlashCommandPayloadValue(key string, value any) (any, bool) {
+	switch v := value.(type) {
+	case nil:
+		return nil, false
+	case map[string]any:
+		normalizeSlashCommandMap(v)
+		if len(v) == 0 {
+			return nil, false
+		}
+		return v, true
+	case []any:
+		out := make([]any, 0, len(v))
+		for _, entry := range v {
+			cleaned, keep := normalizeSlashCommandPayloadValue("", entry)
+			if keep {
+				out = append(out, cleaned)
+			}
+		}
+		if len(out) == 0 && (key == "options" || key == "choices" || key == "channel_types") {
+			return nil, false
+		}
+		return out, true
+	default:
+		return value, true
+	}
+}
+
+func (d *Discord) syncSlashCommands(s *discordgo.Session, appID, guildID string, commands []*discordgo.ApplicationCommand) slashCommandSyncStats {
+	stats := slashCommandSyncStats{}
+	if len(commands) == 0 {
+		return stats
+	}
+	logger := logging.Get().Discord
+	existing, err := d.fetchApplicationCommands(s, appID, guildID)
+	if err != nil {
+		stats.Failed = len(commands)
+		if logger != nil {
+			logger.Warnf("Slash command fetch failed (guild=%q): %v", guildID, err)
+		}
+		return stats
+	}
+	existingByKey := map[string]*discordgo.ApplicationCommand{}
+	for _, cmd := range existing {
+		if key := slashCommandKey(cmd); key != "" {
+			existingByKey[key] = cmd
+		}
+	}
+
+	for _, cmd := range commands {
+		key := slashCommandKey(cmd)
+		if key == "" {
+			continue
+		}
+		current, ok := existingByKey[key]
+		if !ok {
+			if _, err := d.createApplicationCommand(s, appID, guildID, cmd); err != nil {
+				stats.Failed++
+				if logger != nil {
+					logger.Warnf("Slash command registration failed (command=%s): %v", cmd.Name, err)
+				}
+				continue
+			}
+			stats.Created++
+			continue
+		}
+		if current.ID != "" && slashCommandSignature(current) == slashCommandSignature(cmd) {
+			stats.Unchanged++
+			continue
+		}
+		if _, err := d.editApplicationCommand(s, appID, guildID, current.ID, cmd); err != nil {
+			stats.Failed++
+			if logger != nil {
+				logger.Warnf("Slash command update failed (command=%s): %v", cmd.Name, err)
+			}
+			continue
+		}
+		stats.Updated++
+	}
+
+	return stats
+}
+
 func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 	if s == nil || s.State == nil || s.State.User == nil {
 		return
@@ -465,7 +626,7 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 		// Remove global slash commands so the next run can re-register from scratch.
 		logger := logging.Get().Discord
 		deleteFor := func(guildID string) {
-			commands, err := s.ApplicationCommands(appID, guildID)
+			commands, err := d.fetchApplicationCommands(s, appID, guildID)
 			if err != nil {
 				if logger != nil {
 					logger.Warnf("Slash command deregistration failed (guild=%q): %v", guildID, err)
@@ -476,7 +637,7 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 				if cmd == nil || cmd.ID == "" {
 					continue
 				}
-				_ = s.ApplicationCommandDelete(appID, guildID, cmd.ID)
+				_ = d.deleteApplicationCommand(s, appID, guildID, cmd.ID)
 			}
 			if logger != nil {
 				scope := "global"
@@ -490,11 +651,20 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 		return
 	}
 	logger := logging.Get().Discord
-	for _, cmd := range d.slashCommandDefinitions() {
-		if _, err := s.ApplicationCommandCreate(appID, "", cmd); err != nil {
-			if logger != nil {
-				logger.Warnf("Slash command registration failed (command=%s): %v", cmd.Name, err)
-			}
+	if logger != nil {
+		targets := d.slashLocalizationTargets()
+		langs := make([]string, 0, len(targets))
+		for _, target := range targets {
+			langs = append(langs, target.poracle)
 		}
+		if len(langs) == 0 {
+			logger.Infof("Slash localization locales: none")
+		} else {
+			logger.Infof("Slash localization locales: %s", strings.Join(langs, ", "))
+		}
+	}
+	stats := d.syncSlashCommands(s, appID, "", d.slashCommandDefinitions())
+	if logger != nil {
+		logger.Infof("Slash commands synced (global): created=%d updated=%d unchanged=%d failed=%d", stats.Created, stats.Updated, stats.Unchanged, stats.Failed)
 	}
 }

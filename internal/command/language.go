@@ -2,6 +2,7 @@ package command
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -20,12 +21,11 @@ func (c *LanguageCommand) Handle(ctx *Context, args []string) (string, error) {
 		return tr.Translate("You do not have permission to execute this command", false), nil
 	}
 
-	raw, ok := ctx.Config.Get("general.availableLanguages")
-	if !ok {
+	if ctx.I18n == nil {
 		return "🙅", nil
 	}
-	available, ok := raw.(map[string]any)
-	if !ok || len(available) == 0 {
+	available := ctx.I18n.EffectiveLanguages()
+	if len(available) == 0 {
 		return "🙅", nil
 	}
 
@@ -44,15 +44,13 @@ func (c *LanguageCommand) Handle(ctx *Context, args []string) (string, error) {
 		if currentName == "" {
 			currentName = result.Language
 		}
-		keys := []string{}
-		for key := range available {
-			keys = append(keys, key)
-		}
+		keys := append([]string(nil), available...)
+		sort.Strings(keys)
 		return fmt.Sprintf("%s: %s\n%s", tr.Translate("Current language is set to", false), currentName, tr.TranslateFormat("Use `{0}language` to set to one of {1}", ctx.Prefix, strings.Join(keys, ", "))), nil
 	}
 
 	newLanguage := strings.ToLower(args[0])
-	if _, ok := available[newLanguage]; !ok {
+	if !contains(available, newLanguage) {
 		for key, name := range languageNames {
 			if strings.EqualFold(name, args[0]) {
 				newLanguage = key
@@ -60,11 +58,9 @@ func (c *LanguageCommand) Handle(ctx *Context, args []string) (string, error) {
 			}
 		}
 	}
-	if _, ok := available[newLanguage]; !ok {
-		keys := []string{}
-		for key := range available {
-			keys = append(keys, key)
-		}
+	if !contains(available, newLanguage) {
+		keys := append([]string(nil), available...)
+		sort.Strings(keys)
 		return fmt.Sprintf("%s: %s", tr.Translate("I only recognise the following languages", false), strings.Join(keys, ", ")), nil
 	}
 
@@ -78,4 +74,13 @@ func (c *LanguageCommand) Handle(ctx *Context, args []string) (string, error) {
 	}
 	newTranslator := ctx.I18n.Translator(newLanguage)
 	return fmt.Sprintf("%s: %s", newTranslator.Translate("I have changed your language setting to", false), newTranslator.Translate(name, false)), nil
+}
+
+func contains(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }

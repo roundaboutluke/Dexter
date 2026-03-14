@@ -33,6 +33,10 @@ type Discord struct {
 	channelFetcher     func(*discordgo.Session, string) (*discordgo.Channel, error)
 	guildMemberFetcher func(*discordgo.Session, string, string) (*discordgo.Member, error)
 	guildMembersLoader func(*discordgo.Session, string) ([]*discordgo.Member, error)
+	commandFetcher     func(*discordgo.Session, string, string) ([]*discordgo.ApplicationCommand, error)
+	commandCreator     func(*discordgo.Session, string, string, *discordgo.ApplicationCommand) (*discordgo.ApplicationCommand, error)
+	commandEditor      func(*discordgo.Session, string, string, string, *discordgo.ApplicationCommand) (*discordgo.ApplicationCommand, error)
+	commandDeleter     func(*discordgo.Session, string, string, string) error
 
 	greetMu             sync.Mutex
 	lastGreetingMinute  int64

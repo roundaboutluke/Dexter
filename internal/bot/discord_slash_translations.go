@@ -2,7 +2,6 @@ package bot
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 	"unicode"
@@ -193,27 +192,14 @@ func (d *Discord) slashLocalizationTargets() []slashLocalizationTarget {
 }
 
 func (d *Discord) slashLocalizationLanguages() []string {
-	seen := map[string]bool{}
-	langs := []string{}
-	if d != nil && d.manager != nil && d.manager.cfg != nil {
-		if raw, ok := d.manager.cfg.Get("general.availableLanguages"); ok {
-			if data, ok := raw.(map[string]any); ok {
-				for key := range data {
-					locale := strings.ToLower(strings.TrimSpace(key))
-					if locale == "" || seen[locale] {
-						continue
-					}
-					seen[locale] = true
-					langs = append(langs, locale)
-				}
-			}
-		}
+	if d == nil || d.manager == nil || d.manager.i18n == nil {
+		return nil
 	}
+	langs := append([]string(nil), d.manager.i18n.EffectiveLanguages()...)
 	defaultLocale := strings.ToLower(strings.TrimSpace(d.configuredDefaultLocale()))
-	if defaultLocale != "" && !seen[defaultLocale] {
+	if defaultLocale != "" && d.manager.i18n.HasRuntimeLocale(defaultLocale) && !containsString(langs, defaultLocale) {
 		langs = append(langs, defaultLocale)
 	}
-	sort.Strings(langs)
 	return langs
 }
 

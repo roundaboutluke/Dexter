@@ -13,6 +13,14 @@ type ChannelCommand struct{}
 
 func (c *ChannelCommand) Name() string { return "channel" }
 
+func channelLanguageLabel(languageNames map[string]string, language string) string {
+	label := strings.TrimSpace(languageNames[language])
+	if label == "" {
+		return language
+	}
+	return label
+}
+
 func (c *ChannelCommand) Handle(ctx *Context, args []string) (string, error) {
 	tr := ctx.I18n.Translator(ctx.Language)
 	if ctx.Platform != "telegram" && !ctx.IsAdmin {
@@ -50,13 +58,9 @@ func (c *ChannelCommand) Handle(ctx *Context, args []string) (string, error) {
 			languageNames[key] = fmt.Sprintf("%v", value)
 		}
 	}
-	availableLanguages := map[string]bool{}
-	if raw, ok := ctx.Config.Get("general.availableLanguages"); ok {
-		if entries, ok := raw.(map[string]any); ok {
-			for key := range entries {
-				availableLanguages[key] = true
-			}
-		}
+	availableLanguages := []string{}
+	if ctx.I18n != nil {
+		availableLanguages = ctx.I18n.EffectiveLanguages()
 	}
 
 	for _, arg := range args {
@@ -81,7 +85,8 @@ func (c *ChannelCommand) Handle(ctx *Context, args []string) (string, error) {
 						break
 					}
 				}
-				if availableLanguages[langKey] {
+				langKey = strings.ToLower(strings.TrimSpace(langKey))
+				if contains(availableLanguages, langKey) {
 					language = langKey
 				}
 			}
@@ -140,7 +145,7 @@ func (c *ChannelCommand) Handle(ctx *Context, args []string) (string, error) {
 					if areaName != "" {
 						join = tr.Translate("and", false)
 					}
-					reply = fmt.Sprintf("%s %s %s %s", reply, join, tr.Translate("language", false), tr.Translate(languageNames[language], false))
+					reply = fmt.Sprintf("%s %s %s %s", reply, join, tr.Translate("language", false), tr.Translate(channelLanguageLabel(languageNames, language), false))
 				}
 				return reply, nil
 			}
@@ -172,7 +177,7 @@ func (c *ChannelCommand) Handle(ctx *Context, args []string) (string, error) {
 				if areaName != "" {
 					join = tr.Translate("and", false)
 				}
-				reply = fmt.Sprintf("%s %s %s %s", reply, join, tr.Translate("language", false), tr.Translate(languageNames[language], false))
+				reply = fmt.Sprintf("%s %s %s %s", reply, join, tr.Translate("language", false), tr.Translate(channelLanguageLabel(languageNames, language), false))
 			}
 			return reply, nil
 		}

@@ -1,6 +1,7 @@
 package i18n
 
 import (
+	"strings"
 	"sync"
 
 	"poraclego/internal/config"
@@ -8,11 +9,12 @@ import (
 
 // Factory creates translators for configured locales.
 type Factory struct {
-	root      string
-	config    *config.Config
-	mu        sync.Mutex
-	cache     map[string]*Translator
-	cmdCache  []*Translator
+	root        string
+	config      *config.Config
+	mu          sync.Mutex
+	cache       map[string]*Translator
+	cmdCache    []*Translator
+	cmdCacheKey string
 }
 
 // NewFactory builds a translator factory.
@@ -40,30 +42,37 @@ func (f *Factory) AltTranslator() *Translator {
 
 // CommandTranslators returns command translators for available languages.
 func (f *Factory) CommandTranslators() []*Translator {
+	langs := append([]string(nil), f.EffectiveLanguages()...)
+	defaultLocale := ""
+	if f.config != nil {
+		defaultLocale, _ = f.config.GetString("general.locale")
+		defaultLocale = strings.ToLower(strings.TrimSpace(defaultLocale))
+	}
+	if defaultLocale != "" && defaultLocale != "en" && f.HasRuntimeLocale(defaultLocale) && !contains(langs, defaultLocale) {
+		langs = append(langs, defaultLocale)
+	}
+	if !contains(langs, "en") {
+		langs = append(langs, "en")
+	}
+	cacheKey := strings.Join(langs, "\x00")
+
 	f.mu.Lock()
-	if f.cmdCache != nil {
+	if f.cmdCache != nil && f.cmdCacheKey == cacheKey {
 		result := f.cmdCache
 		f.mu.Unlock()
 		return result
 	}
 	f.mu.Unlock()
 
-	langs := f.availableLanguages()
-	result := make([]*Translator, 0, len(langs)+2)
+	result := make([]*Translator, 0, len(langs))
 	for _, locale := range langs {
 		result = append(result, f.Translator(locale))
 	}
-	if !contains(langs, "en") {
-		result = append(result, f.Translator("en"))
-	}
-	defaultLocale, _ := f.config.GetString("general.locale")
-	if defaultLocale != "" && !contains(langs, defaultLocale) && defaultLocale != "en" {
-		result = append(result, f.Translator(defaultLocale))
-	}
 
 	f.mu.Lock()
-	if f.cmdCache == nil {
+	if f.cmdCache == nil || f.cmdCacheKey != cacheKey {
 		f.cmdCache = result
+		f.cmdCacheKey = cacheKey
 	}
 	cached := f.cmdCache
 	f.mu.Unlock()
@@ -118,21 +127,6 @@ func (f *Factory) Translator(locale string) *Translator {
 	f.cache[locale] = tr
 	f.mu.Unlock()
 	return tr
-}
-
-func (f *Factory) availableLanguages() []string {
-	raw, ok := f.config.Get("general.availableLanguages")
-	if !ok {
-		return []string{}
-	}
-	if data, ok := raw.(map[string]any); ok {
-		langs := make([]string, 0, len(data))
-		for key := range data {
-			langs = append(langs, key)
-		}
-		return langs
-	}
-	return []string{}
 }
 
 func contains(values []string, target string) bool {
