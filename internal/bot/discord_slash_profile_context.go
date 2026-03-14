@@ -9,6 +9,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"poraclego/internal/geofence"
+	"poraclego/internal/i18n"
 	"poraclego/internal/tracking"
 )
 
@@ -104,6 +105,19 @@ func (s slashProfileSelection) TargetLabel() string {
 		return fmt.Sprintf("Profile %d", s.ProfileNo)
 	}
 	return "your current profile"
+}
+
+func (s slashProfileSelection) TargetLabelLocalized(tr *i18n.Translator) string {
+	if s.Mode == slashProfileScopeAll {
+		return translateOrDefault(tr, "All profiles")
+	}
+	if row := s.ProfileRow(); row != nil {
+		return localizedProfileDisplayName(tr, row)
+	}
+	if s.ProfileNo > 0 {
+		return localizedProfileLabel(tr, s.ProfileNo)
+	}
+	return translateOrDefault(tr, "your current profile")
 }
 
 func (s slashProfileSelection) LogValue() string {

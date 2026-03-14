@@ -1,28 +1,28 @@
 package bot
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
 )
 
 func (d *Discord) handleSlashRemove(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	tr := d.slashInteractionTranslator(i)
 	options := slashOptions(i.ApplicationCommandData())
 	trackType, ok := optionString(options, "type")
 	if !ok || strings.TrimSpace(trackType) == "" {
-		d.respondEphemeral(s, i, "Please pick a tracking type.")
+		d.respondEphemeral(s, i, tr.Translate("Please pick a tracking type.", false))
 		return
 	}
 	value, ok := optionString(options, "tracking")
 	if !ok || strings.TrimSpace(value) == "" {
-		d.respondEphemeral(s, i, "Please pick a tracking entry.")
+		d.respondEphemeral(s, i, tr.Translate("Please pick a tracking entry.", false))
 		return
 	}
 
 	trackingType, uid := parseRemoveSelection(trackType, value)
 	if trackingType == "" || uid == "" {
-		d.respondEphemeral(s, i, "That tracking entry could not be parsed.")
+		d.respondEphemeral(s, i, tr.Translate("That tracking entry could not be parsed.", false))
 		return
 	}
 	if strings.Contains(value, "|") {
@@ -31,13 +31,13 @@ func (d *Discord) handleSlashRemove(s *discordgo.Session, i *discordgo.Interacti
 			expected = "invasion"
 		}
 		if expected != "" && trackingType != expected {
-			d.respondEphemeral(s, i, "Tracking type changed; please clear the tracking selection and pick again.")
+			d.respondEphemeral(s, i, tr.Translate("Tracking type changed; please clear the tracking selection and pick again.", false))
 			return
 		}
 	}
 	table := removeTrackingTable(trackingType)
 	if table == "" || d.manager == nil || d.manager.query == nil {
-		d.respondEphemeral(s, i, "That tracking entry could not be removed.")
+		d.respondEphemeral(s, i, tr.Translate("That tracking entry could not be removed.", false))
 		return
 	}
 
@@ -60,12 +60,12 @@ func (d *Discord) handleSlashRemove(s *discordgo.Session, i *discordgo.Interacti
 		return
 	}
 	if removed == 0 {
-		target := selection.TargetLabel()
+		target := selection.TargetLabelLocalized(tr)
 		if strings.EqualFold(uid, "all") || strings.EqualFold(uid, "everything") {
-			d.respondEphemeral(s, i, fmt.Sprintf("No tracking entries found in %s.", target))
+			d.respondEphemeral(s, i, tr.TranslateFormat("No tracking entries found in {0}.", target))
 			return
 		}
-		d.respondEphemeral(s, i, fmt.Sprintf("Tracking not found in %s.", target))
+		d.respondEphemeral(s, i, tr.TranslateFormat("Tracking not found in {0}.", target))
 		return
 	}
 	// Keep slash removals in parity with text commands and legacy API deletes:
@@ -75,9 +75,9 @@ func (d *Discord) handleSlashRemove(s *discordgo.Session, i *discordgo.Interacti
 	}
 	d.logSlashUX(i, "remove", "scope", selection.LogValue())
 	if strings.EqualFold(uid, "all") || strings.EqualFold(uid, "everything") {
-		target := selection.TargetLabel()
-		d.respondEphemeral(s, i, fmt.Sprintf("Removed %d tracking entries from %s. Next: use `/tracked` to review your alerts.", removed, target))
+		target := selection.TargetLabelLocalized(tr)
+		d.respondEphemeral(s, i, tr.TranslateFormat("Removed {0} tracking entries from {1}. Next: use `/tracked` to review your alerts.", removed, target))
 		return
 	}
-	d.respondEphemeral(s, i, fmt.Sprintf("Tracking removed from %s. Next: use `/tracked` to review your alerts.", selection.TargetLabel()))
+	d.respondEphemeral(s, i, tr.TranslateFormat("Tracking removed from {0}. Next: use `/tracked` to review your alerts.", selection.TargetLabelLocalized(tr)))
 }

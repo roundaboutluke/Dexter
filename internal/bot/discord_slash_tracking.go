@@ -89,7 +89,7 @@ func (d *Discord) handleSlashTrack(s *discordgo.Session, i *discordgo.Interactio
 		args = append(args, "form:all")
 	}
 
-	d.promptSlashConfirmation(s, i, "track", args, d.confirmTitle("track"), d.confirmFields(i))
+	d.promptSlashConfirmation(s, i, "track", args, d.confirmTitle(i, "track"), d.confirmFields(i))
 }
 
 func (d *Discord) handleSlashRaid(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -131,7 +131,7 @@ func (d *Discord) handleSlashRaid(s *discordgo.Session, i *discordgo.Interaction
 	if value, ok := optionString(options, "template"); ok && strings.TrimSpace(value) != "" {
 		args = append(args, "template:"+strings.TrimSpace(value))
 	}
-	d.promptSlashConfirmation(s, i, "raid", args, d.confirmTitle("raid"), d.confirmFields(i))
+	d.promptSlashConfirmation(s, i, "raid", args, d.confirmTitle(i, "raid"), d.confirmFields(i))
 }
 
 func (d *Discord) handleSlashMaxbattle(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -160,7 +160,7 @@ func (d *Discord) handleSlashMaxbattle(s *discordgo.Session, i *discordgo.Intera
 	if value, ok := optionString(options, "template"); ok && strings.TrimSpace(value) != "" {
 		args = append(args, "template:"+strings.TrimSpace(value))
 	}
-	d.promptSlashConfirmation(s, i, "maxbattle", args, d.confirmTitle("maxbattle"), d.confirmFields(i))
+	d.promptSlashConfirmation(s, i, "maxbattle", args, d.confirmTitle(i, "maxbattle"), d.confirmFields(i))
 }
 
 func (d *Discord) handleSlashEgg(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -205,7 +205,7 @@ func (d *Discord) handleSlashEgg(s *discordgo.Session, i *discordgo.InteractionC
 	if value, ok := optionString(options, "template"); ok && strings.TrimSpace(value) != "" {
 		args = append(args, "template:"+strings.TrimSpace(value))
 	}
-	d.promptSlashConfirmation(s, i, "egg", args, d.confirmTitle("egg"), d.confirmFields(i))
+	d.promptSlashConfirmation(s, i, "egg", args, d.confirmTitle(i, "egg"), d.confirmFields(i))
 }
 
 func (d *Discord) handleSlashQuest(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -242,7 +242,7 @@ func (d *Discord) handleSlashQuest(s *discordgo.Session, i *discordgo.Interactio
 	if value, ok := optionString(options, "template"); ok && strings.TrimSpace(value) != "" {
 		args = append(args, "template:"+strings.TrimSpace(value))
 	}
-	d.promptSlashConfirmation(s, i, "quest", args, d.confirmTitle("quest"), d.confirmFields(i))
+	d.promptSlashConfirmation(s, i, "quest", args, d.confirmTitle(i, "quest"), d.confirmFields(i))
 }
 
 func (d *Discord) handleSlashIncident(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -265,7 +265,7 @@ func (d *Discord) handleSlashIncident(s *discordgo.Session, i *discordgo.Interac
 	if value, ok := optionString(options, "template"); ok && strings.TrimSpace(value) != "" {
 		args = append(args, "template:"+strings.TrimSpace(value))
 	}
-	d.promptSlashConfirmation(s, i, "invasion", args, d.confirmTitle("invasion"), d.confirmFields(i))
+	d.promptSlashConfirmation(s, i, "invasion", args, d.confirmTitle(i, "invasion"), d.confirmFields(i))
 }
 
 func (d *Discord) handleSlashGym(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -297,7 +297,7 @@ func (d *Discord) handleSlashGym(s *discordgo.Session, i *discordgo.InteractionC
 	if value, ok := optionString(options, "template"); ok && strings.TrimSpace(value) != "" {
 		args = append(args, "template:"+strings.TrimSpace(value))
 	}
-	d.promptSlashConfirmation(s, i, "gym", args, d.confirmTitle("gym"), d.confirmFields(i))
+	d.promptSlashConfirmation(s, i, "gym", args, d.confirmTitle(i, "gym"), d.confirmFields(i))
 }
 
 func (d *Discord) handleSlashFort(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -337,7 +337,7 @@ func (d *Discord) handleSlashFort(s *discordgo.Session, i *discordgo.Interaction
 		return
 	}
 	d.logSlashUX(i, "fort", "direct_submit", "")
-	d.promptSlashConfirmation(s, i, "fort", args, d.confirmTitle("fort"), d.confirmFields(i))
+	d.promptSlashConfirmation(s, i, "fort", args, d.confirmTitle(i, "fort"), d.confirmFields(i))
 }
 
 func (d *Discord) handleSlashNest(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -363,7 +363,7 @@ func (d *Discord) handleSlashNest(s *discordgo.Session, i *discordgo.Interaction
 	if value, ok := optionString(options, "template"); ok && strings.TrimSpace(value) != "" {
 		args = append(args, "template:"+strings.TrimSpace(value))
 	}
-	d.promptSlashConfirmation(s, i, "nest", args, d.confirmTitle("nest"), d.confirmFields(i))
+	d.promptSlashConfirmation(s, i, "nest", args, d.confirmTitle(i, "nest"), d.confirmFields(i))
 }
 
 func (d *Discord) handleSlashWeather(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -404,7 +404,7 @@ func (d *Discord) handleSlashWeather(s *discordgo.Session, i *discordgo.Interact
 		}
 	}
 	if location == "" {
-		d.respondEphemeral(s, i, "Please set your location in /profile, or provide a location.")
+		d.respondEphemeral(s, i, d.slashText(i, "Please set your location in /profile, or provide a location."))
 		return
 	}
 	args := []string{}
@@ -416,7 +416,7 @@ func (d *Discord) handleSlashWeather(s *discordgo.Session, i *discordgo.Interact
 	if value, ok := optionString(options, "template"); ok && strings.TrimSpace(value) != "" {
 		args = append(args, "template:"+strings.TrimSpace(value))
 	}
-	d.promptSlashConfirmation(s, i, "weather", args, d.confirmTitle("weather"), d.confirmFields(i))
+	d.promptSlashConfirmation(s, i, "weather", args, d.confirmTitle(i, "weather"), d.confirmFields(i))
 }
 
 func (d *Discord) handleSlashLure(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -439,5 +439,5 @@ func (d *Discord) handleSlashLure(s *discordgo.Session, i *discordgo.Interaction
 	if value, ok := optionString(options, "template"); ok && strings.TrimSpace(value) != "" {
 		args = append(args, "template:"+strings.TrimSpace(value))
 	}
-	d.promptSlashConfirmation(s, i, "lure", args, d.confirmTitle("lure"), d.confirmFields(i))
+	d.promptSlashConfirmation(s, i, "lure", args, d.confirmTitle(i, "lure"), d.confirmFields(i))
 }

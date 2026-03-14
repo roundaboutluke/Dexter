@@ -181,7 +181,7 @@ func (d *Discord) handleSlashAutocomplete(s *discordgo.Session, i *discordgo.Int
 		}
 	case "raid":
 		if focused.Name == "type" {
-			choices = d.autocompleteRaidTypeChoices(query)
+			choices = d.autocompleteRaidTypeChoices(i, query)
 		} else if focused.Name == "gym" {
 			choices = d.autocompleteGymChoices(i, query)
 		} else if focused.Name == "template" {
@@ -189,7 +189,7 @@ func (d *Discord) handleSlashAutocomplete(s *discordgo.Session, i *discordgo.Int
 		}
 	case "maxbattle":
 		if focused.Name == "type" {
-			choices = d.autocompleteMaxbattleTypeChoices(query)
+			choices = d.autocompleteMaxbattleTypeChoices(i, query)
 		} else if focused.Name == "station" {
 			choices = d.autocompleteStationChoices(i, query)
 		} else if focused.Name == "template" {
@@ -197,13 +197,13 @@ func (d *Discord) handleSlashAutocomplete(s *discordgo.Session, i *discordgo.Int
 		}
 	case "quest":
 		if focused.Name == "type" {
-			choices = d.autocompleteQuestTypeChoices(query)
+			choices = d.autocompleteQuestTypeChoices(i, query)
 		} else if focused.Name == "template" {
 			choices = d.autocompleteTemplateChoices(query, "quest")
 		}
 	case "egg":
 		if focused.Name == "level" {
-			choices = d.autocompleteRaidLevelChoices(query)
+			choices = d.autocompleteRaidLevelChoices(i, query)
 		} else if focused.Name == "gym" {
 			choices = d.autocompleteGymChoices(i, query)
 		} else if focused.Name == "template" {
@@ -211,7 +211,7 @@ func (d *Discord) handleSlashAutocomplete(s *discordgo.Session, i *discordgo.Int
 		}
 	case "invasion":
 		if focused.Name == "type" {
-			choices = d.autocompleteIncidentTypeChoices(query)
+			choices = d.autocompleteIncidentTypeChoices(i, query)
 		} else if focused.Name == "template" {
 			choices = d.autocompleteTemplateChoices(query, "invasion")
 		}
@@ -279,7 +279,7 @@ func (d *Discord) handleSlashAutocomplete(s *discordgo.Session, i *discordgo.Int
 func (d *Discord) handleSlashComponent(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	data := i.MessageComponentData()
 	if data.CustomID == slashInfoCancelButton {
-		d.respondEphemeral(s, i, "Canceled.")
+		d.respondEphemeral(s, i, d.slashText(i, "Canceled."))
 		return
 	}
 	if data.CustomID == slashInfoTypeSelect {
@@ -294,7 +294,8 @@ func (d *Discord) handleSlashComponent(s *discordgo.Session, i *discordgo.Intera
 		return
 	}
 	if data.CustomID == slashInfoWeatherEnterCoordinates {
-		d.respondWithModal(s, i, slashInfoWeatherModal, "Weather info", "Coordinates (lat,lon)", "51.5,-0.12")
+		tr := d.slashInteractionTranslator(i)
+		d.respondWithModal(s, i, slashInfoWeatherModal, tr.Translate("Weather info", false), tr.Translate("Coordinates (lat,lon)", false), "51.5,-0.12")
 		return
 	}
 	if data.CustomID == slashAreaShowSelect {
@@ -638,7 +639,7 @@ func (d *Discord) handleSlashComponent(s *discordgo.Session, i *discordgo.Intera
 			return
 		}
 		// Clear the confirmation prompt buttons once canceled.
-		d.respondUpdateComponentsEmbed(s, i, "Canceled.", nil, []discordgo.MessageComponent{})
+		d.respondUpdateComponentsEmbed(s, i, d.slashText(i, "Canceled."), nil, []discordgo.MessageComponent{})
 		d.clearSlashState(i.Member, i.User)
 		return
 	case slashFiltersModal:
@@ -659,7 +660,7 @@ func (d *Discord) handleSlashModal(s *discordgo.Session, i *discordgo.Interactio
 	if data.CustomID == slashInfoTranslateModal {
 		query := strings.TrimSpace(modalTextValue(data, "query"))
 		if query == "" {
-			d.respondEphemeral(s, i, "Please enter text to translate.")
+			d.respondEphemeral(s, i, d.slashText(i, "Please enter text to translate."))
 			return
 		}
 		d.executeSlashLineDeferred(s, i, "info translate "+query)
@@ -668,7 +669,7 @@ func (d *Discord) handleSlashModal(s *discordgo.Session, i *discordgo.Interactio
 	if data.CustomID == slashInfoWeatherModal {
 		query := strings.TrimSpace(modalTextValue(data, "query"))
 		if query == "" {
-			d.respondEphemeral(s, i, "Please enter coordinates (lat,lon).")
+			d.respondEphemeral(s, i, d.slashText(i, "Please enter coordinates (lat,lon)."))
 			return
 		}
 		d.executeSlashLineDeferred(s, i, "info weather "+query)
@@ -702,11 +703,11 @@ func (d *Discord) handleSlashModal(s *discordgo.Session, i *discordgo.Interactio
 	case slashMonsterSearch:
 		query := modalTextValue(data, "query")
 		if strings.TrimSpace(query) == "" {
-			d.respondEphemeral(s, i, "Please enter a Pokemon name or ID.")
+			d.respondEphemeral(s, i, d.slashText(i, "Please enter a Pokemon name or ID."))
 			return
 		}
 		if state.Command == "info" && state.Step == "info-pokemon" && strings.EqualFold(strings.TrimSpace(query), "everything") {
-			d.respondEphemeral(s, i, "Please pick a specific Pokemon.")
+			d.respondEphemeral(s, i, d.slashText(i, "Please pick a specific Pokemon."))
 			return
 		}
 		if strings.EqualFold(strings.TrimSpace(query), "everything") {
@@ -716,14 +717,14 @@ func (d *Discord) handleSlashModal(s *discordgo.Session, i *discordgo.Interactio
 		}
 		options := d.monsterSearchOptions(query)
 		if len(options) == 0 {
-			d.respondEphemeral(s, i, "No Pokemon matched that search.")
+			d.respondEphemeral(s, i, d.slashText(i, "No Pokemon matched that search."))
 			return
 		}
-		d.respondWithSelectMenu(s, i, "Select a Pokemon", slashMonsterSelect, options)
+		d.respondWithSelectMenu(s, i, d.slashText(i, "Select a Pokemon"), slashMonsterSelect, options)
 	case slashRaidInput:
 		query := strings.TrimSpace(modalTextValue(data, "query"))
 		if query == "" {
-			d.respondEphemeral(s, i, "Please enter a raid boss name or level.")
+			d.respondEphemeral(s, i, d.slashText(i, "Please enter a raid boss name or level."))
 			return
 		}
 		if strings.EqualFold(query, "everything") {
@@ -736,7 +737,7 @@ func (d *Discord) handleSlashModal(s *discordgo.Session, i *discordgo.Interactio
 	case slashQuestInput:
 		query := strings.TrimSpace(modalTextValue(data, "query"))
 		if query == "" {
-			d.respondEphemeral(s, i, "Please enter quest filters (e.g. reward:items).")
+			d.respondEphemeral(s, i, d.slashText(i, "Please enter quest filters (e.g. reward:items)."))
 			return
 		}
 		state.Args = splitQuotedArgs(query)
@@ -744,7 +745,7 @@ func (d *Discord) handleSlashModal(s *discordgo.Session, i *discordgo.Interactio
 	case slashInvasionInput:
 		query := strings.TrimSpace(modalTextValue(data, "query"))
 		if query == "" {
-			d.respondEphemeral(s, i, "Please enter invasion filters (e.g. grunt type).")
+			d.respondEphemeral(s, i, d.slashText(i, "Please enter invasion filters (e.g. grunt type)."))
 			return
 		}
 		state.Args = splitQuotedArgs(query)

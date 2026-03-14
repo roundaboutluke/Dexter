@@ -539,28 +539,29 @@ func (d *Discord) logSlashUX(i *discordgo.InteractionCreate, commandName, action
 }
 
 func (d *Discord) effectiveProfileInfo(i *discordgo.InteractionCreate) (int, string) {
+	tr := d.slashInteractionTranslator(i)
 	if d == nil || d.manager == nil || d.manager.query == nil {
-		return 1, "Profile 1"
+		return 1, localizedProfileLabel(tr, 1)
 	}
 	userID, _ := slashUser(i)
 	if userID == "" {
-		return 1, "Profile 1"
+		return 1, localizedProfileLabel(tr, 1)
 	}
 	profileNo := d.userProfileNo(userID)
 	profiles, err := d.manager.query.SelectAllQuery("profiles", map[string]any{"id": userID})
 	if err != nil {
-		return profileNo, fmt.Sprintf("Profile %d", profileNo)
+		return profileNo, localizedProfileLabel(tr, profileNo)
 	}
 	if row := profileRowByNo(profiles, profileNo); row != nil {
-		return profileNo, profileDisplayName(row)
+		return profileNo, localizedProfileDisplayName(tr, row)
 	}
-	return profileNo, fmt.Sprintf("Profile %d", profileNo)
+	return profileNo, localizedProfileLabel(tr, profileNo)
 }
 
 func (d *Discord) guidedWeatherArgs(i *discordgo.InteractionCreate, condition string) ([]string, string) {
 	condition = strings.TrimSpace(condition)
 	if condition == "" {
-		return nil, "Please pick a weather condition."
+		return nil, d.slashText(i, "Please pick a weather condition.")
 	}
 	userID, _ := slashUser(i)
 	location := ""
@@ -587,7 +588,7 @@ func (d *Discord) guidedWeatherArgs(i *discordgo.InteractionCreate, condition st
 		}
 	}
 	if location == "" {
-		return nil, "Set a saved location in `/profile`, or provide a location with `/weather condition:<condition> location:<place>`."
+		return nil, d.slashText(i, "Set a saved location in `/profile`, or provide a location with `/weather condition:<condition> location:<place>`.")
 	}
 	args := append(strings.Fields(location), "|", condition)
 	return args, ""

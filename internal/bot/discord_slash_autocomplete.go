@@ -257,13 +257,14 @@ func (d *Discord) autocompleteWeatherChoices(query string) []*discordgo.Applicat
 	return choices
 }
 
-func (d *Discord) autocompleteRaidTypeChoices(query string) []*discordgo.ApplicationCommandOptionChoice {
+func (d *Discord) autocompleteRaidTypeChoices(i *discordgo.InteractionCreate, query string) []*discordgo.ApplicationCommandOptionChoice {
 	query = strings.ToLower(strings.TrimSpace(query))
+	tr := d.slashInteractionTranslator(i)
 	choices := []*discordgo.ApplicationCommandOptionChoice{}
 	seen := map[string]bool{}
 	if query == "" {
 		choices = append(choices, &discordgo.ApplicationCommandOptionChoice{
-			Name:  "Everything",
+			Name:  translateOrDefault(tr, "Everything"),
 			Value: "everything",
 		})
 		seen["everything"] = true
@@ -283,7 +284,7 @@ func (d *Discord) autocompleteRaidTypeChoices(query string) []*discordgo.Applica
 				if query == "" || strings.Contains(value, query) {
 					seen[value] = true
 					choices = append(choices, &discordgo.ApplicationCommandOptionChoice{
-						Name:  d.raidLevelLabel(level),
+						Name:  d.raidLevelLabel(level, tr),
 						Value: value,
 					})
 				}
@@ -308,13 +309,14 @@ func (d *Discord) autocompleteRaidTypeChoices(query string) []*discordgo.Applica
 	return choices
 }
 
-func (d *Discord) autocompleteMaxbattleTypeChoices(query string) []*discordgo.ApplicationCommandOptionChoice {
+func (d *Discord) autocompleteMaxbattleTypeChoices(i *discordgo.InteractionCreate, query string) []*discordgo.ApplicationCommandOptionChoice {
 	query = strings.ToLower(strings.TrimSpace(query))
+	tr := d.slashInteractionTranslator(i)
 	choices := []*discordgo.ApplicationCommandOptionChoice{}
 	seen := map[string]bool{}
 	if query == "" {
 		choices = append(choices, &discordgo.ApplicationCommandOptionChoice{
-			Name:  "Everything",
+			Name:  translateOrDefault(tr, "Everything"),
 			Value: "everything",
 		})
 		seen["everything"] = true
@@ -334,7 +336,7 @@ func (d *Discord) autocompleteMaxbattleTypeChoices(query string) []*discordgo.Ap
 				if query == "" || strings.Contains(value, query) {
 					seen[value] = true
 					choices = append(choices, &discordgo.ApplicationCommandOptionChoice{
-						Name:  d.maxbattleLevelLabel(level),
+						Name:  d.maxbattleLevelLabel(level, tr),
 						Value: value,
 					})
 				}
@@ -362,11 +364,12 @@ func (d *Discord) autocompleteMaxbattleTypeChoices(query string) []*discordgo.Ap
 	return choices
 }
 
-func (d *Discord) autocompleteRaidLevelChoices(query string) []*discordgo.ApplicationCommandOptionChoice {
+func (d *Discord) autocompleteRaidLevelChoices(i *discordgo.InteractionCreate, query string) []*discordgo.ApplicationCommandOptionChoice {
 	if d.manager == nil || d.manager.data == nil || d.manager.data.UtilData == nil {
 		return nil
 	}
 	query = strings.ToLower(strings.TrimSpace(query))
+	tr := d.slashInteractionTranslator(i)
 	raw, ok := d.manager.data.UtilData["raidLevels"].(map[string]any)
 	if !ok {
 		return nil
@@ -384,13 +387,13 @@ func (d *Discord) autocompleteRaidLevelChoices(query string) []*discordgo.Applic
 	choices := make([]*discordgo.ApplicationCommandOptionChoice, 0, len(levels)+1)
 	if query == "" {
 		choices = append(choices, &discordgo.ApplicationCommandOptionChoice{
-			Name:  "Everything",
+			Name:  translateOrDefault(tr, "Everything"),
 			Value: "everything",
 		})
 	}
 	for _, level := range levels {
 		value := fmt.Sprintf("level%d", level)
-		label := d.raidLevelLabel(level)
+		label := d.raidLevelLabel(level, tr)
 		if query == "" || strings.Contains(strings.ToLower(value), query) || strings.Contains(strings.ToLower(label), query) {
 			choices = append(choices, &discordgo.ApplicationCommandOptionChoice{
 				Name:  label,
