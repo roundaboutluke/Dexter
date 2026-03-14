@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/bwmarrin/discordgo"
@@ -222,6 +223,41 @@ func TestRegisterSlashCommandsCreatesMissingAndPreservesUnrelated(t *testing.T) 
 	}
 	if len(created) != 1 || created[0] != "language" {
 		t.Fatalf("created=%v, want [language]", created)
+	}
+}
+
+func TestRegisterSlashCommandsDeletesLegacySlashCommands(t *testing.T) {
+	cfg := config.New(map[string]any{
+		"general": map[string]any{
+			"locale": "en",
+		},
+	})
+	d := &Discord{manager: &Manager{
+		cfg:  cfg,
+		i18n: i18n.NewFactory(shippedLocaleRoot(t), cfg),
+	}}
+
+	existing := cloneApplicationCommands(t, d.slashCommandDefinitions())
+	existing = append(existing,
+		&discordgo.ApplicationCommand{ID: "legacy-tracked", Type: discordgo.ChatApplicationCommand, Name: "tracked", Description: "Old tracked command"},
+		&discordgo.ApplicationCommand{ID: "legacy-remove", Type: discordgo.ChatApplicationCommand, Name: "remove", Description: "Old remove command"},
+		&discordgo.ApplicationCommand{ID: "custom-1", Type: discordgo.ChatApplicationCommand, Name: "other", Description: "Unrelated command"},
+	)
+
+	deleted := []string{}
+	d.commandFetcher = func(*discordgo.Session, string, string) ([]*discordgo.ApplicationCommand, error) {
+		return existing, nil
+	}
+	d.commandDeleter = func(_ *discordgo.Session, _, _, cmdID string) error {
+		deleted = append(deleted, cmdID)
+		return nil
+	}
+
+	session := &discordgo.Session{State: &discordgo.State{Ready: discordgo.Ready{User: &discordgo.User{ID: "app-1"}}}}
+	d.registerSlashCommands(session)
+
+	if strings.Join(deleted, ",") != "legacy-tracked,legacy-remove" {
+		t.Fatalf("deleted=%v, want legacy tracked/remove only", deleted)
 	}
 }
 

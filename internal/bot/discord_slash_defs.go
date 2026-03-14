@@ -546,6 +546,7 @@ type slashCommandSyncStats struct {
 	Created   int
 	Updated   int
 	Unchanged int
+	Deleted   int
 	Failed    int
 }
 
@@ -585,6 +586,15 @@ func slashCommandSignature(cmd *discordgo.ApplicationCommand) string {
 		return ""
 	}
 	return string(raw)
+}
+
+func legacySlashCommandName(name string) bool {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "track", "egg", "invasion", "tracked", "remove":
+		return true
+	default:
+		return false
+	}
 }
 
 func normalizeSlashCommandPayload(payload map[string]any) {
@@ -664,12 +674,14 @@ func (d *Discord) syncSlashCommands(s *discordgo.Session, appID, guildID string,
 			existingByKey[key] = cmd
 		}
 	}
+	desiredKeys := map[string]bool{}
 
 	for _, cmd := range commands {
 		key := slashCommandKey(cmd)
 		if key == "" {
 			continue
 		}
+		desiredKeys[key] = true
 		current, ok := existingByKey[key]
 		if !ok {
 			if _, err := d.createApplicationCommand(s, appID, guildID, cmd); err != nil {
@@ -694,6 +706,21 @@ func (d *Discord) syncSlashCommands(s *discordgo.Session, appID, guildID string,
 			continue
 		}
 		stats.Updated++
+	}
+
+	for _, cmd := range existing {
+		key := slashCommandKey(cmd)
+		if key == "" || desiredKeys[key] || !legacySlashCommandName(cmd.Name) {
+			continue
+		}
+		if err := d.deleteApplicationCommand(s, appID, guildID, cmd.ID); err != nil {
+			stats.Failed++
+			if logger != nil {
+				logger.Warnf("Slash command delete failed (command=%s): %v", cmd.Name, err)
+			}
+			continue
+		}
+		stats.Deleted++
 	}
 
 	return stats
@@ -762,6 +789,6 @@ func (d *Discord) registerSlashCommands(s *discordgo.Session) {
 	}
 	stats := d.syncSlashCommands(s, appID, "", d.slashCommandDefinitions())
 	if logger != nil {
-		logger.Infof("Slash commands synced (global): created=%d updated=%d unchanged=%d failed=%d", stats.Created, stats.Updated, stats.Unchanged, stats.Failed)
+		logger.Infof("Slash commands synced (global): created=%d updated=%d unchanged=%d deleted=%d failed=%d", stats.Created, stats.Updated, stats.Unchanged, stats.Deleted, stats.Failed)
 	}
 }

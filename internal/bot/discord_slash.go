@@ -175,10 +175,6 @@ func (d *Discord) handleSlashCommand(s *discordgo.Session, i *discordgo.Interact
 		case "remove":
 			d.handleSlashRemove(s, i)
 		}
-	case "tracked":
-		d.handleSlashTracked(s, i)
-	case "remove":
-		d.handleSlashRemove(s, i)
 	case "language":
 		d.handleSlashLanguage(s, i)
 	case "start":
@@ -403,18 +399,6 @@ func (d *Discord) handleSlashAutocomplete(s *discordgo.Session, i *discordgo.Int
 			if focused.Name == "profile" {
 				choices = d.autocompleteProfileChoices(i, query, true)
 			}
-		}
-	case "remove":
-		if focused.Name == "profile" {
-			choices = d.autocompleteProfileChoices(i, query, true)
-		} else if focused.Name == "tracking" {
-			trackingType, _ := optionString(options, "type")
-			profileToken, _ := optionString(options, "profile")
-			choices = d.autocompleteRemoveTrackingChoices(query, trackingType, profileToken, i)
-		}
-	case "tracked":
-		if focused.Name == "profile" {
-			choices = d.autocompleteProfileChoices(i, query, true)
 		}
 	case "help":
 		if focused.Name == "command" {
