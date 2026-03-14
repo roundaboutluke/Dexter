@@ -153,7 +153,7 @@ func TestSlashCommandDefinitionsUseConfiguredLocalizations(t *testing.T) {
 	})
 	d := &Discord{manager: &Manager{
 		cfg:  cfg,
-		i18n: i18n.NewFactory("/Users/pbx/PoracleJS/PoracleGo", cfg),
+		i18n: i18n.NewFactory(shippedLocaleRoot(t), cfg),
 	}}
 
 	commands := d.slashCommandDefinitions()
@@ -229,6 +229,52 @@ func TestLocalizedSlashCommandsSkipInvalidNameAndKeepDescription(t *testing.T) {
 	}
 }
 
+func TestLocalizedSlashCommandsPreferDedicatedSlashNameKeys(t *testing.T) {
+	root := t.TempDir()
+	localeDir := filepath.Join(root, "locale")
+	if err := os.MkdirAll(localeDir, 0o755); err != nil {
+		t.Fatalf("mkdir locale dir: %v", err)
+	}
+	payload := `{
+		"profile":"Profil",
+		"slash.command.profile":"profil",
+		"slash.option.profile":"profil",
+		"Set your saved location, areas, and quiet hours":"Konfiguriere dein Profil",
+		"Choose which profile to review":"Wähle ein Profil"
+	}`
+	if err := os.WriteFile(filepath.Join(localeDir, "de.json"), []byte(payload), 0o644); err != nil {
+		t.Fatalf("write locale file: %v", err)
+	}
+
+	cfg := config.New(map[string]any{
+		"general": map[string]any{
+			"locale":             "en",
+			"availableLanguages": map[string]any{"de": true},
+		},
+	})
+	d := &Discord{manager: &Manager{
+		cfg:  cfg,
+		i18n: i18n.NewFactory(root, cfg),
+	}}
+
+	commands := d.localizedSlashCommands([]*discordgo.ApplicationCommand{{
+		Name:        "profile",
+		Description: "Set your saved location, areas, and quiet hours",
+		Options: []*discordgo.ApplicationCommandOption{{
+			Type:        discordgo.ApplicationCommandOptionString,
+			Name:        "profile",
+			Description: "Choose which profile to review",
+		}},
+	}})
+	cmd := commands[0]
+	if cmd.NameLocalizations == nil || (*cmd.NameLocalizations)[discordgo.German] != "profil" {
+		t.Fatalf("command german localization=%v, want %q", cmd.NameLocalizations, "profil")
+	}
+	if cmd.Options[0].NameLocalizations == nil || cmd.Options[0].NameLocalizations[discordgo.German] != "profil" {
+		t.Fatalf("option german localization=%v, want %q", cmd.Options[0].NameLocalizations, "profil")
+	}
+}
+
 func TestUserLanguageFallsBackToConfiguredLocale(t *testing.T) {
 	env := newSlashMutationTestEnv(t, map[string][]map[string]any{
 		"humans": {{
@@ -265,7 +311,7 @@ func TestBuildProfileScheduleDayPayloadLocalizesDayOptions(t *testing.T) {
 		},
 	})
 	env.discord.manager.cfg = cfg
-	env.discord.manager.i18n = i18n.NewFactory("/Users/pbx/PoracleJS/PoracleGo", cfg)
+	env.discord.manager.i18n = i18n.NewFactory(shippedLocaleRoot(t), cfg)
 
 	i := &discordgo.InteractionCreate{
 		Interaction: &discordgo.Interaction{
@@ -446,7 +492,7 @@ func TestProfileLocationModalTextLocalized(t *testing.T) {
 		},
 	})
 	env.discord.manager.cfg = cfg
-	env.discord.manager.i18n = i18n.NewFactory("/Users/pbx/PoracleJS/PoracleGo", cfg)
+	env.discord.manager.i18n = i18n.NewFactory(shippedLocaleRoot(t), cfg)
 
 	title, label, placeholder := env.discord.profileLocationModalText(slashTestInteraction("user-1"))
 	if title != "Définir la position" {
@@ -473,7 +519,7 @@ func TestProfileCreateModalTextLocalized(t *testing.T) {
 		},
 	})
 	env.discord.manager.cfg = cfg
-	env.discord.manager.i18n = i18n.NewFactory("/Users/pbx/PoracleJS/PoracleGo", cfg)
+	env.discord.manager.i18n = i18n.NewFactory(shippedLocaleRoot(t), cfg)
 
 	title, label, placeholder := env.discord.profileCreateModalText(slashTestInteraction("user-1"))
 	if title != "Nouveau profil" {
@@ -484,6 +530,65 @@ func TestProfileCreateModalTextLocalized(t *testing.T) {
 	}
 	if placeholder != "home" {
 		t.Fatalf("placeholder=%q, want %q", placeholder, "home")
+	}
+}
+
+func TestResolveSlashProfileSelectionLocalizedError(t *testing.T) {
+	root := writeTestLocale(t, "fr", map[string]string{
+		"Profile not found.": "Profil introuvable.",
+	})
+	env := newSlashMutationTestEnv(t, map[string][]map[string]any{
+		"humans": {{
+			"id":       "user-1",
+			"language": "fr",
+		}},
+		"profiles": {{
+			"id":         "user-1",
+			"profile_no": 1,
+			"name":       "Maison",
+		}},
+	}, 0)
+	cfg := config.New(map[string]any{
+		"general": map[string]any{
+			"locale": "en",
+		},
+	})
+	env.discord.manager.cfg = cfg
+	env.discord.manager.i18n = i18n.NewFactory(root, cfg)
+
+	_, errText := env.discord.resolveSlashProfileSelection(slashTestInteraction("user-1"), "missing")
+	if errText != "Profil introuvable." {
+		t.Fatalf("errText=%q, want %q", errText, "Profil introuvable.")
+	}
+}
+
+func TestAddScheduleEntriesForDaysLocalizedUsesTranslator(t *testing.T) {
+	root := writeTestLocale(t, "fr", map[string]string{
+		"Please select at least one day.": "Veuillez choisir au moins un jour.",
+	})
+	tr, err := i18n.NewTranslator(root, "fr")
+	if err != nil {
+		t.Fatalf("new translator: %v", err)
+	}
+
+	_, errText := addScheduleEntriesForDaysLocalized(tr, nil, map[string]any{"profile_no": 1}, nil, 9*60, 10*60)
+	if errText != "Veuillez choisir au moins un jour." {
+		t.Fatalf("errText=%q, want %q", errText, "Veuillez choisir au moins un jour.")
+	}
+}
+
+func TestBuildScheduleEditAssignUpdatesLocalizedUsesTranslator(t *testing.T) {
+	root := writeTestLocale(t, "fr", map[string]string{
+		"Profile not found.": "Profil introuvable.",
+	})
+	tr, err := i18n.NewTranslator(root, "fr")
+	if err != nil {
+		t.Fatalf("new translator: %v", err)
+	}
+
+	_, errText := buildScheduleEditAssignUpdatesLocalized(tr, nil, nil, scheduleEntry{}, 1, 9*60, 10*60)
+	if errText != "Profil introuvable." {
+		t.Fatalf("errText=%q, want %q", errText, "Profil introuvable.")
 	}
 }
 
@@ -501,7 +606,7 @@ func TestShippedLocalesCoverReviewedProfileKeys(t *testing.T) {
 			"locale": "en",
 		},
 	})
-	factory := i18n.NewFactory("/Users/pbx/PoracleJS/PoracleGo", cfg)
+	factory := i18n.NewFactory(shippedLocaleRoot(t), cfg)
 
 	for _, locale := range locales {
 		tr := factory.Translator(locale)
@@ -514,6 +619,69 @@ func TestShippedLocalesCoverReviewedProfileKeys(t *testing.T) {
 				t.Fatalf("locale=%q key=%q fell back to english", locale, key)
 			}
 		}
+	}
+}
+
+func TestShippedSlashProfileLocalizationsAreSlashSafe(t *testing.T) {
+	cfg := config.New(map[string]any{
+		"general": map[string]any{
+			"locale": "en",
+			"availableLanguages": map[string]any{
+				"de":    true,
+				"fr":    true,
+				"it":    true,
+				"nb-no": true,
+				"pl":    true,
+				"ru":    true,
+				"se":    true,
+			},
+		},
+	})
+	d := &Discord{manager: &Manager{
+		cfg:  cfg,
+		i18n: i18n.NewFactory(shippedLocaleRoot(t), cfg),
+	}}
+
+	commands := d.slashCommandDefinitions()
+	profile := findSlashCommand(commands, "profile")
+	if profile == nil || profile.NameLocalizations == nil {
+		t.Fatal("profile command localizations missing")
+	}
+	wantProfile := map[discordgo.Locale]string{
+		discordgo.German:    "profil",
+		discordgo.French:    "profil",
+		discordgo.Italian:   "profilo",
+		discordgo.Norwegian: "profil",
+		discordgo.Polish:    "profil",
+		discordgo.Russian:   "профиль",
+		discordgo.Swedish:   "profil",
+	}
+	for locale, want := range wantProfile {
+		got := (*profile.NameLocalizations)[locale]
+		if got != want {
+			t.Fatalf("profile locale %q=%q, want %q", locale, got, want)
+		}
+		if !validLocalizedSlashName(got) {
+			t.Fatalf("profile locale %q produced invalid slash name %q", locale, got)
+		}
+	}
+
+	tracked := findSlashCommand(commands, "tracked")
+	if tracked == nil {
+		t.Fatal("tracked command missing")
+	}
+	profileOption := findSlashOption(tracked.Options, "profile")
+	if profileOption == nil {
+		t.Fatal("tracked profile option missing")
+	}
+	if got := profileOption.NameLocalizations[discordgo.German]; got != "profil" {
+		t.Fatalf("tracked profile option german=%q, want %q", got, "profil")
+	}
+	if got := profileOption.NameLocalizations[discordgo.Norwegian]; got != "profil" {
+		t.Fatalf("tracked profile option norwegian=%q, want %q", got, "profil")
+	}
+	if !validLocalizedSlashName(profileOption.NameLocalizations[discordgo.German]) {
+		t.Fatalf("tracked profile option german produced invalid slash name %q", profileOption.NameLocalizations[discordgo.German])
 	}
 }
 
@@ -641,7 +809,7 @@ func TestBuildProfileDeletePayloadLocalizesDeleteButton(t *testing.T) {
 		},
 	})
 	env.discord.manager.cfg = cfg
-	env.discord.manager.i18n = i18n.NewFactory("/Users/pbx/PoracleJS/PoracleGo", cfg)
+	env.discord.manager.i18n = i18n.NewFactory(shippedLocaleRoot(t), cfg)
 
 	_, components, errText := env.discord.buildProfileDeletePayload(slashTestInteraction("user-1"), "2")
 	if errText != "" {
@@ -823,6 +991,24 @@ func TestAreaMapRequestUsesFencePathHash(t *testing.T) {
 	}
 	if homeA.Key == work.Key {
 		t.Fatalf("different fence paths should not share cache key: %q", homeA.Key)
+	}
+}
+
+func TestAreaMapRequestUsesFenceMultiPathHash(t *testing.T) {
+	d := &Discord{manager: &Manager{
+		fences: &geofence.Store{Fences: []geofence.Fence{
+			{Name: "North", MultiPath: [][][]float64{{{51.5, -0.1}, {51.6, -0.1}, {51.6, -0.2}}}},
+			{Name: "South", MultiPath: [][][]float64{{{40.0, -73.0}, {40.1, -73.0}, {40.1, -73.1}}}},
+		}},
+	}}
+
+	north := d.areaMapRequest("North")
+	south := d.areaMapRequest("South")
+	if north == nil || south == nil {
+		t.Fatal("expected map requests for multipolygon fences")
+	}
+	if north.Key == south.Key {
+		t.Fatalf("different multipolygon fences should not share cache key: %q", north.Key)
 	}
 }
 

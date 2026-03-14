@@ -151,5 +151,7 @@
 	"Schedule entry not found.":"Nie znaleziono wpisu harmonogramu.",
 	"New profile":"Nowy profil",
 	"Profile name":"Nazwa profilu",
-	"Slash command expired. Please run the command again.":"Polecenie slash wygasło. Uruchom polecenie ponownie."
+	"Slash command expired. Please run the command again.":"Polecenie slash wygasło. Uruchom polecenie ponownie.",
+	"slash.command.profile":"profil",
+	"slash.option.profile":"profil"
 }

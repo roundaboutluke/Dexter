@@ -347,5 +347,7 @@
   "Schedule entry not found.":"Запись расписания не найдена.",
   "New profile":"Новый профиль",
   "Profile name":"Название профиля",
-  "Slash command expired. Please run the command again.":"Срок действия slash-команды истёк. Пожалуйста, запустите команду снова."
+  "Slash command expired. Please run the command again.":"Срок действия slash-команды истёк. Пожалуйста, запустите команду снова.",
+  "slash.command.profile":"профиль",
+  "slash.option.profile":"профиль"
 }

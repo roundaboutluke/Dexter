@@ -142,19 +142,19 @@ func effectiveProfileNoFromHuman(human map[string]any) int {
 
 func (d *Discord) loadSlashProfileContext(i *discordgo.InteractionCreate) (string, map[string]any, []map[string]any, string) {
 	if d == nil || d.manager == nil || d.manager.query == nil {
-		return "", nil, nil, "Target is not registered."
+		return "", nil, nil, d.slashText(i, "Target is not registered.")
 	}
 	userID, _ := slashUser(i)
 	if userID == "" {
-		return "", nil, nil, "Target is not registered."
+		return "", nil, nil, d.slashText(i, "Target is not registered.")
 	}
 	human, err := d.manager.query.SelectOneQuery("humans", map[string]any{"id": userID})
 	if err != nil || human == nil {
-		return "", nil, nil, "Target is not registered."
+		return "", nil, nil, d.slashText(i, "Target is not registered.")
 	}
 	profiles, err := d.manager.query.SelectAllQuery("profiles", map[string]any{"id": userID})
 	if err != nil {
-		return "", nil, nil, "Unable to load profiles."
+		return "", nil, nil, d.slashText(i, "Unable to load profiles.")
 	}
 	sort.Slice(profiles, func(i, j int) bool {
 		return toInt(profiles[i]["profile_no"], 0) < toInt(profiles[j]["profile_no"], 0)
@@ -190,7 +190,7 @@ func (d *Discord) resolveSlashProfileSelection(i *discordgo.InteractionCreate, t
 	}
 	row := profileRowByToken(profiles, token)
 	if row == nil {
-		return slashProfileSelection{}, "That profile could not be found."
+		return slashProfileSelection{}, d.slashText(i, "Profile not found.")
 	}
 	return slashProfileSelection{
 		UserID:      userID,

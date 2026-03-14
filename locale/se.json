@@ -166,6 +166,8 @@
         "Schedule entry not found.":"Schemaposten hittades inte.",
         "New profile":"Ny profil",
         "Profile name":"Profilnamn",
-        "Slash command expired. Please run the command again.":"Slash-kommandot har gått ut. Kör kommandot igen."
+        "Slash command expired. Please run the command again.":"Slash-kommandot har gått ut. Kör kommandot igen.",
+        "slash.command.profile":"profil",
+        "slash.option.profile":"profil"
 
 }

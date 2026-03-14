@@ -317,11 +317,11 @@ func addScheduleEntry(allProfiles []map[string]any, selected map[string]any, day
 
 func addScheduleEntryLocalized(tr *i18n.Translator, allProfiles []map[string]any, selected map[string]any, day, startMin, endMin int) ([]scheduleEntry, string) {
 	if selected == nil {
-		return nil, "Profile not found."
+		return nil, translateOrDefault(tr, "Profile not found.")
 	}
 	selectedNo := toInt(selected["profile_no"], 0)
 	if selectedNo == 0 {
-		return nil, "Profile not found."
+		return nil, translateOrDefault(tr, "Profile not found.")
 	}
 	if conflicts := scheduleConflictsLocalized(tr, allProfiles, day, startMin, endMin, 0, scheduleEntry{}); len(conflicts) > 0 {
 		if tr != nil {
@@ -346,10 +346,10 @@ func addScheduleEntriesForDays(allProfiles []map[string]any, selected map[string
 
 func addScheduleEntriesForDaysLocalized(tr *i18n.Translator, allProfiles []map[string]any, selected map[string]any, days []int, startMin, endMin int) ([]scheduleEntry, string) {
 	if selected == nil {
-		return nil, "Profile not found."
+		return nil, translateOrDefault(tr, "Profile not found.")
 	}
 	if len(days) == 0 {
-		return nil, "Please select at least one day."
+		return nil, translateOrDefault(tr, "Please select at least one day.")
 	}
 	conflicts := []string{}
 	for _, day := range days {
@@ -380,11 +380,11 @@ func addScheduleEntryWithIgnore(allProfiles []map[string]any, selected map[strin
 
 func addScheduleEntryWithIgnoreLocalized(tr *i18n.Translator, allProfiles []map[string]any, selected map[string]any, day, startMin, endMin int, ignoreProfileNo int, ignoreEntry scheduleEntry) ([]scheduleEntry, string) {
 	if selected == nil {
-		return nil, "Profile not found."
+		return nil, translateOrDefault(tr, "Profile not found.")
 	}
 	selectedNo := toInt(selected["profile_no"], 0)
 	if selectedNo == 0 {
-		return nil, "Profile not found."
+		return nil, translateOrDefault(tr, "Profile not found.")
 	}
 	if conflicts := scheduleConflictsLocalized(tr, allProfiles, day, startMin, endMin, ignoreProfileNo, ignoreEntry); len(conflicts) > 0 {
 		if tr != nil {

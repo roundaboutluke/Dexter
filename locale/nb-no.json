@@ -223,5 +223,7 @@
   "Schedule entry not found.":"Tidsplanoppføring ble ikke funnet.",
   "New profile":"Ny profil",
   "Profile name":"Profilnavn",
-  "Slash command expired. Please run the command again.":"Slash-kommandoen er utløpt. Kjør kommandoen på nytt."
+  "Slash command expired. Please run the command again.":"Slash-kommandoen er utløpt. Kjør kommandoen på nytt.",
+  "slash.command.profile":"profil",
+  "slash.option.profile":"profil"
 }

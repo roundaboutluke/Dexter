@@ -623,5 +623,7 @@
 	"Schedule entry not found.":"Voce di pianificazione non trovata.",
 	"New profile":"Nuovo profilo",
 	"Profile name":"Nome profilo",
-	"Slash command expired. Please run the command again.":"Il comando slash è scaduto. Esegui di nuovo il comando."
+	"Slash command expired. Please run the command again.":"Il comando slash è scaduto. Esegui di nuovo il comando.",
+	"slash.command.profile":"profilo",
+	"slash.option.profile":"profilo"
 }

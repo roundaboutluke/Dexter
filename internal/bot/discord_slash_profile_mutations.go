@@ -51,11 +51,11 @@ func buildScheduleEditAssignUpdates(profiles []map[string]any, selected map[stri
 
 func buildScheduleEditAssignUpdatesLocalized(tr *i18n.Translator, profiles []map[string]any, selected map[string]any, original scheduleEntry, day, startMin, endMin int) (map[int][]scheduleEntry, string) {
 	if selected == nil {
-		return nil, "Profile not found."
+		return nil, translateOrDefault(tr, "Profile not found.")
 	}
 	selectedNo := toInt(selected["profile_no"], 0)
 	if selectedNo == 0 {
-		return nil, "Profile not found."
+		return nil, translateOrDefault(tr, "Profile not found.")
 	}
 	if conflicts := scheduleConflictsLocalized(tr, profiles, day, startMin, endMin, original.ProfileNo, original); len(conflicts) > 0 {
 		if tr != nil {

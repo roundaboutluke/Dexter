@@ -576,5 +576,15 @@
     "Schedule entry not found.":"Zeitplaneintrag nicht gefunden.",
     "New profile":"Neues Profil",
     "Profile name":"Profilname",
-    "Slash command expired. Please run the command again.":"Slash-Befehl abgelaufen. Bitte führe den Befehl erneut aus."
+    "Slash command expired. Please run the command again.":"Slash-Befehl abgelaufen. Bitte führe den Befehl erneut aus.",
+    "slash.command.egg":"ei",
+    "slash.command.gym":"arena",
+    "slash.command.invasion":"invasion",
+    "slash.command.language":"sprache",
+    "slash.command.profile":"profil",
+    "slash.command.quest":"quest",
+    "slash.command.raid":"raid",
+    "slash.command.weather":"wetter",
+    "slash.option.gym":"arena",
+    "slash.option.profile":"profil"
 }

@@ -685,5 +685,9 @@
 	"Schedule entry not found.": "Entrée d'horaire introuvable.",
 	"New profile": "Nouveau profil",
 	"Profile name": "Nom du profil",
-	"Slash command expired. Please run the command again.": "La commande slash a expiré. Veuillez relancer la commande."
+	"Slash command expired. Please run the command again.": "La commande slash a expiré. Veuillez relancer la commande.",
+	"slash.command.gym": "arène",
+	"slash.command.profile": "profil",
+	"slash.option.gym": "arène",
+	"slash.option.profile": "profil"
 }

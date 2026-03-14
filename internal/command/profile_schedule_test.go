@@ -9,7 +9,7 @@ import (
 )
 
 func TestParseProfileTimeTokensSupportsSwitchesAndRanges(t *testing.T) {
-	factory := i18n.NewFactory("/Users/pbx/PoracleJS/PoracleGo", config.New(map[string]any{
+	factory := i18n.NewFactory(shippedLocaleRoot(t), config.New(map[string]any{
 		"general": map[string]any{
 			"locale":             "en",
 			"availableLanguages": map[string]any{"en": true},
@@ -70,7 +70,7 @@ func TestFormatProfileTimesAndParseScheduleRanges(t *testing.T) {
 }
 
 func TestFormatScheduleRangeLabelLocalized(t *testing.T) {
-	root := "/Users/pbx/PoracleJS/PoracleGo"
+	root := shippedLocaleRoot(t)
 	tr, err := i18n.NewTranslator(root, "fr")
 	if err != nil {
 		t.Fatalf("new translator: %v", err)
@@ -83,7 +83,7 @@ func TestFormatScheduleRangeLabelLocalized(t *testing.T) {
 
 func testCommandTranslator(t *testing.T) *i18n.Translator {
 	t.Helper()
-	root := "/Users/pbx/PoracleJS/PoracleGo"
+	root := shippedLocaleRoot(t)
 	tr, err := i18n.NewTranslator(root, "en")
 	if err != nil {
 		t.Fatalf("new translator: %v", err)

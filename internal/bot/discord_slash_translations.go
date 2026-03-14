@@ -152,6 +152,26 @@ func translateOrDefault(tr *i18n.Translator, key string) string {
 	return tr.Translate(key, false)
 }
 
+func slashLocalizationKey(kind, name string) string {
+	name = strings.ToLower(strings.TrimSpace(name))
+	if name == "" {
+		return ""
+	}
+	return "slash." + kind + "." + name
+}
+
+func translateSlashName(tr *i18n.Translator, kind, name string) string {
+	if tr == nil {
+		return name
+	}
+	if key := slashLocalizationKey(kind, name); key != "" {
+		if translated := tr.Translate(key, false); translated != key {
+			return translated
+		}
+	}
+	return tr.Translate(name, false)
+}
+
 func (d *Discord) slashLocalizationTargets() []slashLocalizationTarget {
 	if d == nil || d.manager == nil || d.manager.i18n == nil {
 		return nil
@@ -290,7 +310,7 @@ func (d *Discord) applyCommandLocalizations(cmd *discordgo.ApplicationCommand, t
 		if target.tr == nil {
 			continue
 		}
-		if translated := target.tr.Translate(cmd.Name, false); translated != cmd.Name {
+		if translated := translateSlashName(target.tr, "command", cmd.Name); translated != cmd.Name {
 			nameKey := strings.ToLower(translated)
 			switch {
 			case !validLocalizedSlashName(translated):
@@ -341,7 +361,7 @@ func (d *Discord) applyOptionLocalizations(commandName string, options []*discor
 			if target.tr == nil {
 				continue
 			}
-			if translated := target.tr.Translate(option.Name, false); translated != option.Name {
+			if translated := translateSlashName(target.tr, "option", option.Name); translated != option.Name {
 				nameKey := strings.ToLower(translated)
 				switch {
 				case !validLocalizedSlashName(translated):

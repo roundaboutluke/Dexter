@@ -168,7 +168,16 @@ func fencePathHash(fence *geofence.Fence) string {
 	if fence == nil {
 		return ""
 	}
-	raw, err := json.Marshal(fence.Path)
+	if len(fence.Path) == 0 && len(fence.MultiPath) == 0 {
+		return ""
+	}
+	raw, err := json.Marshal(struct {
+		Path      [][]float64   `json:"path,omitempty"`
+		MultiPath [][][]float64 `json:"multipath,omitempty"`
+	}{
+		Path:      fence.Path,
+		MultiPath: fence.MultiPath,
+	})
 	if err != nil {
 		return ""
 	}
