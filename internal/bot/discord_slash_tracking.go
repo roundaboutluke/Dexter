@@ -2,10 +2,102 @@ package bot
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
 )
+
+func appendRaidSharedSlashArgs(args []string, options []*discordgo.ApplicationCommandInteractionDataOption) []string {
+	if value, ok := optionString(options, "team"); ok {
+		switch strings.ToLower(value) {
+		case "blue", "red", "yellow", "white":
+			args = append(args, strings.ToLower(value))
+		}
+	}
+	if value, ok := optionString(options, "rsvp"); ok {
+		switch strings.ToLower(value) {
+		case "on":
+			args = append(args, "rsvp")
+		case "only":
+			args = append(args, "rsvp", "only")
+		case "off":
+			args = append(args, "no", "rsvp")
+		}
+	}
+	if value, ok := optionString(options, "gym"); ok && strings.TrimSpace(value) != "" {
+		args = append(args, "gym:"+strings.TrimSpace(value))
+	}
+	if value, ok := optionInt(options, "distance"); ok && value > 0 {
+		args = append(args, fmt.Sprintf("d%d", value))
+	}
+	if optionEnabled(options, "clean") {
+		args = append(args, "clean")
+	}
+	if value, ok := optionString(options, "template"); ok && strings.TrimSpace(value) != "" {
+		args = append(args, "template:"+strings.TrimSpace(value))
+	}
+	return args
+}
+
+func appendMaxbattleSharedSlashArgs(args []string, options []*discordgo.ApplicationCommandInteractionDataOption) []string {
+	if value, ok := optionString(options, "station"); ok && strings.TrimSpace(value) != "" {
+		args = append(args, "station:"+strings.TrimSpace(value))
+	}
+	if value, ok := optionBool(options, "gmax_only"); ok && value {
+		args = append(args, "gmax")
+	}
+	if value, ok := optionInt(options, "distance"); ok && value > 0 {
+		args = append(args, fmt.Sprintf("d%d", value))
+	}
+	if optionEnabled(options, "clean") {
+		args = append(args, "clean")
+	}
+	if value, ok := optionString(options, "template"); ok && strings.TrimSpace(value) != "" {
+		args = append(args, "template:"+strings.TrimSpace(value))
+	}
+	return args
+}
+
+func appendQuestSharedSlashArgs(args []string, options []*discordgo.ApplicationCommandInteractionDataOption) []string {
+	if value, ok := optionString(options, "ar"); ok {
+		switch strings.ToLower(strings.TrimSpace(value)) {
+		case "ar":
+			args = append(args, "ar")
+		case "noar":
+			args = append(args, "noar")
+		}
+	}
+	if value, ok := optionInt(options, "distance"); ok && value > 0 {
+		args = append(args, fmt.Sprintf("d%d", value))
+	}
+	if optionEnabled(options, "clean") {
+		args = append(args, "clean")
+	}
+	if value, ok := optionString(options, "template"); ok && strings.TrimSpace(value) != "" {
+		args = append(args, "template:"+strings.TrimSpace(value))
+	}
+	return args
+}
+
+func quoteSlashCommandValue(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	if strings.ContainsAny(value, " \t") {
+		return strconv.Quote(value)
+	}
+	return value
+}
+
+func prefixedQuestArg(prefix, value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return prefix
+	}
+	return prefix + ":" + quoteSlashCommandValue(value)
+}
 
 func (d *Discord) handleSlashTrack(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	options := slashOptions(i.ApplicationCommandData())
@@ -90,6 +182,180 @@ func (d *Discord) handleSlashTrack(s *discordgo.Session, i *discordgo.Interactio
 	}
 
 	d.promptSlashConfirmation(s, i, "track", args, d.confirmTitle(i, "track"), d.confirmFields(i))
+}
+
+func (d *Discord) handleSlashRaidBoss(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	options := slashOptions(i.ApplicationCommandData())
+	pokemon, ok := optionString(options, "pokemon")
+	if !ok || strings.TrimSpace(pokemon) == "" {
+		d.respondEphemeral(s, i, d.slashText(i, "Please enter a Pokemon name or ID."))
+		return
+	}
+	args := []string{strings.TrimSpace(pokemon)}
+	if strings.EqualFold(strings.TrimSpace(pokemon), "everything") {
+		args = []string{"everything"}
+	}
+	args = appendRaidSharedSlashArgs(args, options)
+	d.promptSlashConfirmation(s, i, "raid", args, d.confirmTitle(i, "raid"), d.confirmFields(i))
+}
+
+func (d *Discord) handleSlashRaidLevel(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	options := slashOptions(i.ApplicationCommandData())
+	level, ok := optionString(options, "level")
+	if !ok || strings.TrimSpace(level) == "" {
+		d.respondEphemeral(s, i, d.slashText(i, "Please enter a raid boss name or level."))
+		return
+	}
+	args := []string{normalizeRaidType(strings.TrimSpace(level))}
+	args = appendRaidSharedSlashArgs(args, options)
+	d.promptSlashConfirmation(s, i, "raid", args, d.confirmTitle(i, "raid"), d.confirmFields(i))
+}
+
+func (d *Discord) handleSlashRaidEgg(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	options := slashOptions(i.ApplicationCommandData())
+	level, ok := optionString(options, "level")
+	if !ok || strings.TrimSpace(level) == "" {
+		d.respondEphemeral(s, i, d.slashText(i, "Please enter a raid boss name or level."))
+		return
+	}
+	args := []string{normalizeRaidType(strings.TrimSpace(level))}
+	args = appendRaidSharedSlashArgs(args, options)
+	d.promptSlashConfirmation(s, i, "egg", args, d.confirmTitle(i, "egg"), d.confirmFields(i))
+}
+
+func (d *Discord) handleSlashMaxbattleBoss(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	options := slashOptions(i.ApplicationCommandData())
+	pokemon, ok := optionString(options, "pokemon")
+	if !ok || strings.TrimSpace(pokemon) == "" {
+		d.respondEphemeral(s, i, d.slashText(i, "Please enter a Pokemon name or ID."))
+		return
+	}
+	args := []string{strings.TrimSpace(pokemon)}
+	if strings.EqualFold(strings.TrimSpace(pokemon), "everything") {
+		args = []string{"everything"}
+	}
+	args = appendMaxbattleSharedSlashArgs(args, options)
+	d.promptSlashConfirmation(s, i, "maxbattle", args, d.confirmTitle(i, "maxbattle"), d.confirmFields(i))
+}
+
+func (d *Discord) handleSlashMaxbattleLevel(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	options := slashOptions(i.ApplicationCommandData())
+	level, ok := optionString(options, "level")
+	if !ok || strings.TrimSpace(level) == "" {
+		d.respondEphemeral(s, i, d.slashText(i, "Please enter a raid boss name or level."))
+		return
+	}
+	args := []string{normalizeRaidType(strings.TrimSpace(level))}
+	args = appendMaxbattleSharedSlashArgs(args, options)
+	d.promptSlashConfirmation(s, i, "maxbattle", args, d.confirmTitle(i, "maxbattle"), d.confirmFields(i))
+}
+
+func (d *Discord) handleSlashQuestPokemon(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	options := slashOptions(i.ApplicationCommandData())
+	pokemon, ok := optionString(options, "pokemon")
+	if !ok || strings.TrimSpace(pokemon) == "" {
+		d.respondEphemeral(s, i, d.slashText(i, "Please enter a Pokemon name or ID."))
+		return
+	}
+	args := []string{formatQuestArg(strings.TrimSpace(pokemon))}
+	args = appendQuestSharedSlashArgs(args, options)
+	d.promptSlashConfirmation(s, i, "quest", args, d.confirmTitle(i, "quest"), d.confirmFields(i))
+}
+
+func (d *Discord) handleSlashQuestItem(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	options := slashOptions(i.ApplicationCommandData())
+	item, ok := optionString(options, "item")
+	if !ok || strings.TrimSpace(item) == "" {
+		d.respondEphemeral(s, i, d.slashText(i, "Please enter quest filters (e.g. reward:items)."))
+		return
+	}
+	args := []string{formatQuestArg(strings.TrimSpace(item))}
+	if minAmount, ok := optionInt(options, "min_amount"); ok && minAmount > 0 {
+		args = append(args, fmt.Sprintf("amount%d", minAmount))
+	}
+	args = appendQuestSharedSlashArgs(args, options)
+	d.promptSlashConfirmation(s, i, "quest", args, d.confirmTitle(i, "quest"), d.confirmFields(i))
+}
+
+func (d *Discord) handleSlashQuestStardust(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	options := slashOptions(i.ApplicationCommandData())
+	arg := "stardust"
+	if minAmount, ok := optionInt(options, "min_amount"); ok && minAmount > 0 {
+		arg = fmt.Sprintf("stardust%d", minAmount)
+	}
+	args := []string{arg}
+	args = appendQuestSharedSlashArgs(args, options)
+	d.promptSlashConfirmation(s, i, "quest", args, d.confirmTitle(i, "quest"), d.confirmFields(i))
+}
+
+func (d *Discord) handleSlashQuestCandy(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	options := slashOptions(i.ApplicationCommandData())
+	pokemon, ok := optionString(options, "pokemon")
+	if !ok || strings.TrimSpace(pokemon) == "" {
+		d.respondEphemeral(s, i, d.slashText(i, "Please enter a Pokemon name or ID."))
+		return
+	}
+	args := []string{prefixedQuestArg("candy", strings.TrimSpace(pokemon))}
+	if minAmount, ok := optionInt(options, "min_amount"); ok && minAmount > 0 {
+		args = append(args, fmt.Sprintf("amount%d", minAmount))
+	}
+	args = appendQuestSharedSlashArgs(args, options)
+	d.promptSlashConfirmation(s, i, "quest", args, d.confirmTitle(i, "quest"), d.confirmFields(i))
+}
+
+func (d *Discord) handleSlashQuestMegaEnergy(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	options := slashOptions(i.ApplicationCommandData())
+	pokemon, ok := optionString(options, "pokemon")
+	if !ok || strings.TrimSpace(pokemon) == "" {
+		d.respondEphemeral(s, i, d.slashText(i, "Please enter a Pokemon name or ID."))
+		return
+	}
+	args := []string{prefixedQuestArg("energy", strings.TrimSpace(pokemon))}
+	if minAmount, ok := optionInt(options, "min_amount"); ok && minAmount > 0 {
+		args = append(args, fmt.Sprintf("amount%d", minAmount))
+	}
+	args = appendQuestSharedSlashArgs(args, options)
+	d.promptSlashConfirmation(s, i, "quest", args, d.confirmTitle(i, "quest"), d.confirmFields(i))
+}
+
+func (d *Discord) handleSlashRocket(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	options := slashOptions(i.ApplicationCommandData())
+	rocketType, ok := optionString(options, "type")
+	if !ok || strings.TrimSpace(rocketType) == "" {
+		d.respondEphemeral(s, i, d.slashText(i, "Please enter invasion filters (e.g. grunt type)."))
+		return
+	}
+	args := []string{formatInvasionArg(strings.TrimSpace(rocketType))}
+	if value, ok := optionInt(options, "distance"); ok && value > 0 {
+		args = append(args, fmt.Sprintf("d%d", value))
+	}
+	if optionEnabled(options, "clean") {
+		args = append(args, "clean")
+	}
+	if value, ok := optionString(options, "template"); ok && strings.TrimSpace(value) != "" {
+		args = append(args, "template:"+strings.TrimSpace(value))
+	}
+	d.promptSlashConfirmation(s, i, "invasion", args, d.confirmTitle(i, "invasion"), d.confirmFields(i))
+}
+
+func (d *Discord) handleSlashPokestopEvent(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	options := slashOptions(i.ApplicationCommandData())
+	eventType, ok := optionString(options, "type")
+	if !ok || strings.TrimSpace(eventType) == "" {
+		d.respondEphemeral(s, i, d.slashText(i, "Please enter invasion filters (e.g. grunt type)."))
+		return
+	}
+	args := []string{formatInvasionArg(strings.TrimSpace(eventType))}
+	if value, ok := optionInt(options, "distance"); ok && value > 0 {
+		args = append(args, fmt.Sprintf("d%d", value))
+	}
+	if optionEnabled(options, "clean") {
+		args = append(args, "clean")
+	}
+	if value, ok := optionString(options, "template"); ok && strings.TrimSpace(value) != "" {
+		args = append(args, "template:"+strings.TrimSpace(value))
+	}
+	d.promptSlashConfirmation(s, i, "incident", args, d.confirmTitle(i, "incident"), d.confirmFields(i))
 }
 
 func (d *Discord) handleSlashRaid(s *discordgo.Session, i *discordgo.InteractionCreate) {

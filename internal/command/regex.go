@@ -49,6 +49,7 @@ type RegexSet struct {
 	LittleCP   *regexp.Regexp
 	Distance   *regexp.Regexp
 	Time       *regexp.Regexp
+	Amount     *regexp.Regexp
 	Stardust   *regexp.Regexp
 	Energy     *regexp.Regexp
 	Candy      *regexp.Regexp
@@ -108,6 +109,7 @@ func NewRegexSet(factory *i18n.Factory) *RegexSet {
 		LittleCP:   createCommandRegex(factory, "littlecp", "\\d{1,5}"),
 		Distance:   createCommandRegex(factory, "d", "[\\d.]{1,}"),
 		Time:       createCommandRegex(factory, "t", "\\d{1,4}"),
+		Amount:     createCommandRegex(factory, "amount", "\\d{1,8}"),
 		Stardust:   createCommandRegex(factory, "stardust", "\\d{1,8}"),
 		Energy:     createCommandRegex(factory, "energy", ".+"),
 		Candy:      createCommandRegex(factory, "candy", ".+"),

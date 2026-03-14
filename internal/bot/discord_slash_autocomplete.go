@@ -407,6 +407,49 @@ func (d *Discord) autocompleteRaidLevelChoices(i *discordgo.InteractionCreate, q
 	return choices
 }
 
+func (d *Discord) autocompleteMaxbattleLevelChoices(i *discordgo.InteractionCreate, query string) []*discordgo.ApplicationCommandOptionChoice {
+	if d.manager == nil || d.manager.data == nil || d.manager.data.UtilData == nil {
+		return nil
+	}
+	query = strings.ToLower(strings.TrimSpace(query))
+	tr := d.slashInteractionTranslator(i)
+	raw, ok := d.manager.data.UtilData["maxbattleLevels"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	levels := []int{}
+	for key := range raw {
+		if value := toInt(key, 0); value > 0 {
+			levels = append(levels, value)
+		}
+	}
+	if len(levels) == 0 {
+		return nil
+	}
+	sort.Ints(levels)
+	choices := make([]*discordgo.ApplicationCommandOptionChoice, 0, len(levels)+1)
+	if query == "" {
+		choices = append(choices, &discordgo.ApplicationCommandOptionChoice{
+			Name:  translateOrDefault(tr, "Everything"),
+			Value: "everything",
+		})
+	}
+	for _, level := range levels {
+		value := fmt.Sprintf("level%d", level)
+		label := d.maxbattleLevelLabel(level, tr)
+		if query == "" || strings.Contains(strings.ToLower(value), query) || strings.Contains(strings.ToLower(label), query) {
+			choices = append(choices, &discordgo.ApplicationCommandOptionChoice{
+				Name:  label,
+				Value: value,
+			})
+		}
+		if len(choices) >= 25 {
+			break
+		}
+	}
+	return choices
+}
+
 func (d *Discord) autocompleteGymChoices(i *discordgo.InteractionCreate, query string) []*discordgo.ApplicationCommandOptionChoice {
 	if d.manager == nil || d.manager.scanner == nil {
 		return nil

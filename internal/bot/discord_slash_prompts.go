@@ -191,10 +191,33 @@ func (d *Discord) confirmTitle(i *discordgo.InteractionCreate, command string) s
 		return tr.Translate("New Quest Alert:", false)
 	case "invasion":
 		return tr.Translate("New Invasion Alert:", false)
+	case "incident":
+		return tr.Translate("New Pokestop Event Alert:", false)
+	case "gym":
+		return tr.Translate("New Gym Alert:", false)
+	case "fort":
+		return tr.Translate("New Fort Alert:", false)
+	case "nest":
+		return tr.Translate("New Nest Alert:", false)
+	case "weather":
+		return tr.Translate("New Weather Alert:", false)
 	case "lure":
 		return tr.Translate("New Lure Alert:", false)
 	default:
 		return tr.Translate("Confirm Command:", false)
+	}
+}
+
+func slashSemanticCommandName(data discordgo.ApplicationCommandInteractionData) string {
+	switch strings.ToLower(strings.TrimSpace(data.Name)) {
+	case "pokemon":
+		return "track"
+	case "rocket":
+		return "invasion"
+	case "pokestop-event":
+		return "incident"
+	default:
+		return strings.ToLower(strings.TrimSpace(data.Name))
 	}
 }
 
@@ -204,12 +227,13 @@ func (d *Discord) confirmFields(i *discordgo.InteractionCreate) []*discordgo.Mes
 	}
 	tr := d.slashInteractionTranslator(i)
 	data := i.ApplicationCommandData()
+	commandName := slashSemanticCommandName(data)
 	options := slashOptions(data)
 	if len(options) == 0 {
 		return nil
 	}
 
-	inline := strings.EqualFold(data.Name, "track")
+	inline := strings.EqualFold(commandName, "track")
 	fields := []*discordgo.MessageEmbedField{}
 
 	findOption := func(name string) *discordgo.ApplicationCommandInteractionDataOption {
@@ -225,7 +249,7 @@ func (d *Discord) confirmFields(i *discordgo.InteractionCreate) []*discordgo.Mes
 		if opt == nil {
 			continue
 		}
-		if strings.EqualFold(data.Name, "track") {
+		if strings.EqualFold(commandName, "track") {
 			if opt.Name == "pvp_ranks" {
 				continue
 			}
@@ -233,12 +257,12 @@ func (d *Discord) confirmFields(i *discordgo.InteractionCreate) []*discordgo.Mes
 				if ranks := findOption("pvp_ranks"); ranks != nil {
 					fields = append(fields, &discordgo.MessageEmbedField{
 						Name:   localizedOptionName(tr, opt.Name),
-						Value:  d.formatConfirmValue(data.Name, opt.Name, opt.Value, tr),
+						Value:  d.formatConfirmValue(commandName, opt.Name, opt.Value, tr),
 						Inline: inline,
 					})
 					fields = append(fields, &discordgo.MessageEmbedField{
 						Name:   localizedOptionName(tr, ranks.Name),
-						Value:  d.formatConfirmValue(data.Name, ranks.Name, ranks.Value, tr),
+						Value:  d.formatConfirmValue(commandName, ranks.Name, ranks.Value, tr),
 						Inline: inline,
 					})
 					continue
@@ -247,7 +271,7 @@ func (d *Discord) confirmFields(i *discordgo.InteractionCreate) []*discordgo.Mes
 		}
 		fields = append(fields, &discordgo.MessageEmbedField{
 			Name:   localizedOptionName(tr, opt.Name),
-			Value:  d.formatConfirmValue(data.Name, opt.Name, opt.Value, tr),
+			Value:  d.formatConfirmValue(commandName, opt.Name, opt.Value, tr),
 			Inline: inline,
 		})
 	}
@@ -281,7 +305,7 @@ func (d *Discord) formatConfirmValue(command, name string, value any, tr *i18n.T
 				return label
 			}
 		}
-		if command == "invasion" && name == "type" {
+		if (command == "invasion" || command == "incident") && name == "type" {
 			return d.invasionTypeLabel(text, tr)
 		}
 		if command == "quest" && name == "type" {
@@ -292,12 +316,12 @@ func (d *Discord) formatConfirmValue(command, name string, value any, tr *i18n.T
 				return d.pokemonLabel(id)
 			}
 		}
-		if (command == "egg" && name == "level") || (command == "raid" && name == "type") {
+		if ((command == "egg" || command == "raid") && name == "level") || (command == "raid" && name == "type") {
 			if level, ok := parseLevelString(lower); ok {
 				return d.raidLevelLabel(level, tr)
 			}
 		}
-		if command == "maxbattle" && name == "type" {
+		if command == "maxbattle" && (name == "type" || name == "level") {
 			if level, ok := parseLevelString(lower); ok {
 				return d.maxbattleLevelLabel(level, tr)
 			}
@@ -687,13 +711,12 @@ func (d *Discord) promptSlashConfirmation(s *discordgo.Session, i *discordgo.Int
 		Title:  title,
 		Fields: fields,
 	}
-	ephemeral := strings.EqualFold(command, "track")
 	d.respondComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, []discordgo.MessageComponent{
 		discordgo.ActionsRow{Components: []discordgo.MessageComponent{
 			discordgo.Button{CustomID: slashConfirmButton, Label: translateOrDefault(tr, "Verify"), Style: discordgo.SuccessButton},
 			discordgo.Button{CustomID: slashCancelButton, Label: translateOrDefault(tr, "Cancel"), Style: discordgo.DangerButton},
 		}},
-	}, ephemeral)
+	}, true)
 }
 
 func (d *Discord) respondWithSelectMenu(s *discordgo.Session, i *discordgo.InteractionCreate, text, customID string, options []discordgo.SelectMenuOption) {

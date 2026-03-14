@@ -134,6 +134,7 @@ func buildQuestOptions(ctx *Context, args []string, re *RegexSet, remove bool) q
 	}
 
 	minDust := 10000000
+	minAmount := 0
 	energyTargets := []int{}
 	candyTargets := []int{}
 	xlCandyTargets := []int{}
@@ -152,6 +153,11 @@ func buildQuestOptions(ctx *Context, args []string, re *RegexSet, remove bool) q
 			continue
 		}
 		switch {
+		case re.Amount.MatchString(arg):
+			match := re.Amount.FindStringSubmatch(arg)
+			if len(match) > 2 {
+				minAmount = toInt(match[2], 0)
+			}
 		case strings.EqualFold(arg, "stardust"):
 			minDust = 0
 			options.StardustTracking = -1
@@ -215,13 +221,13 @@ func buildQuestOptions(ctx *Context, args []string, re *RegexSet, remove bool) q
 		entries = append(entries, questEntry{RewardType: 3, Reward: minDust, Shiny: shiny})
 	}
 	for _, id := range energyTargets {
-		entries = append(entries, questEntry{RewardType: 12, Reward: id, Shiny: shiny})
+		entries = append(entries, questEntry{RewardType: 12, Reward: id, Amount: minAmount, Shiny: shiny})
 	}
 	for _, id := range candyTargets {
-		entries = append(entries, questEntry{RewardType: 4, Reward: id, Shiny: shiny})
+		entries = append(entries, questEntry{RewardType: 4, Reward: id, Amount: minAmount, Shiny: shiny})
 	}
 	for _, id := range xlCandyTargets {
-		entries = append(entries, questEntry{RewardType: 9, Reward: id, Shiny: shiny})
+		entries = append(entries, questEntry{RewardType: 9, Reward: id, Amount: minAmount, Shiny: shiny})
 	}
 	if expTarget == 1 {
 		entries = append(entries, questEntry{RewardType: 1, Reward: 0, Shiny: shiny})
@@ -231,7 +237,7 @@ func buildQuestOptions(ctx *Context, args []string, re *RegexSet, remove bool) q
 		entries = append(entries, questEntry{RewardType: 7, Reward: toInt(mon["id"], 0), Form: formID, Shiny: shiny})
 	}
 	for _, id := range itemIDs {
-		entries = append(entries, questEntry{RewardType: 2, Reward: id, Shiny: shiny})
+		entries = append(entries, questEntry{RewardType: 2, Reward: id, Amount: minAmount, Shiny: shiny})
 	}
 
 	options.Entries = entries

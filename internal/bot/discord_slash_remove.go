@@ -27,16 +27,12 @@ func (d *Discord) handleSlashRemove(s *discordgo.Session, i *discordgo.Interacti
 	}
 	if strings.Contains(value, "|") {
 		expected := strings.ToLower(strings.TrimSpace(trackType))
-		if expected == "incident" {
-			expected = "invasion"
-		}
 		if expected != "" && trackingType != expected {
 			d.respondEphemeral(s, i, tr.Translate("Tracking type changed; please clear the tracking selection and pick again.", false))
 			return
 		}
 	}
-	table := removeTrackingTable(trackingType)
-	if table == "" || d.manager == nil || d.manager.query == nil {
+	if d.manager == nil || d.manager.query == nil {
 		d.respondEphemeral(s, i, tr.Translate("That tracking entry could not be removed.", false))
 		return
 	}
@@ -47,14 +43,16 @@ func (d *Discord) handleSlashRemove(s *discordgo.Session, i *discordgo.Interacti
 		d.respondEphemeral(s, i, errText)
 		return
 	}
-	where := map[string]any{"id": selection.UserID}
-	if selection.Mode != slashProfileScopeAll && selection.ProfileNo > 0 {
-		where["profile_no"] = selection.ProfileNo
+	rows, table := d.slashTrackingRowsForSelection(selection, trackingType)
+	if table == "" {
+		d.respondEphemeral(s, i, tr.Translate("That tracking entry could not be removed.", false))
+		return
 	}
+	targetRows := rows
 	if !strings.EqualFold(uid, "all") && !strings.EqualFold(uid, "everything") {
-		where["uid"] = parseUID(uid)
+		targetRows = slashFilterRowsByUID(rows, uid)
 	}
-	removed, err := d.manager.query.DeleteQuery(table, where)
+	removed, err := d.deleteSlashTrackingRows(table, targetRows)
 	if err != nil {
 		d.respondEphemeral(s, i, err.Error())
 		return
@@ -62,22 +60,17 @@ func (d *Discord) handleSlashRemove(s *discordgo.Session, i *discordgo.Interacti
 	if removed == 0 {
 		target := selection.TargetLabelLocalized(tr)
 		if strings.EqualFold(uid, "all") || strings.EqualFold(uid, "everything") {
-			d.respondEphemeral(s, i, tr.TranslateFormat("No tracking entries found in {0}.", target))
+			d.respondEphemeral(s, i, tr.TranslateFormat("No filters found in {0}.", target))
 			return
 		}
-		d.respondEphemeral(s, i, tr.TranslateFormat("Tracking not found in {0}.", target))
+		d.respondEphemeral(s, i, tr.TranslateFormat("Filter not found in {0}.", target))
 		return
-	}
-	// Keep slash removals in parity with text commands and legacy API deletes:
-	// monster alerts may still match from the fastMonsters cache until it is refreshed.
-	if d.manager != nil && d.manager.processor != nil {
-		d.manager.processor.RefreshAlertCacheAsync()
 	}
 	d.logSlashUX(i, "remove", "scope", selection.LogValue())
-	if strings.EqualFold(uid, "all") || strings.EqualFold(uid, "everything") {
-		target := selection.TargetLabelLocalized(tr)
-		d.respondEphemeral(s, i, tr.TranslateFormat("Removed {0} tracking entries from {1}. Next: use `/tracked` to review your alerts.", removed, target))
+	embeds, components, ok := d.slashFilterMutationResponse(i, "removed", trackingType, table, selection.TargetLabelLocalized(tr), selection.UserID, targetRows)
+	if !ok {
+		d.respondEphemeral(s, i, tr.Translate("No filters were changed.", false))
 		return
 	}
-	d.respondEphemeral(s, i, tr.TranslateFormat("Tracking removed from {0}. Next: use `/tracked` to review your alerts.", selection.TargetLabelLocalized(tr)))
+	d.respondEphemeralComponentsEmbed(s, i, "", embeds, components)
 }

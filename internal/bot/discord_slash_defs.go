@@ -35,6 +35,15 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 		pvpMaxRank = 4096
 	}
 
+	subcommand := func(name, description string, options []*discordgo.ApplicationCommandOption) *discordgo.ApplicationCommandOption {
+		return &discordgo.ApplicationCommandOption{
+			Type:        discordgo.ApplicationCommandOptionSubCommand,
+			Name:        name,
+			Description: description,
+			Options:     options,
+		}
+	}
+
 	distanceOption := func() *discordgo.ApplicationCommandOption {
 		opt := &discordgo.ApplicationCommandOption{
 			Type:        discordgo.ApplicationCommandOptionInteger,
@@ -73,6 +82,34 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 		}
 	}
 
+	raidTeamOption := func() *discordgo.ApplicationCommandOption {
+		return &discordgo.ApplicationCommandOption{
+			Type:        discordgo.ApplicationCommandOptionString,
+			Name:        "team",
+			Description: "Select controlling team",
+			Choices: []*discordgo.ApplicationCommandOptionChoice{
+				{Name: "All", Value: "all"},
+				{Name: "Valor (Red)", Value: "red"},
+				{Name: "Mystic (Blue)", Value: "blue"},
+				{Name: "Instinct (Yellow)", Value: "yellow"},
+				{Name: "Uncontested (White)", Value: "white"},
+			},
+		}
+	}
+
+	rsvpOption := func() *discordgo.ApplicationCommandOption {
+		return &discordgo.ApplicationCommandOption{
+			Type:        discordgo.ApplicationCommandOptionString,
+			Name:        "rsvp",
+			Description: "RSVP matching",
+			Choices: []*discordgo.ApplicationCommandOptionChoice{
+				{Name: "off", Value: "off"},
+				{Name: "on", Value: "on"},
+				{Name: "only", Value: "only"},
+			},
+		}
+	}
+
 	trackOptions := []*discordgo.ApplicationCommandOption{
 		{
 			Type:         discordgo.ApplicationCommandOptionString,
@@ -88,16 +125,16 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 		},
 		{Type: discordgo.ApplicationCommandOptionInteger, Name: "min_iv", Description: "Set minimum IV", MinValue: floatPtr(0), MaxValue: 100},
 		{Type: discordgo.ApplicationCommandOptionInteger, Name: "max_iv", Description: "Set maximum IV", MinValue: floatPtr(0), MaxValue: 100},
+		{Type: discordgo.ApplicationCommandOptionInteger, Name: "min_cp", Description: "Minimum CP", MinValue: floatPtr(0)},
+		{Type: discordgo.ApplicationCommandOptionInteger, Name: "max_cp", Description: "Maximum CP", MinValue: floatPtr(0)},
+		{Type: discordgo.ApplicationCommandOptionInteger, Name: "min_level", Description: "Minimum level", MinValue: floatPtr(1), MaxValue: 50},
+		{Type: discordgo.ApplicationCommandOptionInteger, Name: "max_level", Description: "Maximum level", MinValue: floatPtr(1), MaxValue: 50},
 		{Type: discordgo.ApplicationCommandOptionInteger, Name: "min_atk", Description: "Minimum attack", MinValue: floatPtr(0), MaxValue: 15},
 		{Type: discordgo.ApplicationCommandOptionInteger, Name: "max_atk", Description: "Maximum attack", MinValue: floatPtr(0), MaxValue: 15},
 		{Type: discordgo.ApplicationCommandOptionInteger, Name: "min_def", Description: "Minimum defense", MinValue: floatPtr(0), MaxValue: 15},
 		{Type: discordgo.ApplicationCommandOptionInteger, Name: "max_def", Description: "Maximum defense", MinValue: floatPtr(0), MaxValue: 15},
 		{Type: discordgo.ApplicationCommandOptionInteger, Name: "min_sta", Description: "Minimum stamina", MinValue: floatPtr(0), MaxValue: 15},
 		{Type: discordgo.ApplicationCommandOptionInteger, Name: "max_sta", Description: "Maximum stamina", MinValue: floatPtr(0), MaxValue: 15},
-		{Type: discordgo.ApplicationCommandOptionInteger, Name: "min_cp", Description: "Minimum CP", MinValue: floatPtr(0)},
-		{Type: discordgo.ApplicationCommandOptionInteger, Name: "max_cp", Description: "Maximum CP", MinValue: floatPtr(0)},
-		{Type: discordgo.ApplicationCommandOptionInteger, Name: "min_level", Description: "Minimum level", MinValue: floatPtr(1), MaxValue: 50},
-		{Type: discordgo.ApplicationCommandOptionInteger, Name: "max_level", Description: "Maximum level", MinValue: floatPtr(1), MaxValue: 50},
 		{
 			Type:        discordgo.ApplicationCommandOptionString,
 			Name:        "size",
@@ -111,7 +148,6 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 				{Name: "xxl", Value: "xxl"},
 			},
 		},
-		distanceOption(),
 		{
 			Type:        discordgo.ApplicationCommandOptionString,
 			Name:        "gender",
@@ -140,6 +176,7 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 			MaxValue:    float64(pvpMaxRank),
 		},
 		{Type: discordgo.ApplicationCommandOptionInteger, Name: "min_time", Description: "Minimum time left in seconds", MinValue: floatPtr(0)},
+		distanceOption(),
 		cleanFlagOption("Auto delete after despawn"),
 	}
 	trackOptions = append(trackOptions, templateOptions()...)
@@ -158,12 +195,9 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 				{Name: "Normal", Value: "normal"},
 			},
 		},
-		{Type: discordgo.ApplicationCommandOptionBoolean, Name: "slot_changes", Description: "Alert on slot changes"},
 		{Type: discordgo.ApplicationCommandOptionString, Name: "gym", Description: "Optional gym", Autocomplete: true},
-		distanceOption(),
-		cleanFlagOption("Auto delete after expiration"),
+		{Type: discordgo.ApplicationCommandOptionBoolean, Name: "slot_changes", Description: "Alert on slot changes"},
 	}
-	gymOptions = append(gymOptions, templateOptions()...)
 	if gymBattleEnabled {
 		gymOptions = append(gymOptions, &discordgo.ApplicationCommandOption{
 			Type:        discordgo.ApplicationCommandOptionBoolean,
@@ -171,6 +205,11 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 			Description: "Alert on battle changes",
 		})
 	}
+	gymOptions = append(gymOptions,
+		distanceOption(),
+		cleanFlagOption("Auto delete after expiration"),
+	)
+	gymOptions = append(gymOptions, templateOptions()...)
 
 	fortOptions := []*discordgo.ApplicationCommandOption{
 		{
@@ -183,12 +222,12 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 				{Name: "Gym", Value: "gym"},
 			},
 		},
-		{Type: discordgo.ApplicationCommandOptionBoolean, Name: "include_empty", Description: "Include empty POIs"},
-		{Type: discordgo.ApplicationCommandOptionBoolean, Name: "location", Description: "Track location changes"},
+		{Type: discordgo.ApplicationCommandOptionBoolean, Name: "new", Description: "Track new POIs"},
+		{Type: discordgo.ApplicationCommandOptionBoolean, Name: "removal", Description: "Track removals"},
 		{Type: discordgo.ApplicationCommandOptionBoolean, Name: "name", Description: "Track name changes"},
 		{Type: discordgo.ApplicationCommandOptionBoolean, Name: "photo", Description: "Track photo changes"},
-		{Type: discordgo.ApplicationCommandOptionBoolean, Name: "removal", Description: "Track removals"},
-		{Type: discordgo.ApplicationCommandOptionBoolean, Name: "new", Description: "Track new POIs"},
+		{Type: discordgo.ApplicationCommandOptionBoolean, Name: "location", Description: "Track location changes"},
+		{Type: discordgo.ApplicationCommandOptionBoolean, Name: "include_empty", Description: "Include empty POIs"},
 		distanceOption(),
 	}
 	fortOptions = append(fortOptions, templateOptions()...)
@@ -218,105 +257,164 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 	}
 	weatherOptions = append(weatherOptions, templateOptions()...)
 
+	raidBossOptions := []*discordgo.ApplicationCommandOption{
+		{Type: discordgo.ApplicationCommandOptionString, Name: "pokemon", Description: "Choose a Pokemon, or leave blank for a guided flow", Autocomplete: true},
+		{Type: discordgo.ApplicationCommandOptionString, Name: "gym", Description: "Optional gym", Autocomplete: true},
+		raidTeamOption(),
+		rsvpOption(),
+		distanceOption(),
+		cleanFlagOption("Auto delete after expiration"),
+	}
+	raidBossOptions = append(raidBossOptions, templateOptions()...)
+
+	raidLevelOptions := []*discordgo.ApplicationCommandOption{
+		{Type: discordgo.ApplicationCommandOptionString, Name: "level", Description: "Choose a raid level, or leave blank for a guided flow", Autocomplete: true},
+		{Type: discordgo.ApplicationCommandOptionString, Name: "gym", Description: "Optional gym", Autocomplete: true},
+		raidTeamOption(),
+		rsvpOption(),
+		distanceOption(),
+		cleanFlagOption("Auto delete after expiration"),
+	}
+	raidLevelOptions = append(raidLevelOptions, templateOptions()...)
+
+	eggOptions := []*discordgo.ApplicationCommandOption{
+		{Type: discordgo.ApplicationCommandOptionString, Name: "level", Description: "Choose an egg level, or leave blank for a guided flow", Autocomplete: true},
+		{Type: discordgo.ApplicationCommandOptionString, Name: "gym", Description: "Optional gym", Autocomplete: true},
+		raidTeamOption(),
+		rsvpOption(),
+		distanceOption(),
+		cleanFlagOption("Auto delete after expiration"),
+	}
+	eggOptions = append(eggOptions, templateOptions()...)
+
+	maxbattleBossOptions := []*discordgo.ApplicationCommandOption{
+		{Type: discordgo.ApplicationCommandOptionString, Name: "pokemon", Description: "Choose a Pokemon, or leave blank for a guided flow", Autocomplete: true},
+		{Type: discordgo.ApplicationCommandOptionString, Name: "station", Description: "Optional station", Autocomplete: true},
+		{Type: discordgo.ApplicationCommandOptionBoolean, Name: "gmax_only", Description: "Only Gigantamax battles"},
+		distanceOption(),
+		cleanFlagOption("Auto delete after expiration"),
+	}
+	maxbattleBossOptions = append(maxbattleBossOptions, templateOptions()...)
+
+	maxbattleLevelOptions := []*discordgo.ApplicationCommandOption{
+		{Type: discordgo.ApplicationCommandOptionString, Name: "level", Description: "Choose a max battle level, or leave blank for a guided flow", Autocomplete: true},
+		{Type: discordgo.ApplicationCommandOptionString, Name: "station", Description: "Optional station", Autocomplete: true},
+		{Type: discordgo.ApplicationCommandOptionBoolean, Name: "gmax_only", Description: "Only Gigantamax battles"},
+		distanceOption(),
+		cleanFlagOption("Auto delete after expiration"),
+	}
+	maxbattleLevelOptions = append(maxbattleLevelOptions, templateOptions()...)
+
+	questAROption := &discordgo.ApplicationCommandOption{
+		Type:        discordgo.ApplicationCommandOptionString,
+		Name:        "ar",
+		Description: "Optional AR mapping filter",
+		Choices: []*discordgo.ApplicationCommandOptionChoice{
+			{Name: "Any", Value: "any"},
+			{Name: "No AR", Value: "noar"},
+			{Name: "With AR", Value: "ar"},
+		},
+	}
+	questPokemonOptions := []*discordgo.ApplicationCommandOption{
+		{Type: discordgo.ApplicationCommandOptionString, Name: "pokemon", Description: "Choose a Pokemon, or leave blank for a guided flow", Autocomplete: true},
+		questAROption,
+		distanceOption(),
+		cleanFlagOption("Auto delete after expiration"),
+	}
+	questPokemonOptions = append(questPokemonOptions, templateOptions()...)
+
+	questItemOptions := []*discordgo.ApplicationCommandOption{
+		{Type: discordgo.ApplicationCommandOptionString, Name: "item", Description: "Choose an item, or leave blank for a guided flow", Autocomplete: true},
+		{Type: discordgo.ApplicationCommandOptionInteger, Name: "min_amount", Description: "Optional minimum value for items only", MinValue: floatPtr(0)},
+		questAROption,
+		distanceOption(),
+		cleanFlagOption("Auto delete after expiration"),
+	}
+	questItemOptions = append(questItemOptions, templateOptions()...)
+
+	questStardustOptions := []*discordgo.ApplicationCommandOption{
+		{Type: discordgo.ApplicationCommandOptionInteger, Name: "min_amount", Description: "Optional minimum value for stardust only", MinValue: floatPtr(0)},
+		questAROption,
+		distanceOption(),
+		cleanFlagOption("Auto delete after expiration"),
+	}
+	questStardustOptions = append(questStardustOptions, templateOptions()...)
+
+	questCandyOptions := []*discordgo.ApplicationCommandOption{
+		{Type: discordgo.ApplicationCommandOptionString, Name: "pokemon", Description: "Choose a Pokemon, or leave blank for a guided flow", Autocomplete: true},
+		{Type: discordgo.ApplicationCommandOptionInteger, Name: "min_amount", Description: "Optional minimum value for candy only", MinValue: floatPtr(0)},
+		questAROption,
+		distanceOption(),
+		cleanFlagOption("Auto delete after expiration"),
+	}
+	questCandyOptions = append(questCandyOptions, templateOptions()...)
+
+	questMegaEnergyOptions := []*discordgo.ApplicationCommandOption{
+		{Type: discordgo.ApplicationCommandOptionString, Name: "pokemon", Description: "Choose a Pokemon, or leave blank for a guided flow", Autocomplete: true},
+		{Type: discordgo.ApplicationCommandOptionInteger, Name: "min_amount", Description: "Optional minimum value for mega energy only", MinValue: floatPtr(0)},
+		questAROption,
+		distanceOption(),
+		cleanFlagOption("Auto delete after expiration"),
+	}
+	questMegaEnergyOptions = append(questMegaEnergyOptions, templateOptions()...)
+
+	rocketOptions := []*discordgo.ApplicationCommandOption{
+		{Type: discordgo.ApplicationCommandOptionString, Name: "type", Description: "Choose a grunt or leader type, or leave blank for a guided flow", Autocomplete: true},
+		distanceOption(),
+		cleanFlagOption("Auto delete after expiration"),
+	}
+	rocketOptions = append(rocketOptions, templateOptions()...)
+
+	incidentOptions := []*discordgo.ApplicationCommandOption{
+		{Type: discordgo.ApplicationCommandOptionString, Name: "type", Description: "Choose a Pokestop event type, or leave blank for a guided flow", Autocomplete: true},
+		distanceOption(),
+		cleanFlagOption("Auto delete after expiration"),
+	}
+	incidentOptions = append(incidentOptions, templateOptions()...)
+
 	commands := []*discordgo.ApplicationCommand{
 		{
-			Name:        "track",
+			Name:        "pokemon",
 			Description: "Track Pokemon spawns",
 			Options:     trackOptions,
 		},
 		{
 			Name:        "raid",
-			Description: "Track raid bosses or raid levels",
-			Options: append([]*discordgo.ApplicationCommandOption{
-				{Type: discordgo.ApplicationCommandOptionString, Name: "type", Description: "Choose a boss or level, or leave blank for a guided flow", Autocomplete: true},
-				{Type: discordgo.ApplicationCommandOptionString, Name: "gym", Description: "Optional gym", Autocomplete: true},
-				{
-					Type:        discordgo.ApplicationCommandOptionString,
-					Name:        "team",
-					Description: "Select controlling team",
-					Choices: []*discordgo.ApplicationCommandOptionChoice{
-						{Name: "All", Value: "all"},
-						{Name: "Valor (Red)", Value: "red"},
-						{Name: "Mystic (Blue)", Value: "blue"},
-						{Name: "Instinct (Yellow)", Value: "yellow"},
-						{Name: "Uncontested (White)", Value: "white"},
-					},
-				},
-				{Type: discordgo.ApplicationCommandOptionString, Name: "rsvp", Description: "RSVP matching", Choices: []*discordgo.ApplicationCommandOptionChoice{
-					{Name: "off", Value: "off"},
-					{Name: "on", Value: "on"},
-					{Name: "only", Value: "only"},
-				}},
-				distanceOption(),
-				cleanFlagOption("Auto delete after expiration"),
-			}, templateOptions()...),
-		},
-		{
-			Name:        "egg",
-			Description: "Track raid eggs by level",
-			Options: append([]*discordgo.ApplicationCommandOption{
-				{Type: discordgo.ApplicationCommandOptionString, Name: "level", Description: "Choose an egg level, or leave blank for a guided flow", Autocomplete: true},
-				{Type: discordgo.ApplicationCommandOptionString, Name: "gym", Description: "Optional gym", Autocomplete: true},
-				{
-					Type:        discordgo.ApplicationCommandOptionString,
-					Name:        "team",
-					Description: "Select controlling team",
-					Choices: []*discordgo.ApplicationCommandOptionChoice{
-						{Name: "All", Value: "all"},
-						{Name: "Valor (Red)", Value: "red"},
-						{Name: "Mystic (Blue)", Value: "blue"},
-						{Name: "Instinct (Yellow)", Value: "yellow"},
-						{Name: "Uncontested (White)", Value: "white"},
-					},
-				},
-				{Type: discordgo.ApplicationCommandOptionString, Name: "rsvp", Description: "RSVP matching", Choices: []*discordgo.ApplicationCommandOptionChoice{
-					{Name: "off", Value: "off"},
-					{Name: "on", Value: "on"},
-					{Name: "only", Value: "only"},
-				}},
-				distanceOption(),
-				cleanFlagOption("Auto delete after expiration"),
-			}, templateOptions()...),
+			Description: "Track raid bosses, levels, or eggs",
+			Options: []*discordgo.ApplicationCommandOption{
+				subcommand("boss", "Track a raid boss", raidBossOptions),
+				subcommand("level", "Track raid levels", raidLevelOptions),
+				subcommand("egg", "Track raid eggs by level", eggOptions),
+			},
 		},
 		{
 			Name:        "maxbattle",
 			Description: "Track max battles by boss or level",
-			Options: append([]*discordgo.ApplicationCommandOption{
-				{Type: discordgo.ApplicationCommandOptionString, Name: "type", Description: "Choose a boss or level, or leave blank for a guided flow", Autocomplete: true},
-				{Type: discordgo.ApplicationCommandOptionString, Name: "station", Description: "Optional station", Autocomplete: true},
-				{Type: discordgo.ApplicationCommandOptionBoolean, Name: "gmax_only", Description: "Only Gigantamax battles"},
-				distanceOption(),
-				cleanFlagOption("Auto delete after expiration"),
-			}, templateOptions()...),
+			Options: []*discordgo.ApplicationCommandOption{
+				subcommand("boss", "Track max battles by boss", maxbattleBossOptions),
+				subcommand("level", "Track max battles by level", maxbattleLevelOptions),
+			},
 		},
 		{
 			Name:        "quest",
 			Description: "Track quest rewards",
-			Options: append([]*discordgo.ApplicationCommandOption{
-				{Type: discordgo.ApplicationCommandOptionString, Name: "type", Description: "Choose a reward, or leave blank for a guided flow", Autocomplete: true},
-				{Type: discordgo.ApplicationCommandOptionInteger, Name: "min_amount", Description: "Optional minimum value for items only", MinValue: floatPtr(0)},
-				{
-					Type:        discordgo.ApplicationCommandOptionString,
-					Name:        "ar",
-					Description: "Optional AR mapping filter",
-					Choices: []*discordgo.ApplicationCommandOptionChoice{
-						{Name: "Any", Value: "any"},
-						{Name: "No AR", Value: "noar"},
-						{Name: "With AR", Value: "ar"},
-					},
-				},
-				distanceOption(),
-				cleanFlagOption("Auto delete after expiration"),
-			}, templateOptions()...),
+			Options: []*discordgo.ApplicationCommandOption{
+				subcommand("pokemon", "Track Pokemon quest rewards", questPokemonOptions),
+				subcommand("item", "Track item quest rewards", questItemOptions),
+				subcommand("stardust", "Track stardust quest rewards", questStardustOptions),
+				subcommand("candy", "Track candy quest rewards", questCandyOptions),
+				subcommand("mega-energy", "Track mega energy quest rewards", questMegaEnergyOptions),
+			},
 		},
 		{
-			Name:        "invasion",
+			Name:        "rocket",
 			Description: "Track Team Rocket invasions",
-			Options: append([]*discordgo.ApplicationCommandOption{
-				{Type: discordgo.ApplicationCommandOptionString, Name: "type", Description: "Choose a grunt or leader type, or leave blank for a guided flow", Autocomplete: true},
-				distanceOption(),
-				cleanFlagOption("Auto delete after expiration"),
-			}, templateOptions()...),
+			Options:     rocketOptions,
+		},
+		{
+			Name:        "pokestop-event",
+			Description: "Track Pokestop events",
+			Options:     incidentOptions,
 		},
 		{
 			Name:        "gym",
@@ -369,40 +467,39 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 		},
 		{
 			Name:        "profile",
-			Description: "Set your saved location, areas, and quiet hours",
+			Description: "Manage your active profile, saved location, areas, and quiet hours",
 		},
 		{
-			Name:        "tracked",
-			Description: "Review what you are tracking",
+			Name:        "filters",
+			Description: "Show or remove filters",
 			Options: []*discordgo.ApplicationCommandOption{
-				{Type: discordgo.ApplicationCommandOptionString, Name: "profile", Description: "Choose which profile to review", Autocomplete: true},
-			},
-		},
-		{
-			Name:        "remove",
-			Description: "Remove one or more tracking entries",
-			Options: []*discordgo.ApplicationCommandOption{
-				{
-					Type:        discordgo.ApplicationCommandOptionString,
-					Name:        "type",
-					Description: "Choose what kind of alert to remove",
-					Required:    true,
-					Choices: []*discordgo.ApplicationCommandOptionChoice{
-						{Name: "pokemon", Value: "pokemon"},
-						{Name: "raid", Value: "raid"},
-						{Name: "egg", Value: "egg"},
-						{Name: "maxbattle", Value: "maxbattle"},
-						{Name: "invasion", Value: "invasion"},
-						{Name: "quest", Value: "quest"},
-						{Name: "gym", Value: "gym"},
-						{Name: "weather", Value: "weather"},
-						{Name: "lure", Value: "lure"},
-						{Name: "nest", Value: "nest"},
-						{Name: "fort", Value: "fort"},
+				subcommand("show", "Review your filters", []*discordgo.ApplicationCommandOption{
+					{Type: discordgo.ApplicationCommandOptionString, Name: "profile", Description: "Choose which profile to review", Autocomplete: true},
+				}),
+				subcommand("remove", "Remove one or more filters", []*discordgo.ApplicationCommandOption{
+					{
+						Type:        discordgo.ApplicationCommandOptionString,
+						Name:        "type",
+						Description: "Choose what kind of filter to remove",
+						Required:    true,
+						Choices: []*discordgo.ApplicationCommandOptionChoice{
+							{Name: "pokemon", Value: "pokemon"},
+							{Name: "raid", Value: "raid"},
+							{Name: "egg", Value: "egg"},
+							{Name: "maxbattle", Value: "maxbattle"},
+							{Name: "rocket", Value: "rocket"},
+							{Name: "pokestop-event", Value: "pokestop-event"},
+							{Name: "quest", Value: "quest"},
+							{Name: "gym", Value: "gym"},
+							{Name: "weather", Value: "weather"},
+							{Name: "lure", Value: "lure"},
+							{Name: "nest", Value: "nest"},
+							{Name: "fort", Value: "fort"},
+						},
 					},
-				},
-				{Type: discordgo.ApplicationCommandOptionString, Name: "tracking", Description: "Choose what to remove", Required: true, Autocomplete: true},
-				{Type: discordgo.ApplicationCommandOptionString, Name: "profile", Description: "Choose which profile to remove from", Autocomplete: true},
+					{Type: discordgo.ApplicationCommandOptionString, Name: "tracking", Description: "Choose what to remove", Required: true, Autocomplete: true},
+					{Type: discordgo.ApplicationCommandOptionString, Name: "profile", Description: "Choose which profile to remove from", Autocomplete: true},
+				}),
 			},
 		},
 		{

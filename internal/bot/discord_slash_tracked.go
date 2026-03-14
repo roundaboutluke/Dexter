@@ -38,6 +38,14 @@ func (d *Discord) handleSlashHelp(s *discordgo.Session, i *discordgo.Interaction
 	options := slashOptions(i.ApplicationCommandData())
 	commandName, _ := optionString(options, "command")
 	commandName = strings.ToLower(strings.TrimSpace(commandName))
+	switch commandName {
+	case "pokemon":
+		commandName = "track"
+	case "rocket", "pokestop-event":
+		commandName = "invasion"
+	case "filters":
+		commandName = "tracked"
+	}
 	line := "help slash"
 	if commandName != "" {
 		line = "help " + commandName
@@ -254,11 +262,11 @@ func (d *Discord) buildSlashTrackedAllProfilesSummary(selection slashProfileSele
 	if len(lines) == 0 {
 		return translateOrDefault(tr, "You're not tracking anything in any profile.")
 	}
-	header := translateOrDefault(tr, "Tracking summary across all profiles.")
+	header := translateOrDefault(tr, "Filter summary across all profiles.")
 	if row := profileRowByNo(selection.Profiles, selection.EffectiveNo); row != nil {
-		header = tr.TranslateFormat("Tracking summary across all profiles. Current profile: {0}.", localizedProfileDisplayName(tr, row))
+		header = tr.TranslateFormat("Filter summary across all profiles. Current profile: {0}.", localizedProfileDisplayName(tr, row))
 	}
-	return header + "\n\n" + strings.Join(lines, "\n") + "\n\n" + translateOrDefault(tr, "Use `/tracked profile:<profile>` for full details.")
+	return header + "\n\n" + strings.Join(lines, "\n") + "\n\n" + translateOrDefault(tr, "Use `/filters show profile:<profile>` for full details.")
 }
 
 func (d *Discord) buildSlashTrackedReply(s *discordgo.Session, i *discordgo.InteractionCreate) string {
@@ -292,7 +300,7 @@ func (d *Discord) buildSlashTrackedReply(s *discordgo.Session, i *discordgo.Inte
 		return d.buildSlashTrackedAllProfilesSummary(selection, tr)
 	}
 
-	lines := []string{tr.TranslateFormat("Viewing tracking for {0}.", selection.TargetLabelLocalized(tr))}
+	lines := []string{tr.TranslateFormat("Viewing filters for {0}.", selection.TargetLabelLocalized(tr))}
 	alertStatus := map[bool]string{
 		true:  tr.Translate("enabled", false),
 		false: tr.Translate("disabled", false),
@@ -315,8 +323,8 @@ func (d *Discord) buildSlashTrackedReply(s *discordgo.Session, i *discordgo.Inte
 	if len(message) < 4000 {
 		return message
 	}
-	fileName := fmt.Sprintf("tracked-p%d.txt", selection.ProfileNo)
-	return command.FileReply(fileName, tr.TranslateFormat("Tracking for {0} is attached as a file:", selection.TargetLabelLocalized(tr)), message)
+	fileName := fmt.Sprintf("filters-p%d.txt", selection.ProfileNo)
+	return command.FileReply(fileName, tr.TranslateFormat("Filters for {0} are attached as a file:", selection.TargetLabelLocalized(tr)), message)
 }
 
 func (d *Discord) handleSlashLanguage(s *discordgo.Session, i *discordgo.InteractionCreate) {

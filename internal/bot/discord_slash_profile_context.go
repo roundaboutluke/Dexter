@@ -55,7 +55,7 @@ func removeTrackingTable(trackingType string) string {
 		return "gym"
 	case "maxbattle":
 		return "maxbattle"
-	case "incident", "invasion":
+	case "incident", "invasion", "rocket", "pokestop-event":
 		return "invasion"
 	case "quest":
 		return "quest"

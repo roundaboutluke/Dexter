@@ -13,6 +13,7 @@ import (
 
 	"poraclego/internal/command"
 	"poraclego/internal/config"
+	"poraclego/internal/data"
 	"poraclego/internal/dts"
 	"poraclego/internal/geofence"
 	"poraclego/internal/i18n"
@@ -24,14 +25,17 @@ func TestSlashCommandDefinitionsGuidedEntryOptionsAreOptional(t *testing.T) {
 
 	cases := []struct {
 		command string
+		sub     string
 		option  string
 	}{
-		{command: "track", option: "pokemon"},
-		{command: "raid", option: "type"},
-		{command: "egg", option: "level"},
-		{command: "maxbattle", option: "type"},
-		{command: "quest", option: "type"},
-		{command: "invasion", option: "type"},
+		{command: "pokemon", option: "pokemon"},
+		{command: "raid", sub: "boss", option: "pokemon"},
+		{command: "raid", sub: "level", option: "level"},
+		{command: "raid", sub: "egg", option: "level"},
+		{command: "maxbattle", sub: "boss", option: "pokemon"},
+		{command: "maxbattle", sub: "level", option: "level"},
+		{command: "quest", sub: "pokemon", option: "pokemon"},
+		{command: "rocket", option: "type"},
 		{command: "gym", option: "team"},
 		{command: "fort", option: "type"},
 		{command: "nest", option: "pokemon"},
@@ -45,7 +49,15 @@ func TestSlashCommandDefinitionsGuidedEntryOptionsAreOptional(t *testing.T) {
 		if cmd == nil {
 			t.Fatalf("command %q not found", tc.command)
 		}
-		option := findSlashOption(cmd.Options, tc.option)
+		options := cmd.Options
+		if tc.sub != "" {
+			subcommand := findSlashSubcommand(cmd.Options, tc.sub)
+			if subcommand == nil {
+				t.Fatalf("subcommand %q not found on command %q", tc.sub, tc.command)
+			}
+			options = subcommand.Options
+		}
+		option := findSlashOption(options, tc.option)
 		if option == nil {
 			t.Fatalf("option %q not found on command %q", tc.option, tc.command)
 		}
@@ -59,29 +71,33 @@ func TestSlashCommandDefinitionsProfileAndHelpOptions(t *testing.T) {
 	d := &Discord{manager: &Manager{cfg: config.New(nil)}}
 	commands := d.slashCommandDefinitions()
 
-	tracked := findSlashCommand(commands, "tracked")
-	if tracked == nil {
-		t.Fatal("tracked command not found")
+	filters := findSlashCommand(commands, "filters")
+	if filters == nil {
+		t.Fatal("filters command not found")
 	}
-	trackedProfile := findSlashOption(tracked.Options, "profile")
+	show := findSlashSubcommand(filters.Options, "show")
+	if show == nil {
+		t.Fatal("filters show subcommand not found")
+	}
+	trackedProfile := findSlashOption(show.Options, "profile")
 	if trackedProfile == nil || !trackedProfile.Autocomplete || trackedProfile.Required {
-		t.Fatal("tracked profile option should exist, autocomplete, and remain optional")
+		t.Fatal("filters show profile option should exist, autocomplete, and remain optional")
 	}
 
-	remove := findSlashCommand(commands, "remove")
+	remove := findSlashSubcommand(filters.Options, "remove")
 	if remove == nil {
-		t.Fatal("remove command not found")
+		t.Fatal("filters remove subcommand not found")
 	}
 	removeProfile := findSlashOption(remove.Options, "profile")
 	if removeProfile == nil || !removeProfile.Autocomplete || removeProfile.Required {
-		t.Fatal("remove profile option should exist, autocomplete, and remain optional")
+		t.Fatal("filters remove profile option should exist, autocomplete, and remain optional")
 	}
 	removeTracking := findSlashOption(remove.Options, "tracking")
 	if removeTracking == nil || !removeTracking.Autocomplete || !removeTracking.Required {
-		t.Fatal("remove tracking option should exist, autocomplete, and remain required")
+		t.Fatal("filters remove tracking option should exist, autocomplete, and remain required")
 	}
 	if len(remove.Options) < 3 || remove.Options[1].Name != "tracking" || remove.Options[2].Name != "profile" {
-		t.Fatal("remove command should place required tracking before optional profile")
+		t.Fatal("filters remove should place required tracking before optional profile")
 	}
 
 	help := findSlashCommand(commands, "help")
@@ -91,6 +107,60 @@ func TestSlashCommandDefinitionsProfileAndHelpOptions(t *testing.T) {
 	helpCommand := findSlashOption(help.Options, "command")
 	if helpCommand == nil || !helpCommand.Autocomplete || helpCommand.Required {
 		t.Fatal("help command option should exist, autocomplete, and remain optional")
+	}
+}
+
+func TestSlashCommandDefinitionsOptionOrdering(t *testing.T) {
+	d := &Discord{manager: &Manager{cfg: config.New(map[string]any{
+		"tracking": map[string]any{
+			"enableGymBattle": true,
+		},
+	})}}
+	commands := d.slashCommandDefinitions()
+
+	cases := []struct {
+		command string
+		sub     string
+		want    []string
+	}{
+		{command: "pokemon", want: []string{"pokemon", "form", "min_iv", "max_iv", "min_cp", "max_cp", "min_level", "max_level", "min_atk", "max_atk", "min_def", "max_def", "min_sta", "max_sta", "size", "gender", "pvp_league", "pvp_ranks", "min_time", "distance", "clean", "template"}},
+		{command: "raid", sub: "boss", want: []string{"pokemon", "gym", "team", "rsvp", "distance", "clean", "template"}},
+		{command: "raid", sub: "level", want: []string{"level", "gym", "team", "rsvp", "distance", "clean", "template"}},
+		{command: "raid", sub: "egg", want: []string{"level", "gym", "team", "rsvp", "distance", "clean", "template"}},
+		{command: "maxbattle", sub: "boss", want: []string{"pokemon", "station", "gmax_only", "distance", "clean", "template"}},
+		{command: "maxbattle", sub: "level", want: []string{"level", "station", "gmax_only", "distance", "clean", "template"}},
+		{command: "quest", sub: "pokemon", want: []string{"pokemon", "ar", "distance", "clean", "template"}},
+		{command: "quest", sub: "item", want: []string{"item", "min_amount", "ar", "distance", "clean", "template"}},
+		{command: "quest", sub: "stardust", want: []string{"min_amount", "ar", "distance", "clean", "template"}},
+		{command: "quest", sub: "candy", want: []string{"pokemon", "min_amount", "ar", "distance", "clean", "template"}},
+		{command: "quest", sub: "mega-energy", want: []string{"pokemon", "min_amount", "ar", "distance", "clean", "template"}},
+		{command: "rocket", want: []string{"type", "distance", "clean", "template"}},
+		{command: "pokestop-event", want: []string{"type", "distance", "clean", "template"}},
+		{command: "gym", want: []string{"team", "gym", "slot_changes", "battle_changes", "distance", "clean", "template"}},
+		{command: "fort", want: []string{"type", "new", "removal", "name", "photo", "location", "include_empty", "distance", "template"}},
+		{command: "nest", want: []string{"pokemon", "min_spawn", "distance", "clean", "template"}},
+		{command: "weather", want: []string{"condition", "location", "clean", "template"}},
+		{command: "lure", want: []string{"type", "distance", "clean", "template"}},
+		{command: "filters", sub: "remove", want: []string{"type", "tracking", "profile"}},
+		{command: "filters", sub: "show", want: []string{"profile"}},
+	}
+
+	for _, tc := range cases {
+		cmd := findSlashCommand(commands, tc.command)
+		if cmd == nil {
+			t.Fatalf("command %q not found", tc.command)
+		}
+		options := cmd.Options
+		if tc.sub != "" {
+			subcommand := findSlashSubcommand(cmd.Options, tc.sub)
+			if subcommand == nil {
+				t.Fatalf("subcommand %q not found on command %q", tc.sub, tc.command)
+			}
+			options = subcommand.Options
+		}
+		if got := slashOptionNames(options); strings.Join(got, ",") != strings.Join(tc.want, ",") {
+			t.Fatalf("%s %s option order=%v, want %v", tc.command, tc.sub, got, tc.want)
+		}
 	}
 }
 
@@ -109,17 +179,132 @@ func TestAutocompleteHelpCommandChoicesUsesDiscordTemplates(t *testing.T) {
 	}
 
 	choices := d.autocompleteHelpCommandChoices("")
-	if !hasChoiceValue(choices, "tracked") {
-		t.Fatal("expected tracked help choice")
+	if !hasChoiceValue(choices, "filters") {
+		t.Fatal("expected filters help choice")
 	}
-	if !hasChoiceValue(choices, "remove") {
-		t.Fatal("expected remove help choice")
+	if hasChoiceValue(choices, "tracked") || hasChoiceValue(choices, "remove") {
+		t.Fatal("did not expect legacy tracked/remove help choices")
 	}
 	if hasChoiceValue(choices, "slash") {
 		t.Fatal("did not expect slash greeting help choice")
 	}
 	if hasChoiceValue(choices, "profile") {
 		t.Fatal("did not expect telegram-only help choice")
+	}
+}
+
+func TestSlashTrackingRowsForSelectionSeparatesRocketAndPokestopEvents(t *testing.T) {
+	env := newSlashMutationTestEnv(t, map[string][]map[string]any{
+		"invasion": {
+			{"uid": 1, "id": "user-1", "profile_no": 1, "grunt_type": "fire"},
+			{"uid": 2, "id": "user-1", "profile_no": 1, "grunt_type": "spring event"},
+		},
+	}, 0)
+	env.discord.manager.data = &data.GameData{
+		UtilData: map[string]any{
+			"pokestopEvent": map[string]any{
+				"event-1": map[string]any{"name": "spring event"},
+			},
+		},
+	}
+
+	selection := slashProfileSelection{UserID: "user-1", Mode: slashProfileScopeSpecific, ProfileNo: 1}
+	rocketRows, table := env.discord.slashTrackingRowsForSelection(selection, "rocket")
+	if table != "invasion" {
+		t.Fatalf("rocket table=%q, want invasion", table)
+	}
+	if len(rocketRows) != 1 || slashRowUID(rocketRows[0]) != "1" {
+		t.Fatalf("rocket rows=%v, want uid 1 only", rocketRows)
+	}
+
+	eventRows, table := env.discord.slashTrackingRowsForSelection(selection, "pokestop-event")
+	if table != "invasion" {
+		t.Fatalf("pokestop-event table=%q, want invasion", table)
+	}
+	if len(eventRows) != 1 || slashRowUID(eventRows[0]) != "2" {
+		t.Fatalf("pokestop-event rows=%v, want uid 2 only", eventRows)
+	}
+}
+
+func TestDeleteAndRestoreSlashTrackingRowsRoundTrip(t *testing.T) {
+	env := newSlashMutationTestEnv(t, map[string][]map[string]any{
+		"monsters": {
+			{"uid": 101, "id": "user-1", "profile_no": 1, "pokemon_id": 1, "form": 0, "distance": 500},
+		},
+	}, 0)
+
+	rows, err := env.query.SelectAllQuery("monsters", map[string]any{"id": "user-1", "profile_no": 1})
+	if err != nil {
+		t.Fatalf("select rows: %v", err)
+	}
+	removed, err := env.discord.deleteSlashTrackingRows("monsters", rows)
+	if err != nil {
+		t.Fatalf("deleteSlashTrackingRows: %v", err)
+	}
+	if removed != 1 {
+		t.Fatalf("removed=%d, want 1", removed)
+	}
+	afterDelete, err := env.query.SelectAllQuery("monsters", map[string]any{"id": "user-1", "profile_no": 1})
+	if err != nil {
+		t.Fatalf("select after delete: %v", err)
+	}
+	if len(afterDelete) != 0 {
+		t.Fatalf("rows after delete=%v, want empty", afterDelete)
+	}
+	env.waitForRefresh(t, 1)
+
+	restored, err := env.discord.restoreSlashTrackingRows("monsters", rows)
+	if err != nil {
+		t.Fatalf("restoreSlashTrackingRows: %v", err)
+	}
+	if restored != 1 {
+		t.Fatalf("restored=%d, want 1", restored)
+	}
+	afterRestore, err := env.query.SelectAllQuery("monsters", map[string]any{"id": "user-1", "profile_no": 1})
+	if err != nil {
+		t.Fatalf("select after restore: %v", err)
+	}
+	if len(afterRestore) != 1 || slashRowUID(afterRestore[0]) != "101" {
+		t.Fatalf("rows after restore=%v, want uid 101", afterRestore)
+	}
+	env.waitForRefresh(t, 2)
+}
+
+func TestSlashFilterMutationResponseCreatesActionButtons(t *testing.T) {
+	env := newSlashMutationTestEnv(t, map[string][]map[string]any{}, 0)
+	i := slashTestInteraction("user-1")
+	rows := []map[string]any{{"uid": 42, "id": "user-1", "profile_no": 1, "pokemon_id": 1, "form": 0}}
+
+	embeds, components, ok := env.discord.slashFilterMutationResponse(i, "added", "pokemon", "monsters", "Profile 1", "user-1", rows)
+	if !ok {
+		t.Fatal("expected add response payload")
+	}
+	if len(embeds) != 1 || embeds[0].Title != "Filter Added" {
+		t.Fatalf("add embeds=%v, want Filter Added", embeds)
+	}
+	row, ok := components[0].(discordgo.ActionsRow)
+	if !ok || len(row.Components) != 1 {
+		t.Fatalf("add components=%#v, want one button", components)
+	}
+	button, ok := row.Components[0].(discordgo.Button)
+	if !ok || !strings.HasPrefix(button.CustomID, slashFilterRemoveButtonPrefix) {
+		t.Fatalf("add button=%#v, want remove action", row.Components[0])
+	}
+
+	embeds, components, ok = env.discord.slashFilterMutationResponse(i, "removed", "pokemon", "monsters", "Profile 1", "user-1", rows)
+	if !ok {
+		t.Fatal("expected remove response payload")
+	}
+	if len(embeds) != 1 || embeds[0].Title != "Filter Removed" {
+		t.Fatalf("remove embeds=%v, want Filter Removed", embeds)
+	}
+	row, ok = components[0].(discordgo.ActionsRow)
+	if !ok || len(row.Components) != 1 {
+		t.Fatalf("remove components=%#v, want one button", components)
+	}
+	button, ok = row.Components[0].(discordgo.Button)
+	if !ok || !strings.HasPrefix(button.CustomID, slashFilterRestoreButtonPrefix) {
+		t.Fatalf("remove button=%#v, want restore action", row.Components[0])
 	}
 }
 
@@ -172,13 +357,13 @@ func TestSlashCommandDefinitionsUseConfiguredLocalizations(t *testing.T) {
 		t.Fatal("did not expect english localization entry when translated value matches default")
 	}
 
-	track := findSlashCommand(commands, "track")
-	if track == nil {
-		t.Fatal("track command not found")
+	pokemon := findSlashCommand(commands, "pokemon")
+	if pokemon == nil {
+		t.Fatal("pokemon command not found")
 	}
-	gender := findSlashOption(track.Options, "gender")
+	gender := findSlashOption(pokemon.Options, "gender")
 	if gender == nil {
-		t.Fatal("track gender option not found")
+		t.Fatal("pokemon gender option not found")
 	}
 	if len(gender.Choices) < 3 {
 		t.Fatalf("gender choices=%d, want at least 3", len(gender.Choices))
@@ -666,22 +851,26 @@ func TestShippedSlashProfileLocalizationsAreSlashSafe(t *testing.T) {
 		}
 	}
 
-	tracked := findSlashCommand(commands, "tracked")
-	if tracked == nil {
-		t.Fatal("tracked command missing")
+	filters := findSlashCommand(commands, "filters")
+	if filters == nil {
+		t.Fatal("filters command missing")
 	}
-	profileOption := findSlashOption(tracked.Options, "profile")
+	show := findSlashSubcommand(filters.Options, "show")
+	if show == nil {
+		t.Fatal("filters show subcommand missing")
+	}
+	profileOption := findSlashOption(show.Options, "profile")
 	if profileOption == nil {
-		t.Fatal("tracked profile option missing")
+		t.Fatal("filters show profile option missing")
 	}
 	if got := profileOption.NameLocalizations[discordgo.German]; got != "profil" {
-		t.Fatalf("tracked profile option german=%q, want %q", got, "profil")
+		t.Fatalf("filters show profile option german=%q, want %q", got, "profil")
 	}
 	if got := profileOption.NameLocalizations[discordgo.Norwegian]; got != "profil" {
-		t.Fatalf("tracked profile option norwegian=%q, want %q", got, "profil")
+		t.Fatalf("filters show profile option norwegian=%q, want %q", got, "profil")
 	}
 	if !validLocalizedSlashName(profileOption.NameLocalizations[discordgo.German]) {
-		t.Fatalf("tracked profile option german produced invalid slash name %q", profileOption.NameLocalizations[discordgo.German])
+		t.Fatalf("filters show profile option german produced invalid slash name %q", profileOption.NameLocalizations[discordgo.German])
 	}
 }
 
@@ -1388,6 +1577,26 @@ func findSlashOption(options []*discordgo.ApplicationCommandOption, name string)
 		}
 	}
 	return nil
+}
+
+func findSlashSubcommand(options []*discordgo.ApplicationCommandOption, name string) *discordgo.ApplicationCommandOption {
+	for _, option := range options {
+		if option != nil && option.Type == discordgo.ApplicationCommandOptionSubCommand && option.Name == name {
+			return option
+		}
+	}
+	return nil
+}
+
+func slashOptionNames(options []*discordgo.ApplicationCommandOption) []string {
+	names := make([]string, 0, len(options))
+	for _, option := range options {
+		if option == nil {
+			continue
+		}
+		names = append(names, option.Name)
+	}
+	return names
 }
 
 func hasChoiceValue(choices []*discordgo.ApplicationCommandOptionChoice, value string) bool {

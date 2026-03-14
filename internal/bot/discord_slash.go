@@ -109,16 +109,51 @@ func (d *Discord) handleSlashCommand(s *discordgo.Session, i *discordgo.Interact
 		return
 	}
 	switch data.Name {
+	case "pokemon":
+		d.handleSlashTrack(s, i)
 	case "track":
 		d.handleSlashTrack(s, i)
 	case "raid":
-		d.handleSlashRaid(s, i)
+		switch slashSubcommand(data) {
+		case "boss":
+			d.handleSlashRaidBoss(s, i)
+		case "level":
+			d.handleSlashRaidLevel(s, i)
+		case "egg":
+			d.handleSlashRaidEgg(s, i)
+		default:
+			d.handleSlashRaid(s, i)
+		}
 	case "egg":
 		d.handleSlashEgg(s, i)
 	case "maxbattle":
-		d.handleSlashMaxbattle(s, i)
+		switch slashSubcommand(data) {
+		case "boss":
+			d.handleSlashMaxbattleBoss(s, i)
+		case "level":
+			d.handleSlashMaxbattleLevel(s, i)
+		default:
+			d.handleSlashMaxbattle(s, i)
+		}
 	case "quest":
-		d.handleSlashQuest(s, i)
+		switch slashSubcommand(data) {
+		case "pokemon":
+			d.handleSlashQuestPokemon(s, i)
+		case "item":
+			d.handleSlashQuestItem(s, i)
+		case "stardust":
+			d.handleSlashQuestStardust(s, i)
+		case "candy":
+			d.handleSlashQuestCandy(s, i)
+		case "mega-energy":
+			d.handleSlashQuestMegaEnergy(s, i)
+		default:
+			d.handleSlashQuest(s, i)
+		}
+	case "rocket":
+		d.handleSlashRocket(s, i)
+	case "pokestop-event":
+		d.handleSlashPokestopEvent(s, i)
 	case "invasion":
 		d.handleSlashIncident(s, i)
 	case "gym":
@@ -133,6 +168,13 @@ func (d *Discord) handleSlashCommand(s *discordgo.Session, i *discordgo.Interact
 		d.handleSlashLure(s, i)
 	case "profile":
 		d.handleSlashProfile(s, i)
+	case "filters":
+		switch slashSubcommand(data) {
+		case "show":
+			d.handleSlashTracked(s, i)
+		case "remove":
+			d.handleSlashRemove(s, i)
+		}
 	case "tracked":
 		d.handleSlashTracked(s, i)
 	case "remove":
@@ -170,6 +212,15 @@ func (d *Discord) handleSlashAutocomplete(s *discordgo.Session, i *discordgo.Int
 
 	var choices []*discordgo.ApplicationCommandOptionChoice
 	switch data.Name {
+	case "pokemon":
+		if focused.Name == "pokemon" {
+			choices = d.autocompletePokemonChoices(query)
+		} else if focused.Name == "form" {
+			pokemon, _ := optionString(options, "pokemon")
+			choices = d.autocompletePokemonFormChoices(query, pokemon)
+		} else if focused.Name == "template" {
+			choices = d.autocompleteTemplateChoices(query, "monster")
+		}
 	case "track":
 		if focused.Name == "pokemon" {
 			choices = d.autocompletePokemonChoices(query)
@@ -180,26 +231,103 @@ func (d *Discord) handleSlashAutocomplete(s *discordgo.Session, i *discordgo.Int
 			choices = d.autocompleteTemplateChoices(query, "monster")
 		}
 	case "raid":
-		if focused.Name == "type" {
-			choices = d.autocompleteRaidTypeChoices(i, query)
-		} else if focused.Name == "gym" {
-			choices = d.autocompleteGymChoices(i, query)
-		} else if focused.Name == "template" {
-			choices = d.autocompleteTemplateChoices(query, "raid")
+		switch slashSubcommand(data) {
+		case "boss":
+			if focused.Name == "pokemon" {
+				choices = d.autocompletePokemonChoices(query)
+			} else if focused.Name == "gym" {
+				choices = d.autocompleteGymChoices(i, query)
+			} else if focused.Name == "template" {
+				choices = d.autocompleteTemplateChoices(query, "raid")
+			}
+		case "level":
+			if focused.Name == "level" {
+				choices = d.autocompleteRaidLevelChoices(i, query)
+			} else if focused.Name == "gym" {
+				choices = d.autocompleteGymChoices(i, query)
+			} else if focused.Name == "template" {
+				choices = d.autocompleteTemplateChoices(query, "raid")
+			}
+		case "egg":
+			if focused.Name == "level" {
+				choices = d.autocompleteRaidLevelChoices(i, query)
+			} else if focused.Name == "gym" {
+				choices = d.autocompleteGymChoices(i, query)
+			} else if focused.Name == "template" {
+				choices = d.autocompleteTemplateChoices(query, "egg")
+			}
+		default:
+			if focused.Name == "type" {
+				choices = d.autocompleteRaidTypeChoices(i, query)
+			} else if focused.Name == "gym" {
+				choices = d.autocompleteGymChoices(i, query)
+			} else if focused.Name == "template" {
+				choices = d.autocompleteTemplateChoices(query, "raid")
+			}
 		}
 	case "maxbattle":
-		if focused.Name == "type" {
-			choices = d.autocompleteMaxbattleTypeChoices(i, query)
-		} else if focused.Name == "station" {
-			choices = d.autocompleteStationChoices(i, query)
-		} else if focused.Name == "template" {
-			choices = d.autocompleteTemplateChoices(query, "maxbattle")
+		switch slashSubcommand(data) {
+		case "boss":
+			if focused.Name == "pokemon" {
+				choices = d.autocompletePokemonChoices(query)
+			} else if focused.Name == "station" {
+				choices = d.autocompleteStationChoices(i, query)
+			} else if focused.Name == "template" {
+				choices = d.autocompleteTemplateChoices(query, "maxbattle")
+			}
+		case "level":
+			if focused.Name == "level" {
+				choices = d.autocompleteMaxbattleLevelChoices(i, query)
+			} else if focused.Name == "station" {
+				choices = d.autocompleteStationChoices(i, query)
+			} else if focused.Name == "template" {
+				choices = d.autocompleteTemplateChoices(query, "maxbattle")
+			}
+		default:
+			if focused.Name == "type" {
+				choices = d.autocompleteMaxbattleTypeChoices(i, query)
+			} else if focused.Name == "station" {
+				choices = d.autocompleteStationChoices(i, query)
+			} else if focused.Name == "template" {
+				choices = d.autocompleteTemplateChoices(query, "maxbattle")
+			}
 		}
 	case "quest":
-		if focused.Name == "type" {
-			choices = d.autocompleteQuestTypeChoices(i, query)
-		} else if focused.Name == "template" {
-			choices = d.autocompleteTemplateChoices(query, "quest")
+		switch slashSubcommand(data) {
+		case "pokemon":
+			if focused.Name == "pokemon" {
+				choices = d.autocompleteQuestPokemonChoices(i, query)
+			} else if focused.Name == "template" {
+				choices = d.autocompleteTemplateChoices(query, "quest")
+			}
+		case "item":
+			if focused.Name == "item" {
+				choices = d.autocompleteQuestItemRewardChoices(i, query)
+			} else if focused.Name == "template" {
+				choices = d.autocompleteTemplateChoices(query, "quest")
+			}
+		case "candy":
+			if focused.Name == "pokemon" {
+				choices = d.autocompleteQuestCandyRewardChoices(i, query)
+			} else if focused.Name == "template" {
+				choices = d.autocompleteTemplateChoices(query, "quest")
+			}
+		case "mega-energy":
+			if focused.Name == "pokemon" {
+				choices = d.autocompleteQuestMegaEnergyRewardChoices(i, query)
+			} else if focused.Name == "template" {
+				choices = d.autocompleteTemplateChoices(query, "quest")
+			}
+		case "stardust":
+			if focused.Name == "template" {
+				choices = d.autocompleteTemplateChoices(query, "quest")
+			}
+		default:
+			if focused.Name == "type" {
+				choices = d.autocompleteQuestTypeChoices(i, query)
+			} else if focused.Name == "template" {
+				choices = d.autocompleteTemplateChoices(query, "quest")
+			}
 		}
 	case "egg":
 		if focused.Name == "level" {
@@ -212,6 +340,18 @@ func (d *Discord) handleSlashAutocomplete(s *discordgo.Session, i *discordgo.Int
 	case "invasion":
 		if focused.Name == "type" {
 			choices = d.autocompleteIncidentTypeChoices(i, query)
+		} else if focused.Name == "template" {
+			choices = d.autocompleteTemplateChoices(query, "invasion")
+		}
+	case "rocket":
+		if focused.Name == "type" {
+			choices = d.autocompleteRocketTypeChoices(i, query)
+		} else if focused.Name == "template" {
+			choices = d.autocompleteTemplateChoices(query, "invasion")
+		}
+	case "pokestop-event":
+		if focused.Name == "type" {
+			choices = d.autocompletePokestopEventChoices(i, query)
 		} else if focused.Name == "template" {
 			choices = d.autocompleteTemplateChoices(query, "invasion")
 		}
@@ -248,6 +388,21 @@ func (d *Discord) handleSlashAutocomplete(s *discordgo.Session, i *discordgo.Int
 	case "info":
 		if focused.Name == "pokemon" {
 			choices = d.autocompleteInfoPokemonChoices(query)
+		}
+	case "filters":
+		switch slashSubcommand(data) {
+		case "remove":
+			if focused.Name == "profile" {
+				choices = d.autocompleteProfileChoices(i, query, true)
+			} else if focused.Name == "tracking" {
+				trackingType, _ := optionString(options, "type")
+				profileToken, _ := optionString(options, "profile")
+				choices = d.autocompleteRemoveTrackingChoices(query, trackingType, profileToken, i)
+			}
+		case "show":
+			if focused.Name == "profile" {
+				choices = d.autocompleteProfileChoices(i, query, true)
+			}
 		}
 	case "remove":
 		if focused.Name == "profile" {
@@ -467,6 +622,14 @@ func (d *Discord) handleSlashComponent(s *discordgo.Session, i *discordgo.Intera
 		d.handleProfileScheduleEditAssign(s, i, value, data.Values[0])
 		return
 	}
+	if strings.HasPrefix(data.CustomID, slashFilterRemoveButtonPrefix) {
+		d.handleSlashFilterRemoveAction(s, i, strings.TrimPrefix(data.CustomID, slashFilterRemoveButtonPrefix))
+		return
+	}
+	if strings.HasPrefix(data.CustomID, slashFilterRestoreButtonPrefix) {
+		d.handleSlashFilterRestoreAction(s, i, strings.TrimPrefix(data.CustomID, slashFilterRestoreButtonPrefix))
+		return
+	}
 	if strings.HasPrefix(data.CustomID, slashAreaShowRemove) {
 		area := strings.TrimPrefix(data.CustomID, slashAreaShowRemove)
 		if strings.TrimSpace(area) != "" {
@@ -620,14 +783,38 @@ func (d *Discord) handleSlashComponent(s *discordgo.Session, i *discordgo.Intera
 			d.clearSlashState(i.Member, i.User)
 			return
 		}
-		// Clear the confirmation prompt buttons immediately, then send the command output as a follow-up.
-		text, embeds, components := slashConfirmCloseoutPayload(i)
-		d.respondUpdateComponentsEmbed(s, i, text, embeds, components)
 		line := ""
 		if state != nil {
 			line = strings.TrimSpace(state.Command + " " + strings.Join(state.Args, " "))
 		}
+		trackingType := ""
+		table := ""
+		profileLabel := ""
+		beforeRows := []map[string]any(nil)
+		selection := slashProfileSelection{}
+		if state != nil {
+			trackingType = slashTrackingTypeFromCommand(state.Command)
+			if trackingType != "" {
+				if resolved, errText := d.resolveSlashProfileSelection(i, ""); errText == "" {
+					selection = resolved
+					beforeRows, table = d.slashTrackingRowsForSelection(selection, trackingType)
+					profileLabel = selection.TargetLabelLocalized(d.slashInteractionTranslator(i))
+				}
+			}
+		}
 		result := d.buildSlashExecutionResult(s, i, line)
+		if result.Success() && table != "" && selection.UserID != "" {
+			afterRows, _ := d.slashTrackingRowsForSelection(selection, trackingType)
+			changedRows := slashChangedRows(beforeRows, afterRows)
+			if embeds, components, ok := d.slashFilterMutationResponse(i, "added", trackingType, table, profileLabel, selection.UserID, changedRows); ok {
+				d.respondUpdateComponentsEmbed(s, i, "", embeds, components)
+				d.clearSlashState(i.Member, i.User)
+				return
+			}
+		}
+		// Clear the confirmation prompt buttons immediately, then send the command output as a follow-up.
+		text, embeds, components := slashConfirmCloseoutPayload(i)
+		d.respondUpdateComponentsEmbed(s, i, text, embeds, components)
 		d.followupEphemeralSlashReply(s, i, result.Reply)
 		d.clearSlashState(i.Member, i.User)
 		return

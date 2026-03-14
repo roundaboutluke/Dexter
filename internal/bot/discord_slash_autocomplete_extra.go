@@ -92,6 +92,120 @@ func (d *Discord) autocompleteQuestTypeChoices(i *discordgo.InteractionCreate, q
 	return choices
 }
 
+func questChoiceAutocomplete(entries []questChoice, query string) []*discordgo.ApplicationCommandOptionChoice {
+	query = strings.ToLower(strings.TrimSpace(query))
+	choices := []*discordgo.ApplicationCommandOptionChoice{}
+	for _, entry := range entries {
+		label := truncateChoiceLabel(entry.label)
+		value := strings.TrimSpace(entry.value)
+		if label == "" || value == "" {
+			continue
+		}
+		if query != "" && !strings.Contains(strings.ToLower(label), query) && !strings.Contains(strings.ToLower(value), query) {
+			continue
+		}
+		choices = append(choices, &discordgo.ApplicationCommandOptionChoice{
+			Name:  label,
+			Value: value,
+		})
+		if len(choices) >= 25 {
+			break
+		}
+	}
+	return choices
+}
+
+func (d *Discord) autocompleteQuestPokemonChoices(_ *discordgo.InteractionCreate, query string) []*discordgo.ApplicationCommandOptionChoice {
+	entries := d.questMonsterChoices()
+	sort.Slice(entries, func(i, j int) bool { return entries[i].label < entries[j].label })
+	return questChoiceAutocomplete(entries, query)
+}
+
+func (d *Discord) autocompleteQuestItemRewardChoices(_ *discordgo.InteractionCreate, query string) []*discordgo.ApplicationCommandOptionChoice {
+	entries := d.questItemChoices()
+	sort.Slice(entries, func(i, j int) bool { return entries[i].label < entries[j].label })
+	return questChoiceAutocomplete(entries, query)
+}
+
+func (d *Discord) autocompleteQuestCandyRewardChoices(_ *discordgo.InteractionCreate, query string) []*discordgo.ApplicationCommandOptionChoice {
+	entries := d.questCandyMonsterChoices()
+	sort.Slice(entries, func(i, j int) bool { return entries[i].label < entries[j].label })
+	return questChoiceAutocomplete(entries, query)
+}
+
+func (d *Discord) autocompleteQuestMegaEnergyRewardChoices(_ *discordgo.InteractionCreate, query string) []*discordgo.ApplicationCommandOptionChoice {
+	entries := d.questMegaEnergyChoices()
+	sort.Slice(entries, func(i, j int) bool { return entries[i].label < entries[j].label })
+	return questChoiceAutocomplete(entries, query)
+}
+
+func (d *Discord) isPokestopEventType(value string) bool {
+	if d == nil || d.manager == nil || d.manager.data == nil || d.manager.data.UtilData == nil {
+		return false
+	}
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" {
+		return false
+	}
+	raw, ok := d.manager.data.UtilData["pokestopEvent"].(map[string]any)
+	if !ok {
+		return false
+	}
+	for _, item := range raw {
+		entry, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		name := strings.ToLower(strings.TrimSpace(getStringValue(entry["name"])))
+		if name == value {
+			return true
+		}
+	}
+	return false
+}
+
+func (d *Discord) autocompleteRocketTypeChoices(i *discordgo.InteractionCreate, query string) []*discordgo.ApplicationCommandOptionChoice {
+	allChoices := d.autocompleteIncidentTypeChoices(i, query)
+	choices := []*discordgo.ApplicationCommandOptionChoice{}
+	for _, choice := range allChoices {
+		if choice == nil {
+			continue
+		}
+		value := strings.TrimSpace(fmt.Sprintf("%v", choice.Value))
+		if value == "" {
+			continue
+		}
+		if strings.EqualFold(value, "everything") || !d.isPokestopEventType(value) {
+			choices = append(choices, choice)
+		}
+		if len(choices) >= 25 {
+			break
+		}
+	}
+	return choices
+}
+
+func (d *Discord) autocompletePokestopEventChoices(i *discordgo.InteractionCreate, query string) []*discordgo.ApplicationCommandOptionChoice {
+	allChoices := d.autocompleteIncidentTypeChoices(i, query)
+	choices := []*discordgo.ApplicationCommandOptionChoice{}
+	for _, choice := range allChoices {
+		if choice == nil {
+			continue
+		}
+		value := strings.TrimSpace(fmt.Sprintf("%v", choice.Value))
+		if value == "" {
+			continue
+		}
+		if strings.EqualFold(value, "everything") || d.isPokestopEventType(value) {
+			choices = append(choices, choice)
+		}
+		if len(choices) >= 25 {
+			break
+		}
+	}
+	return choices
+}
+
 func (d *Discord) autocompleteIncidentTypeChoices(i *discordgo.InteractionCreate, query string) []*discordgo.ApplicationCommandOptionChoice {
 	if d.manager == nil || d.manager.data == nil {
 		return nil
@@ -322,6 +436,14 @@ func (d *Discord) autocompleteHelpCommandChoices(query string) []*discordgo.Appl
 	query = strings.ToLower(strings.TrimSpace(query))
 	ids := []string{}
 	seen := map[string]bool{}
+	addID := func(id string) {
+		id = strings.TrimSpace(id)
+		if id == "" || seen[id] {
+			return
+		}
+		seen[id] = true
+		ids = append(ids, id)
+	}
 	if d != nil && d.manager != nil {
 		for _, tpl := range d.manager.templates {
 			if tpl.Type != "help" {
@@ -331,15 +453,24 @@ func (d *Discord) autocompleteHelpCommandChoices(query string) []*discordgo.Appl
 				continue
 			}
 			id := strings.TrimSpace(fmt.Sprintf("%v", tpl.ID))
-			if id == "" || strings.EqualFold(id, "slash") || seen[id] {
+			if id == "" || strings.EqualFold(id, "slash") {
 				continue
 			}
-			seen[id] = true
-			ids = append(ids, id)
+			switch strings.ToLower(id) {
+			case "track":
+				addID("pokemon")
+			case "invasion":
+				addID("rocket")
+				addID("pokestop-event")
+			case "tracked", "remove":
+				addID("filters")
+			default:
+				addID(id)
+			}
 		}
 	}
 	if len(ids) == 0 {
-		ids = []string{"track", "raid", "quest", "invasion", "tracked", "remove", "profile", "info"}
+		ids = []string{"pokemon", "raid", "quest", "rocket", "pokestop-event", "filters", "profile", "info"}
 	}
 	sort.Strings(ids)
 	choices := []*discordgo.ApplicationCommandOptionChoice{}
@@ -536,21 +667,22 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType, profile
 				break
 			}
 		}
-	case "incident", "invasion":
+	case "incident", "invasion", "rocket", "pokestop-event":
 		if query == "" {
-			appendChoice(removeAllLabel(removeAllType), "invasion|all")
+			appendChoice(removeAllLabel(removeAllType), strings.ToLower(trackingType)+"|all")
 		}
 		rows, err := d.manager.query.SelectAllQueryLimit("invasion", whereByUser(), fetchLimit)
 		if err != nil {
 			return nil
 		}
+		rows = d.filterRowsByTrackingType(rows, trackingType)
 		for _, row := range rows {
 			uid := strings.TrimSpace(fmt.Sprintf("%v", row["uid"]))
 			if uid == "" {
 				continue
 			}
 			label := labelWithProfile(row, tracking.InvasionRowText(d.manager.cfg, tr, d.manager.data, row))
-			appendChoice(label, "invasion|"+uid)
+			appendChoice(label, strings.ToLower(trackingType)+"|"+uid)
 			if len(choices) >= 25 {
 				break
 			}

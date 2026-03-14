@@ -631,11 +631,11 @@
           },
           {
             "name": "Add Alerts",
-            "value": "`{{prefix}}track` Pokemon spawns\n`{{prefix}}raid` bosses or raid levels\n`{{prefix}}egg` raid eggs by level\n`{{prefix}}maxbattle` max battles\n`{{prefix}}quest` quest rewards\n`{{prefix}}invasion` Team Rocket invasions\n`{{prefix}}gym`, `{{prefix}}fort`, `{{prefix}}nest`, `{{prefix}}weather`, `{{prefix}}lure`\n\nSlash tip: on the major tracking commands, leaving the first option blank opens a guided flow."
+            "value": "`{{prefix}}pokemon` Pokemon spawns\n`{{prefix}}raid boss|level|egg`\n`{{prefix}}maxbattle boss|level`\n`{{prefix}}quest pokemon|item|stardust|candy|mega-energy`\n`{{prefix}}rocket` Team Rocket invasions\n`{{prefix}}pokestop-event` Pokestop events\n`{{prefix}}gym`, `{{prefix}}fort`, `{{prefix}}nest`, `{{prefix}}weather`, `{{prefix}}lure`\n\nSlash tip: on the major tracking commands, leaving the first option blank opens a guided flow."
           },
           {
             "name": "Manage Alerts",
-            "value": "`{{prefix}}tracked` review your alerts\n`{{prefix}}tracked profile:<profile>` view one profile\n`{{prefix}}tracked profile:all` show a cross-profile summary\n`{{prefix}}remove` remove one alert\n`{{prefix}}remove profile:<profile>` remove from a chosen profile\n`{{prefix}}start` and `{{prefix}}stop` enable or pause alerts"
+            "value": "`{{prefix}}filters show` reviews your filters\n`{{prefix}}filters show profile:<profile>` views one profile\n`{{prefix}}filters show profile:all` shows a cross-profile summary\n`{{prefix}}filters remove` removes one or more filters\n`{{prefix}}start` and `{{prefix}}stop` enable or pause alerts"
           },
           {
             "name": "Advanced",
@@ -656,7 +656,7 @@
         "fields": [
           {
             "name": "Quick Start",
-            "value": "`{{prefix}}track pokemon:<name>` tracks one Pokemon.\n`{{prefix}}track pokemon:everything` tracks everything.\nWhen using slash commands, leaving `pokemon` blank opens a guided flow."
+            "value": "`{{prefix}}pokemon pokemon:<name>` tracks one Pokemon.\n`{{prefix}}pokemon pokemon:everything` tracks everything.\nWhen using slash commands, leaving `pokemon` blank opens a guided flow."
           },
           {
             "name": "Useful Filters",
@@ -664,7 +664,7 @@
           },
           {
             "name": "Next Step",
-            "value": "After adding a track, use `{{prefix}}tracked` to confirm which profile it was saved to."
+            "value": "After adding a filter, use `{{prefix}}filters show` to confirm which profile it was saved to."
           }
         ]
       }
@@ -681,7 +681,7 @@
         "fields": [
           {
             "name": "Boss Or Level",
-            "value": "`{{prefix}}raid type:<boss>` tracks a raid boss.\n`{{prefix}}raid type:<level>` tracks a raid level.\nWhen using slash commands, leaving `type` blank opens a guided flow."
+            "value": "`{{prefix}}raid boss pokemon:<boss>` tracks a raid boss.\n`{{prefix}}raid level level:<level>` tracks a raid level.\n`{{prefix}}raid egg level:<level>` tracks raid eggs.\nWhen using slash commands, leaving the main target blank opens a guided flow."
           },
           {
             "name": "Optional Filters",
@@ -689,7 +689,7 @@
           },
           {
             "name": "Related",
-            "value": "Use `{{prefix}}egg` for egg alerts and `{{prefix}}maxbattle` for max battle alerts."
+            "value": "Use `{{prefix}}maxbattle boss|level` for max battle alerts."
           }
         ]
       }
@@ -706,11 +706,11 @@
         "fields": [
           {
             "name": "Rewards",
-            "value": "`{{prefix}}quest type:<pokemon>` tracks Pokemon rewards.\n`{{prefix}}quest type:<item>` tracks item rewards.\nSlash users can leave `type` blank to use the guided flow."
+            "value": "`{{prefix}}quest pokemon pokemon:<pokemon>` tracks Pokemon rewards.\n`{{prefix}}quest item item:<item>` tracks item rewards.\n`{{prefix}}quest stardust min_amount:<amount>` tracks stardust rewards.\n`{{prefix}}quest candy pokemon:<pokemon>` and `{{prefix}}quest mega-energy pokemon:<pokemon>` track the newer reward types."
           },
           {
             "name": "Filters",
-            "value": "`min_amount` only applies to item rewards.\n`ar` filters AR vs non-AR quests.\n`distance`, `clean`, and `template` are also supported."
+            "value": "`min_amount` applies to item, stardust, candy, and mega-energy rewards.\n`ar` filters AR vs non-AR quests.\n`distance`, `clean`, and `template` are also supported."
           },
           {
             "name": "Setup Reminder",
@@ -731,7 +731,7 @@
         "fields": [
           {
             "name": "Types",
-            "value": "`{{prefix}}invasion type:<leader>` tracks leaders.\n`{{prefix}}invasion type:<grunt>` tracks grunt lineups.\nSlash users can leave `type` blank to use the guided flow."
+            "value": "`{{prefix}}rocket type:<leader>` tracks leaders.\n`{{prefix}}rocket type:<grunt>` tracks grunt lineups.\n`{{prefix}}pokestop-event type:<event>` tracks Pokestop events."
           },
           {
             "name": "Filters",
@@ -739,7 +739,7 @@
           },
           {
             "name": "Review",
-            "value": "Use `{{prefix}}tracked` after adding an invasion alert to confirm the saved profile."
+            "value": "Use `{{prefix}}filters show` after adding a Rocket or Pokestop event filter to confirm the saved profile."
           }
         ]
       }
@@ -756,11 +756,11 @@
         "fields": [
           {
             "name": "Default View",
-            "value": "`{{prefix}}tracked` shows the detailed list for your current effective profile."
+            "value": "`{{prefix}}filters show` shows the detailed list for your current effective profile."
           },
           {
             "name": "Profile Scope",
-            "value": "`{{prefix}}tracked profile:<profile>` shows one specific profile.\n`{{prefix}}tracked profile:all` shows a summary across every profile without dumping the full list."
+            "value": "`{{prefix}}filters show profile:<profile>` shows one specific profile.\n`{{prefix}}filters show profile:all` shows a summary across every profile without dumping the full list."
           },
           {
             "name": "Large Lists",
@@ -781,7 +781,7 @@
         "fields": [
           {
             "name": "Basic Use",
-            "value": "`{{prefix}}remove type:<kind> tracking:<entry>` removes one alert.\nAutocomplete is based on the selected tracking type."
+            "value": "`{{prefix}}filters remove type:<kind> tracking:<entry>` removes one filter.\nAutocomplete is based on the selected filter type."
           },
           {
             "name": "Profile Scope",
@@ -789,7 +789,7 @@
           },
           {
             "name": "Tip",
-            "value": "If you are unsure where something was saved, run `{{prefix}}tracked profile:all` first."
+            "value": "If you are unsure where something was saved, run `{{prefix}}filters show profile:all` first."
           }
         ]
       }
@@ -810,7 +810,7 @@
           },
           {
             "name": "Why It Matters",
-            "value": "Most tracking commands save into your current effective profile and rely on your saved location or chosen areas."
+            "value": "Most slash filters save into your current effective profile and rely on your saved location or chosen areas."
           },
           {
             "name": "Recommended Setup",

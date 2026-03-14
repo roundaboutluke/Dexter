@@ -107,6 +107,11 @@ func TestShippedDeFrSlashRuntimeKeysCovered(t *testing.T) {
 		"What do you want to look up?",
 		"Ready to run `{0}`",
 		"New Pokemon Alert:",
+		"New Pokestop Event Alert:",
+		"New Gym Alert:",
+		"New Fort Alert:",
+		"New Nest Alert:",
+		"New Weather Alert:",
 		"Confirm Command:",
 		"Canceled.",
 		"Weather info",
@@ -135,23 +140,43 @@ func TestShippedDeFrSlashRuntimeKeysCovered(t *testing.T) {
 		"That tracking entry could not be parsed.",
 		"Tracking type changed; please clear the tracking selection and pick again.",
 		"That tracking entry could not be removed.",
-		"No tracking entries found in {0}.",
-		"Tracking not found in {0}.",
-		"Removed {0} tracking entries from {1}. Next: use `/tracked` to review your alerts.",
-		"Tracking removed from {0}. Next: use `/tracked` to review your alerts.",
+		"That filter action is no longer available.",
+		"That filter action has expired.",
+		"That filter action belongs to another user.",
+		"No filters were changed.",
+		"No filters found in {0}.",
+		"Filter not found in {0}.",
+		"Filter Added",
+		"Filters Added",
+		"Filter Removed",
+		"Filters Removed",
+		"Filter Restored",
+		"Filters Restored",
+		"Filter",
+		"Type",
+		"Remove Filter",
+		"Remove Filters",
+		"Restore Filter",
+		"Restore Filters",
+		"Saved to {0}.",
+		"Removed from {0}.",
+		"Restored in {0}.",
+		"Rocket",
+		"Pokestop Event",
+		"And {0} more...",
 		"Weather info: use your saved location or enter coordinates?",
 		"Use saved location",
 		"Enter coordinates",
 		"Please pick something to look up.",
 		"You're not tracking anything in any profile.",
-		"Tracking summary across all profiles.",
-		"Tracking summary across all profiles. Current profile: {0}.",
-		"Use `/tracked profile:<profile>` for full details.",
-		"Viewing tracking for {0}.",
+		"Filter summary across all profiles.",
+		"Filter summary across all profiles. Current profile: {0}.",
+		"Use `/filters show profile:<profile>` for full details.",
+		"Viewing filters for {0}.",
 		"Your alerts are currently",
 		"Your location is currently set to",
 		"You have not set a location yet",
-		"Tracking for {0} is attached as a file:",
+		"Filters for {0} are attached as a file:",
 	}
 
 	cfg := config.New(map[string]any{
@@ -341,7 +366,7 @@ func walkSlashOptions(options []*discordgo.ApplicationCommandOption, fn func(*di
 
 func choiceMayRemainUnchanged(name string) bool {
 	switch name {
-	case "Pokemon", "pokemon", "Pokestop", "raid", "egg", "maxbattle", "invasion", "quest", "gym", "weather", "lure", "nest", "fort", "xxs", "xs", "m", "xl", "xxl":
+	case "Pokemon", "pokemon", "Pokestop", "raid", "egg", "maxbattle", "invasion", "rocket", "pokestop-event", "quest", "gym", "weather", "lure", "nest", "fort", "xxs", "xs", "m", "xl", "xxl":
 		return true
 	default:
 		return false
