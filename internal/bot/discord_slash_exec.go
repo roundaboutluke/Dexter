@@ -28,6 +28,21 @@ func (r slashExecutionResult) Success() bool {
 	return r.Status == slashExecutionSuccess
 }
 
+func slashErrorEmbed(text string) *discordgo.MessageEmbed {
+	return &discordgo.MessageEmbed{
+		Description: "❌ " + text,
+		Color:       0xED4245, // Discord red
+	}
+}
+
+func (d *Discord) respondEphemeralError(s *discordgo.Session, i *discordgo.InteractionCreate, text string) {
+	d.respondEphemeralComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{slashErrorEmbed(text)}, nil)
+}
+
+func (d *Discord) respondUpdateError(s *discordgo.Session, i *discordgo.InteractionCreate, text string) {
+	d.respondUpdateComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{slashErrorEmbed(text)}, nil)
+}
+
 func (d *Discord) respondDeferredEphemeral(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	response := &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,

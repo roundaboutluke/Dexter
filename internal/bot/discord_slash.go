@@ -690,7 +690,7 @@ func (d *Discord) handleSlashComponent(s *discordgo.Session, i *discordgo.Intera
 	state := d.getSlashState(i.Member, i.User)
 	if state == nil || state.ExpiresAt.Before(time.Now()) {
 		d.clearSlashState(i.Member, i.User)
-		d.respondEphemeral(s, i, d.slashExpiredText(i))
+		d.respondEphemeralError(s, i, d.slashExpiredText(i))
 		return
 	}
 
@@ -808,14 +808,14 @@ func (d *Discord) handleSlashComponent(s *discordgo.Session, i *discordgo.Intera
 			d.clearSlashRenderMessage(i.Message)
 			userID, _ := slashUser(i)
 			if userID == "" || d.manager == nil || d.manager.query == nil {
-				d.respondEphemeral(s, i, d.slashText(i, "Target is not registered."))
+				d.respondEphemeralError(s, i, d.slashText(i, "Target is not registered."))
 				return
 			}
 			line := strings.TrimSpace(state.Command + " " + strings.Join(state.Args, " "))
 			result := d.buildSlashExecutionResult(s, i, line)
 			human, err := d.manager.query.SelectOneQuery("humans", map[string]any{"id": userID})
 			if err != nil {
-				d.respondEphemeral(s, i, d.slashText(i, "Target is not registered."))
+				d.respondEphemeralError(s, i, d.slashText(i, "Target is not registered."))
 				return
 			}
 			target := ""
@@ -933,7 +933,7 @@ func (d *Discord) handleSlashModal(s *discordgo.Session, i *discordgo.Interactio
 	state := d.getSlashState(i.Member, i.User)
 	if state == nil || state.ExpiresAt.Before(time.Now()) {
 		d.clearSlashState(i.Member, i.User)
-		d.respondEphemeral(s, i, d.slashExpiredText(i))
+		d.respondEphemeralError(s, i, d.slashExpiredText(i))
 		return
 	}
 	switch data.CustomID {
@@ -954,7 +954,7 @@ func (d *Discord) handleSlashModal(s *discordgo.Session, i *discordgo.Interactio
 		}
 		options := d.monsterSearchOptions(query)
 		if len(options) == 0 {
-			d.respondEphemeral(s, i, d.slashText(i, "No Pokemon matched that search."))
+			d.respondEphemeralError(s, i, d.slashText(i, "No Pokemon matched that search."))
 			return
 		}
 		d.respondWithSelectMenu(s, i, d.slashText(i, "Select a Pokemon"), slashMonsterSelect, options)

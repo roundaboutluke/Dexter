@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"sync"
 
 	"poraclego/internal/uicons"
 )
@@ -142,34 +141,12 @@ func shinyPossibleForHook(p *Processor, hook *Hook) bool {
 	return p.shinyPossible.IsPossible(pokemonID, form)
 }
 
-var (
-	uiconsClients   = map[string]*uicons.Client{}
-	uiconsClientsMu sync.Mutex
-)
-
 func isUiconsRepo(baseURL, imageType string) bool {
-	key := baseURL + "|" + imageType
-	uiconsClientsMu.Lock()
-	client, ok := uiconsClients[key]
-	if !ok {
-		client = uicons.NewClient(baseURL, imageType)
-		uiconsClients[key] = client
-	}
-	uiconsClientsMu.Unlock()
-	okRepo, _ := client.IsUiconsRepository()
-	return okRepo
+	return uicons.IsCachedRepo(baseURL, imageType)
 }
 
 func uiconsClient(baseURL, imageType string) *uicons.Client {
-	key := baseURL + "|" + imageType
-	uiconsClientsMu.Lock()
-	client, ok := uiconsClients[key]
-	if !ok {
-		client = uicons.NewClient(baseURL, imageType)
-		uiconsClients[key] = client
-	}
-	uiconsClientsMu.Unlock()
-	return client
+	return uicons.CachedClient(baseURL, imageType)
 }
 
 func legacyUiconsURL(base, imageType string, hook *Hook) string {

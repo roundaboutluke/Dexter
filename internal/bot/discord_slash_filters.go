@@ -7,10 +7,13 @@ import (
 	"strings"
 	"time"
 
+	"strconv"
+
 	"github.com/bwmarrin/discordgo"
 	"poraclego/internal/db"
 	"poraclego/internal/i18n"
 	"poraclego/internal/tracking"
+	"poraclego/internal/uicons"
 )
 
 const (
@@ -22,6 +25,455 @@ const (
 	slashFilterCardColorRemoved  = 0xED4245
 	slashFilterCardColorRestored = 0x5865F2
 )
+
+func (d *Discord) slashUiconsClient() *uicons.Client {
+	if d == nil || d.manager == nil || d.manager.cfg == nil {
+		return nil
+	}
+	imgURL, _ := d.manager.cfg.GetString("general.imgUrl")
+	if imgURL == "" {
+		return nil
+	}
+	return uicons.CachedClient(imgURL, "png")
+}
+
+func (d *Discord) slashFilterIconURL(trackingType string, rows []map[string]any) string {
+	if len(rows) == 0 {
+		return ""
+	}
+	client := d.slashUiconsClient()
+	if client == nil {
+		return ""
+	}
+	row := rows[0]
+	switch trackingType {
+	case "pokemon":
+		pokemonID := toInt(row["pokemon_id"], 0)
+		if pokemonID == 0 {
+			return ""
+		}
+		form := toInt(row["form"], 0)
+		evolution := toInt(row["evolution"], 0)
+		url, _ := client.PokemonIcon(pokemonID, form, evolution, 0, 0, 0, false, 0)
+		return url
+	case "raid", "maxbattle":
+		pokemonID := toInt(row["pokemon_id"], 9000)
+		if pokemonID == 9000 || pokemonID == 0 {
+			level := toInt(row["level"], 0)
+			if level > 0 {
+				url, _ := client.RaidEggIcon(level, false, false)
+				return url
+			}
+			return ""
+		}
+		form := toInt(row["form"], 0)
+		evolution := toInt(row["evolution"], 0)
+		url, _ := client.PokemonIcon(pokemonID, form, evolution, 0, 0, 0, false, 0)
+		return url
+	case "egg":
+		level := toInt(row["level"], 0)
+		if level > 0 {
+			url, _ := client.RaidEggIcon(level, false, false)
+			return url
+		}
+		return ""
+	case "quest":
+		rewardType := toInt(row["reward_type"], 0)
+		reward := toInt(row["reward"], 0)
+		switch rewardType {
+		case 7:
+			if reward == 0 {
+				return ""
+			}
+			form := toInt(row["form"], 0)
+			url, _ := client.PokemonIcon(reward, form, 0, 0, 0, 0, false, 0)
+			return url
+		case 2:
+			if reward > 0 {
+				url, _ := client.RewardItemIcon(reward)
+				return url
+			}
+		case 3:
+			url, _ := client.RewardStardustIcon(reward)
+			return url
+		case 12:
+			url, _ := client.RewardMegaEnergyIcon(reward, 0)
+			return url
+		case 4:
+			url, _ := client.RewardCandyIcon(reward, 0)
+			return url
+		case 9:
+			url, _ := client.RewardXLCandyIcon(reward, 0)
+			return url
+		}
+		return ""
+	case "rocket":
+		gruntType := strings.TrimSpace(fmt.Sprintf("%v", row["grunt_type"]))
+		if id, err := strconv.Atoi(gruntType); err == nil && id > 0 {
+			url, _ := client.InvasionIcon(id)
+			return url
+		}
+		return ""
+	case "pokestop-event":
+		gruntType := strings.TrimSpace(fmt.Sprintf("%v", row["grunt_type"]))
+		switch strings.ToLower(gruntType) {
+		case "gold-stop":
+			url, _ := client.PokestopIcon(0, false, 7, false)
+			return url
+		case "kecleon":
+			url, _ := client.PokemonIcon(352, 0, 0, 0, 0, 0, false, 0)
+			return url
+		case "showcase":
+			url, _ := client.PokestopIcon(0, false, 9, false)
+			return url
+		}
+		return ""
+	case "lure":
+		lureID := toInt(row["lure_id"], 0)
+		if lureID > 0 {
+			url, _ := client.RewardItemIcon(lureID)
+			return url
+		}
+		return ""
+	case "weather":
+		condition := toInt(row["condition"], 0)
+		if condition > 0 {
+			url, _ := client.WeatherIcon(condition)
+			return url
+		}
+		return ""
+	case "gym":
+		team := toInt(row["team"], 0)
+		url, _ := client.GymIcon(team, 0, false, false)
+		return url
+	case "nest":
+		pokemonID := toInt(row["pokemon_id"], 0)
+		if pokemonID == 0 {
+			return ""
+		}
+		form := toInt(row["form"], 0)
+		url, _ := client.PokemonIcon(pokemonID, form, 0, 0, 0, 0, false, 0)
+		return url
+	case "fort":
+		return ""
+	default:
+		return ""
+	}
+}
+
+func (d *Discord) slashFilterTypedHeading(tr *i18n.Translator, trackingType string, rows []map[string]any) string {
+	typeLabel := slashTrackingTitle(tr, trackingType)
+	if len(rows) == 0 {
+		return typeLabel
+	}
+	if len(rows) > 1 {
+		return fmt.Sprintf("%d %s", len(rows), strings.ToLower(translateOrDefault(tr, "Filters")))
+	}
+	row := rows[0]
+	name := ""
+	switch trackingType {
+	case "pokemon":
+		name = d.slashMonsterName(tr, row)
+	case "raid", "maxbattle":
+		pokemonID := toInt(row["pokemon_id"], 9000)
+		if pokemonID == 9000 || pokemonID == 0 {
+			level := toInt(row["level"], 0)
+			if level == 90 {
+				name = translateOrDefault(tr, "All levels")
+			} else if level > 0 {
+				name = fmt.Sprintf("%s %d", translateOrDefault(tr, "Level"), level)
+			}
+		} else {
+			name = d.slashMonsterName(tr, row)
+		}
+	case "egg":
+		level := toInt(row["level"], 0)
+		if level == 90 {
+			name = translateOrDefault(tr, "All levels")
+		} else if level > 0 {
+			name = fmt.Sprintf("%s %d", translateOrDefault(tr, "Level"), level)
+		}
+	case "quest":
+		name = d.slashQuestRewardName(tr, row)
+	case "rocket", "pokestop-event":
+		grunt := strings.TrimSpace(fmt.Sprintf("%v", row["grunt_type"]))
+		if grunt != "" && !strings.EqualFold(grunt, "everything") {
+			name = d.invasionTypeLabel(grunt, tr)
+		} else {
+			name = translateOrDefault(tr, "Everything")
+		}
+	case "lure":
+		lureID := toInt(row["lure_id"], 0)
+		if lureID == 0 {
+			name = translateOrDefault(tr, "Everything")
+		} else if d.manager != nil && d.manager.data != nil {
+			name = tracking.LureRowText(d.manager.cfg, tr, d.manager.data, row)
+		}
+	case "weather":
+		condition := toInt(row["condition"], 0)
+		if condition == 0 {
+			name = translateOrDefault(tr, "Everything")
+		} else if d.manager != nil && d.manager.data != nil {
+			name = tracking.WeatherRowText(tr, d.manager.data, row)
+		}
+	case "gym":
+		name = d.slashFilterRowText(tr, trackingType, row)
+	case "nest":
+		name = d.slashMonsterName(tr, row)
+	default:
+		name = d.slashFilterRowText(tr, trackingType, row)
+	}
+	if name == "" {
+		return typeLabel
+	}
+	return fmt.Sprintf("%s: %s", typeLabel, name)
+}
+
+func (d *Discord) slashMonsterName(tr *i18n.Translator, row map[string]any) string {
+	pokemonID := toInt(row["pokemon_id"], 0)
+	if pokemonID == 0 {
+		return translateOrDefault(tr, "Everything")
+	}
+	if d.manager == nil || d.manager.data == nil {
+		return fmt.Sprintf("#%d", pokemonID)
+	}
+	formID := toInt(row["form"], 0)
+	for _, raw := range d.manager.data.Monsters {
+		mon, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		if toInt(mon["id"], -1) != pokemonID {
+			continue
+		}
+		form := toMapAny(mon["form"])
+		if toInt(form["id"], -1) == formID {
+			name := translateOrDefault(tr, fmt.Sprintf("%v", mon["name"]))
+			formName := fmt.Sprintf("%v", form["name"])
+			if formName != "" && formName != "Normal" && toInt(form["id"], 0) != 0 {
+				name = name + " " + translateOrDefault(tr, formName)
+			}
+			return name
+		}
+	}
+	return fmt.Sprintf("#%d", pokemonID)
+}
+
+func (d *Discord) slashQuestRewardName(tr *i18n.Translator, row map[string]any) string {
+	rewardType := toInt(row["reward_type"], 0)
+	reward := toInt(row["reward"], 0)
+	form := toInt(row["form"], 0)
+	switch rewardType {
+	case 7:
+		fakeRow := map[string]any{"pokemon_id": reward, "form": form}
+		return d.slashMonsterName(tr, fakeRow)
+	case 2:
+		if d.manager != nil && d.manager.data != nil {
+			if item := d.manager.data.Items[fmt.Sprintf("%d", reward)]; item != nil {
+				if m, ok := item.(map[string]any); ok {
+					if name := fmt.Sprintf("%v", m["name"]); name != "" {
+						return translateOrDefault(tr, name)
+					}
+				}
+			}
+		}
+		return translateOrDefault(tr, "Item")
+	case 3:
+		return translateOrDefault(tr, "Stardust")
+	case 12:
+		name := translateOrDefault(tr, "Mega Energy")
+		if reward > 0 {
+			fakeRow := map[string]any{"pokemon_id": reward, "form": 0}
+			monName := d.slashMonsterName(tr, fakeRow)
+			if monName != "" {
+				return name + " " + monName
+			}
+		}
+		return name
+	case 4:
+		if reward == 0 {
+			return translateOrDefault(tr, "Rare Candy")
+		}
+		fakeRow := map[string]any{"pokemon_id": reward, "form": 0}
+		return d.slashMonsterName(tr, fakeRow) + " Candy"
+	case 9:
+		if reward == 0 {
+			return translateOrDefault(tr, "Rare Candy XL")
+		}
+		fakeRow := map[string]any{"pokemon_id": reward, "form": 0}
+		return d.slashMonsterName(tr, fakeRow) + " XL Candy"
+	case 1:
+		return translateOrDefault(tr, "Experience")
+	default:
+		return translateOrDefault(tr, "Reward")
+	}
+}
+
+func toMapAny(v any) map[string]any {
+	if m, ok := v.(map[string]any); ok {
+		return m
+	}
+	return map[string]any{}
+}
+
+func slashFilterNonDefaultDetailLines(tr *i18n.Translator, trackingType string, row map[string]any) []string {
+	lines := []string{}
+	switch trackingType {
+	case "pokemon":
+		addIfNotDefault := func(label string, keys ...string) {
+			for _, key := range keys {
+				val := toInt(row[key], 0)
+				def := monsterDefaultValue(key)
+				if val != def {
+					lines = append(lines, slashCardDetailLine(label, fmt.Sprintf("%d", val)))
+					return
+				}
+			}
+		}
+		minIV := toInt(row["min_iv"], 0)
+		maxIV := toInt(row["max_iv"], 100)
+		if minIV != 0 || maxIV != 100 {
+			lines = append(lines, slashCardDetailLine(translateOrDefault(tr, "IV"), fmt.Sprintf("%d%% - %d%%", minIV, maxIV)))
+		}
+		minCP := toInt(row["min_cp"], 0)
+		maxCP := toInt(row["max_cp"], 9000)
+		if minCP != 0 || maxCP != 9000 {
+			lines = append(lines, slashCardDetailLine(translateOrDefault(tr, "CP"), fmt.Sprintf("%d - %d", minCP, maxCP)))
+		}
+		minLvl := toInt(row["min_level"], 0)
+		maxLvl := toInt(row["max_level"], 40)
+		if minLvl != 0 || maxLvl != 40 {
+			lines = append(lines, slashCardDetailLine(translateOrDefault(tr, "Level"), fmt.Sprintf("%d - %d", minLvl, maxLvl)))
+		}
+		atk := toInt(row["atk"], 0)
+		def_ := toInt(row["def"], 0)
+		sta := toInt(row["sta"], 0)
+		maxAtk := toInt(row["max_atk"], 15)
+		maxDef := toInt(row["max_def"], 15)
+		maxSta := toInt(row["max_sta"], 15)
+		if atk != 0 || def_ != 0 || sta != 0 || maxAtk != 15 || maxDef != 15 || maxSta != 15 {
+			lines = append(lines, slashCardDetailLine(translateOrDefault(tr, "Stats"), fmt.Sprintf("%d/%d/%d - %d/%d/%d", atk, def_, sta, maxAtk, maxDef, maxSta)))
+		}
+		pvpLeague := toInt(row["pvp_ranking_league"], 0)
+		if pvpLeague != 0 {
+			pvpWorst := toInt(row["pvp_ranking_worst"], 0)
+			lines = append(lines, slashCardDetailLine("PVP", fmt.Sprintf("%dCP top %d", pvpLeague, pvpWorst)))
+		}
+		gender := toInt(row["gender"], 0)
+		if gender == 1 {
+			lines = append(lines, slashCardDetailLine(translateOrDefault(tr, "Gender"), "♂"))
+		} else if gender == 2 {
+			lines = append(lines, slashCardDetailLine(translateOrDefault(tr, "Gender"), "♀"))
+		}
+		size := toInt(row["size"], 0)
+		maxSize := toInt(row["max_size"], 5)
+		if size != 0 || maxSize != 5 {
+			sizeLabels := map[int]string{1: "XXS", 2: "XS", 3: "M", 4: "XL", 5: "XXL"}
+			sizeMin := sizeLabels[size]
+			sizeMax := sizeLabels[maxSize]
+			if sizeMin == "" {
+				sizeMin = fmt.Sprintf("%d", size)
+			}
+			if sizeMax == "" {
+				sizeMax = fmt.Sprintf("%d", maxSize)
+			}
+			lines = append(lines, slashCardDetailLine(translateOrDefault(tr, "Size"), fmt.Sprintf("%s - %s", sizeMin, sizeMax)))
+		}
+		distance := toInt(row["distance"], 0)
+		if distance > 0 {
+			lines = append(lines, slashCardDetailLine(translateOrDefault(tr, "Distance"), fmt.Sprintf("%dm", distance)))
+		}
+		minTime := toInt(row["min_time"], 0)
+		if minTime > 0 {
+			lines = append(lines, slashCardDetailLine(translateOrDefault(tr, "Min time"), fmt.Sprintf("%ds", minTime)))
+		}
+		_ = addIfNotDefault // suppress unused warning for this helper pattern
+	case "raid", "egg", "maxbattle":
+		distance := toInt(row["distance"], 0)
+		if distance > 0 {
+			lines = append(lines, slashCardDetailLine(translateOrDefault(tr, "Distance"), fmt.Sprintf("%dm", distance)))
+		}
+		team := toInt(row["team"], 4)
+		if team != 4 {
+			lines = append(lines, slashCardDetailLine(translateOrDefault(tr, "Team"), fmt.Sprintf("%d", team)))
+		}
+		exclusive := toInt(row["exclusive"], 0)
+		if exclusive != 0 {
+			lines = append(lines, slashCardDetailLine("EX", translateOrDefault(tr, "Yes")))
+		}
+	case "quest":
+		amount := toInt(row["amount"], 0)
+		if amount > 0 {
+			lines = append(lines, slashCardDetailLine(translateOrDefault(tr, "Amount"), fmt.Sprintf("%d+", amount)))
+		}
+		distance := toInt(row["distance"], 0)
+		if distance > 0 {
+			lines = append(lines, slashCardDetailLine(translateOrDefault(tr, "Distance"), fmt.Sprintf("%dm", distance)))
+		}
+	case "rocket", "pokestop-event":
+		distance := toInt(row["distance"], 0)
+		if distance > 0 {
+			lines = append(lines, slashCardDetailLine(translateOrDefault(tr, "Distance"), fmt.Sprintf("%dm", distance)))
+		}
+		gender := toInt(row["gender"], 0)
+		if gender == 1 {
+			lines = append(lines, slashCardDetailLine(translateOrDefault(tr, "Gender"), "♂"))
+		} else if gender == 2 {
+			lines = append(lines, slashCardDetailLine(translateOrDefault(tr, "Gender"), "♀"))
+		}
+	case "lure":
+		distance := toInt(row["distance"], 0)
+		if distance > 0 {
+			lines = append(lines, slashCardDetailLine(translateOrDefault(tr, "Distance"), fmt.Sprintf("%dm", distance)))
+		}
+	case "weather":
+		// Weather tracking has minimal params
+	case "gym":
+		distance := toInt(row["distance"], 0)
+		if distance > 0 {
+			lines = append(lines, slashCardDetailLine(translateOrDefault(tr, "Distance"), fmt.Sprintf("%dm", distance)))
+		}
+	case "nest":
+		distance := toInt(row["distance"], 0)
+		if distance > 0 {
+			lines = append(lines, slashCardDetailLine(translateOrDefault(tr, "Distance"), fmt.Sprintf("%dm", distance)))
+		}
+	}
+	clean := toInt(row["clean"], 0)
+	if clean != 0 {
+		lines = append(lines, slashCardDetailLine(translateOrDefault(tr, "Clean"), translateOrDefault(tr, "Yes")))
+	}
+	return lines
+}
+
+func monsterDefaultValue(key string) int {
+	switch key {
+	case "min_iv":
+		return 0
+	case "max_iv":
+		return 100
+	case "min_cp":
+		return 0
+	case "max_cp":
+		return 9000
+	case "min_level":
+		return 0
+	case "max_level":
+		return 40
+	case "atk", "def", "sta":
+		return 0
+	case "max_atk", "max_def", "max_sta":
+		return 15
+	case "gender", "size", "rarity", "distance", "min_time":
+		return 0
+	case "max_size":
+		return 5
+	case "max_rarity":
+		return 6
+	default:
+		return 0
+	}
+}
 
 type slashFilterActionState struct {
 	UserID       string
@@ -474,33 +926,112 @@ func (d *Discord) slashFilterPreviewEmbed(i *discordgo.InteractionCreate, title,
 	if commandLine = strings.TrimSpace(commandLine); commandLine != "" {
 		embed.Footer = &discordgo.MessageEmbedFooter{Text: commandLine}
 	}
+	if iconURL := d.slashPreviewIconURL(commandLine); iconURL != "" {
+		embed.Thumbnail = &discordgo.MessageEmbedThumbnail{URL: iconURL}
+	}
 	return embed
+}
+
+func (d *Discord) slashPreviewIconURL(commandLine string) string {
+	parts := strings.Fields(commandLine)
+	if len(parts) < 2 {
+		return ""
+	}
+	command := strings.ToLower(parts[0])
+	trackingType := slashTrackingTypeFromCommand(command)
+	if trackingType == "" {
+		return ""
+	}
+	client := d.slashUiconsClient()
+	if client == nil {
+		return ""
+	}
+	switch trackingType {
+	case "pokemon":
+		name := parts[1]
+		if id := d.pokemonIDFromName(name); id > 0 {
+			url, _ := client.PokemonIcon(id, 0, 0, 0, 0, 0, false, 0)
+			return url
+		}
+	case "raid", "maxbattle":
+		name := parts[1]
+		if strings.HasPrefix(strings.ToLower(name), "level") {
+			if len(parts) > 2 {
+				if level, err := strconv.Atoi(parts[2]); err == nil && level > 0 {
+					url, _ := client.RaidEggIcon(level, false, false)
+					return url
+				}
+			}
+		} else if id := d.pokemonIDFromName(name); id > 0 {
+			url, _ := client.PokemonIcon(id, 0, 0, 0, 0, 0, false, 0)
+			return url
+		}
+	case "egg":
+		name := parts[1]
+		if strings.HasPrefix(strings.ToLower(name), "level") && len(parts) > 2 {
+			if level, err := strconv.Atoi(parts[2]); err == nil && level > 0 {
+				url, _ := client.RaidEggIcon(level, false, false)
+				return url
+			}
+		} else if level, err := strconv.Atoi(name); err == nil && level > 0 {
+			url, _ := client.RaidEggIcon(level, false, false)
+			return url
+		}
+	}
+	return ""
+}
+
+func (d *Discord) pokemonIDFromName(name string) int {
+	if d.manager == nil || d.manager.data == nil {
+		return 0
+	}
+	lower := strings.ToLower(strings.TrimSpace(name))
+	if id, err := strconv.Atoi(lower); err == nil {
+		return id
+	}
+	for _, raw := range d.manager.data.Monsters {
+		mon, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		monName := strings.ToLower(fmt.Sprintf("%v", mon["name"]))
+		if monName == lower {
+			return toInt(mon["id"], 0)
+		}
+	}
+	return 0
 }
 
 func (d *Discord) slashFilterMutationEmbed(i *discordgo.InteractionCreate, action, trackingType string, rows []map[string]any, profileLabel string) *discordgo.MessageEmbed {
 	tr := d.slashInteractionTranslator(i)
-	intro := ""
-	if profileLabel != "" {
-		if profileKey := slashFilterMutationProfileKey(action); profileKey != "" {
-			intro = tr.TranslateFormat(profileKey, profileLabel)
-		}
-	}
+	headline := d.slashFilterTypedHeading(tr, trackingType, rows)
 	detailLines := []string{}
 	if profileLabel != "" {
 		detailLines = append(detailLines, slashCardDetailLine(tr.Translate("Profile", false), profileLabel))
 	}
-	if trackingType != "" {
-		detailLines = append(detailLines, slashCardDetailLine(tr.Translate("Type", false), slashTrackingTitle(tr, trackingType)))
+	if len(rows) == 1 {
+		detailLines = append(detailLines, slashFilterNonDefaultDetailLines(tr, trackingType, rows[0])...)
+	} else if len(rows) > 1 {
+		for idx, row := range rows {
+			if idx >= 5 {
+				detailLines = append(detailLines, fmt.Sprintf("*%s*", tr.TranslateFormat("And {0} more...", len(rows)-idx)))
+				break
+			}
+			label := d.slashFilterRowText(tr, trackingType, row)
+			if label != "" {
+				detailLines = append(detailLines, "- "+label)
+			}
+		}
 	}
-	summary := ""
-	if len(rows) > 1 {
-		summary = d.slashFilterSummary(tr, trackingType, rows)
-	}
-	return &discordgo.MessageEmbed{
+	embed := &discordgo.MessageEmbed{
 		Title:       tr.Translate(slashFilterMutationTitleKey(action, len(rows)), false),
-		Description: slashCardDescription(d.slashFilterCardHeadline(tr, trackingType, rows), intro, detailLines, summary),
+		Description: slashCardDescription(headline, "", detailLines, ""),
 		Color:       slashFilterCardColor(action),
 	}
+	if iconURL := d.slashFilterIconURL(trackingType, rows); iconURL != "" {
+		embed.Thumbnail = &discordgo.MessageEmbedThumbnail{URL: iconURL}
+	}
+	return embed
 }
 
 func (d *Discord) slashFilterMutationComponents(i *discordgo.InteractionCreate, trackingType, customID string, count int, restoring bool) []discordgo.MessageComponent {
@@ -596,21 +1127,21 @@ func (d *Discord) handleSlashFilterRemoveAction(s *discordgo.Session, i *discord
 	userID, _ := slashUser(i)
 	action, errKey := d.slashFilterAction(id, userID)
 	if errKey != "" {
-		d.respondEphemeral(s, i, d.slashText(i, errKey))
+		d.respondEphemeralError(s, i, d.slashText(i, errKey))
 		return
 	}
 	removed, err := d.deleteSlashTrackingRows(action.Table, action.Rows)
 	if err != nil {
-		d.respondEphemeral(s, i, err.Error())
+		d.respondEphemeralError(s, i, err.Error())
 		return
 	}
 	if removed == 0 {
-		d.respondEphemeral(s, i, d.slashText(i, "No filters were changed."))
+		d.respondEphemeralError(s, i, d.slashText(i, "No filters were changed."))
 		return
 	}
 	embeds, components, ok := d.slashFilterMutationResponse(i, "removed", action.TrackingType, action.Table, action.ProfileLabel, userID, action.Rows)
 	if !ok {
-		d.respondEphemeral(s, i, d.slashText(i, "No filters were changed."))
+		d.respondEphemeralError(s, i, d.slashText(i, "No filters were changed."))
 		return
 	}
 	d.respondUpdateComponentsEmbed(s, i, "", embeds, components)
@@ -620,21 +1151,21 @@ func (d *Discord) handleSlashFilterRestoreAction(s *discordgo.Session, i *discor
 	userID, _ := slashUser(i)
 	action, errKey := d.slashFilterAction(id, userID)
 	if errKey != "" {
-		d.respondEphemeral(s, i, d.slashText(i, errKey))
+		d.respondEphemeralError(s, i, d.slashText(i, errKey))
 		return
 	}
 	restored, err := d.restoreSlashTrackingRows(action.Table, action.Rows)
 	if err != nil {
-		d.respondEphemeral(s, i, err.Error())
+		d.respondEphemeralError(s, i, err.Error())
 		return
 	}
 	if restored == 0 {
-		d.respondEphemeral(s, i, d.slashText(i, "No filters were changed."))
+		d.respondEphemeralError(s, i, d.slashText(i, "No filters were changed."))
 		return
 	}
 	embeds, components, ok := d.slashFilterMutationResponse(i, "restored", action.TrackingType, action.Table, action.ProfileLabel, userID, action.Rows)
 	if !ok {
-		d.respondEphemeral(s, i, d.slashText(i, "No filters were changed."))
+		d.respondEphemeralError(s, i, d.slashText(i, "No filters were changed."))
 		return
 	}
 	d.respondUpdateComponentsEmbed(s, i, "", embeds, components)

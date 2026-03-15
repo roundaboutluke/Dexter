@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -377,4 +378,39 @@ func suffixFlag(enabled bool, suffix string) []string {
 		return []string{suffix, ""}
 	}
 	return []string{""}
+}
+
+var (
+	cachedClients   = map[string]*Client{}
+	cachedClientsMu sync.Mutex
+)
+
+// CachedClient returns a shared Client for the given base URL and image type.
+// Clients are cached by key and reused across calls. Thread-safe.
+func CachedClient(baseURL, imageType string) *Client {
+	if baseURL == "" {
+		return nil
+	}
+	if imageType == "" {
+		imageType = "png"
+	}
+	key := baseURL + "|" + imageType
+	cachedClientsMu.Lock()
+	client, ok := cachedClients[key]
+	if !ok {
+		client = NewClient(baseURL, imageType)
+		cachedClients[key] = client
+	}
+	cachedClientsMu.Unlock()
+	return client
+}
+
+// IsCachedRepo checks whether a cached client for the given URL is a valid uicons repository.
+func IsCachedRepo(baseURL, imageType string) bool {
+	client := CachedClient(baseURL, imageType)
+	if client == nil {
+		return false
+	}
+	ok, _ := client.IsUiconsRepository()
+	return ok
 }
