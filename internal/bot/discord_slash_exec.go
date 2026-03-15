@@ -525,6 +525,17 @@ func (d *Discord) startSlashGuide(i *discordgo.InteractionCreate, commandName, s
 	d.setSlashState(i.Member, i.User, state)
 }
 
+func (d *Discord) startSlashGuideWithProfile(i *discordgo.InteractionCreate, commandName, step string, selection slashProfileSelection) {
+	state := &slashBuilderState{
+		Command:      commandName,
+		Step:         step,
+		ProfileNo:    selection.ProfileNo,
+		ProfileLabel: selection.TargetLabelLocalized(d.slashInteractionTranslator(i)),
+		ExpiresAt:    time.Now().Add(5 * time.Minute),
+	}
+	d.setSlashState(i.Member, i.User, state)
+}
+
 func (d *Discord) logSlashUX(i *discordgo.InteractionCreate, commandName, action, detail string) {
 	logger := logging.Get().Discord
 	if logger == nil || i == nil {
@@ -556,6 +567,30 @@ func (d *Discord) effectiveProfileInfo(i *discordgo.InteractionCreate) (int, str
 		return profileNo, localizedProfileDisplayName(tr, row)
 	}
 	return profileNo, localizedProfileLabel(tr, profileNo)
+}
+
+func (d *Discord) resolveSlashTrackingProfileSelection(i *discordgo.InteractionCreate, token string) (slashProfileSelection, string) {
+	selection, errText := d.resolveSlashProfileSelection(i, token)
+	if errText != "" {
+		return slashProfileSelection{}, errText
+	}
+	if selection.Mode == slashProfileScopeAll {
+		return slashProfileSelection{}, d.slashText(i, "Please choose a specific profile.")
+	}
+	if selection.ProfileNo <= 0 {
+		return slashProfileSelection{}, d.slashText(i, "Profile not found.")
+	}
+	return selection, ""
+}
+
+func (d *Discord) slashProfileSelectionForState(i *discordgo.InteractionCreate, state *slashBuilderState) (slashProfileSelection, string) {
+	if state == nil {
+		return d.resolveSlashTrackingProfileSelection(i, "")
+	}
+	if state.ProfileNo > 0 {
+		return d.resolveSlashTrackingProfileSelection(i, fmt.Sprintf("%d", state.ProfileNo))
+	}
+	return d.resolveSlashTrackingProfileSelection(i, "")
 }
 
 func (d *Discord) guidedWeatherArgs(i *discordgo.InteractionCreate, condition string) ([]string, string) {
@@ -697,6 +732,10 @@ func (d *Discord) buildSlashContext(s *discordgo.Session, i *discordgo.Interacti
 }
 
 func (d *Discord) buildSlashExecutionResult(s *discordgo.Session, i *discordgo.InteractionCreate, line string) slashExecutionResult {
+	return d.buildSlashExecutionResultForProfile(s, i, line, 0)
+}
+
+func (d *Discord) buildSlashExecutionResultForProfile(s *discordgo.Session, i *discordgo.InteractionCreate, line string, profileNo int) slashExecutionResult {
 	line = strings.TrimSpace(line)
 	if line == "" {
 		return slashExecutionResult{
@@ -710,6 +749,9 @@ func (d *Discord) buildSlashExecutionResult(s *discordgo.Session, i *discordgo.I
 			Status: slashExecutionBlocked,
 			Reply:  d.slashText(i, "No command to run."),
 		}
+	}
+	if profileNo > 0 {
+		ctx.ProfileOverride = profileNo
 	}
 	tokens := splitQuotedArgs(line)
 	if len(tokens) > 0 && ctx.Config != nil {

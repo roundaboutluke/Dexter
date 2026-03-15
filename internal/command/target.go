@@ -25,7 +25,7 @@ func loadTargetRow(ctx *Context, t Target) (map[string]any, int, string, error) 
 		return row, 1, t.ID, err
 	}
 	currentProfileNo := toInt(row["current_profile_no"], 1)
-	profileNo := resolveCommandProfileNo(row, currentProfileNo)
+	profileNo := resolveCommandProfileNo(ctx, row, currentProfileNo)
 	targetID := t.ID
 	if idVal, ok := row["id"]; ok {
 		targetID = fmt.Sprintf("%v", idVal)
@@ -38,7 +38,10 @@ func loadTargetRow(ctx *Context, t Target) (map[string]any, int, string, error) 
 	return row, profileNo, targetID, nil
 }
 
-func resolveCommandProfileNo(row map[string]any, currentProfileNo int) int {
+func resolveCommandProfileNo(ctx *Context, row map[string]any, currentProfileNo int) int {
+	if ctx != nil && ctx.ProfileOverride > 0 {
+		return ctx.ProfileOverride
+	}
 	if currentProfileNo > 0 {
 		return currentProfileNo
 	}

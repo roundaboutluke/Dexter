@@ -171,7 +171,7 @@ func (d *Discord) respondWithFiltersPrompt(s *discordgo.Session, i *discordgo.In
 	content := tr.TranslateFormat("Ready to run `{0}`", commandLine)
 	d.respondWithButtons(s, i, content, []discordgo.MessageComponent{
 		discordgo.Button{CustomID: slashFiltersModal, Label: tr.Translate("Add filters", false), Style: discordgo.SecondaryButton},
-		discordgo.Button{CustomID: slashConfirmButton, Label: tr.Translate("Verify", false), Style: discordgo.SuccessButton},
+		discordgo.Button{CustomID: slashConfirmButton, Label: tr.Translate("Review Filter", false), Style: discordgo.SuccessButton},
 		discordgo.Button{CustomID: slashCancelButton, Label: tr.Translate("Cancel", false), Style: discordgo.DangerButton},
 	})
 }
@@ -247,6 +247,9 @@ func (d *Discord) confirmFields(i *discordgo.InteractionCreate) []*discordgo.Mes
 
 	for _, opt := range options {
 		if opt == nil {
+			continue
+		}
+		if opt.Name == "profile" {
 			continue
 		}
 		if strings.EqualFold(commandName, "track") {
@@ -676,44 +679,39 @@ func parseLevelString(value string) (int, bool) {
 }
 
 func (d *Discord) promptSlashConfirmation(s *discordgo.Session, i *discordgo.InteractionCreate, command string, args []string, title string, fields []*discordgo.MessageEmbedField) {
+	d.promptSlashConfirmationWithSelection(s, i, command, args, title, fields, slashProfileSelection{})
+}
+
+func (d *Discord) promptSlashConfirmationWithSelection(s *discordgo.Session, i *discordgo.InteractionCreate, command string, args []string, title string, fields []*discordgo.MessageEmbedField, selection slashProfileSelection) {
 	state := &slashBuilderState{
 		Command:   command,
 		Args:      args,
-		Step:      "confirm",
 		ExpiresAt: time.Now().Add(5 * time.Minute),
 	}
+	if selection.ProfileNo > 0 {
+		state.ProfileNo = selection.ProfileNo
+		state.ProfileLabel = selection.TargetLabelLocalized(d.slashInteractionTranslator(i))
+	}
+	d.promptSlashConfirmationState(s, i, state, title, fields)
+}
+
+func (d *Discord) promptSlashConfirmationState(s *discordgo.Session, i *discordgo.InteractionCreate, state *slashBuilderState, title string, fields []*discordgo.MessageEmbedField) {
+	if state == nil {
+		return
+	}
+	state.Step = "confirm"
+	state.ExpiresAt = time.Now().Add(5 * time.Minute)
 	d.setSlashState(i.Member, i.User, state)
 	commandLine := strings.TrimSpace(state.Command + " " + strings.Join(state.Args, " "))
-	profileNo, profileLabel := d.effectiveProfileInfo(i)
 	tr := d.slashInteractionTranslator(i)
-	profileFieldName := translateOrDefault(tr, "Profile")
-	commandFieldName := translateOrDefault(tr, "Command")
-	contextFields := []*discordgo.MessageEmbedField{
-		{Name: profileFieldName, Value: profileLabel, Inline: true},
-		{Name: commandFieldName, Value: commandLine, Inline: false},
+	profileLabel := strings.TrimSpace(state.ProfileLabel)
+	if profileLabel == "" {
+		_, profileLabel = d.effectiveProfileInfo(i)
 	}
-	if len(fields) == 0 {
-		fields = contextFields
-	} else {
-		fields = append(fields, contextFields...)
-	}
-	if profileNo > 0 && len(fields) > 0 {
-		for _, field := range fields {
-			if field == nil {
-				continue
-			}
-			if field.Name == profileFieldName {
-				field.Value = profileLabel
-			}
-		}
-	}
-	embed := &discordgo.MessageEmbed{
-		Title:  title,
-		Fields: fields,
-	}
+	embed := d.slashFilterPreviewEmbed(i, title, commandLine, profileLabel, fields)
 	d.respondComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, []discordgo.MessageComponent{
 		discordgo.ActionsRow{Components: []discordgo.MessageComponent{
-			discordgo.Button{CustomID: slashConfirmButton, Label: translateOrDefault(tr, "Verify"), Style: discordgo.SuccessButton},
+			discordgo.Button{CustomID: slashConfirmButton, Label: translateOrDefault(tr, "Save Filter"), Style: discordgo.SuccessButton},
 			discordgo.Button{CustomID: slashCancelButton, Label: translateOrDefault(tr, "Cancel"), Style: discordgo.DangerButton},
 		}},
 	}, true)

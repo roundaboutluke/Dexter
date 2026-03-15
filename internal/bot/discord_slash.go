@@ -69,6 +69,8 @@ type slashBuilderState struct {
 	Command         string
 	Args            []string
 	Step            string
+	ProfileNo       int
+	ProfileLabel    string
 	ExpiresAt       time.Time
 	OriginMessageID string
 	OriginChannelID string
@@ -188,6 +190,19 @@ func (d *Discord) handleSlashCommand(s *discordgo.Session, i *discordgo.Interact
 	}
 }
 
+func slashCommandAddsTracking(data discordgo.ApplicationCommandInteractionData) bool {
+	switch data.Name {
+	case "pokemon", "track", "rocket", "pokestop-event", "invasion", "gym", "fort", "nest", "weather", "lure", "egg":
+		return true
+	case "raid", "maxbattle":
+		return true
+	case "quest":
+		return true
+	default:
+		return false
+	}
+}
+
 func (d *Discord) handleSlashAutocomplete(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	data := i.ApplicationCommandData()
 	if data.Name == "" {
@@ -207,8 +222,14 @@ func (d *Discord) handleSlashAutocomplete(s *discordgo.Session, i *discordgo.Int
 	}
 
 	var choices []*discordgo.ApplicationCommandOptionChoice
+	if focused.Name == "profile" && slashCommandAddsTracking(data) {
+		choices = d.autocompleteProfileChoices(i, query, false)
+	}
 	switch data.Name {
 	case "pokemon":
+		if choices != nil {
+			break
+		}
 		if focused.Name == "pokemon" {
 			choices = d.autocompletePokemonChoices(query)
 		} else if focused.Name == "form" {
@@ -218,6 +239,9 @@ func (d *Discord) handleSlashAutocomplete(s *discordgo.Session, i *discordgo.Int
 			choices = d.autocompleteTemplateChoices(query, "monster")
 		}
 	case "track":
+		if choices != nil {
+			break
+		}
 		if focused.Name == "pokemon" {
 			choices = d.autocompletePokemonChoices(query)
 		} else if focused.Name == "form" {
@@ -227,6 +251,9 @@ func (d *Discord) handleSlashAutocomplete(s *discordgo.Session, i *discordgo.Int
 			choices = d.autocompleteTemplateChoices(query, "monster")
 		}
 	case "raid":
+		if choices != nil {
+			break
+		}
 		switch slashSubcommand(data) {
 		case "boss":
 			if focused.Name == "pokemon" {
@@ -262,6 +289,9 @@ func (d *Discord) handleSlashAutocomplete(s *discordgo.Session, i *discordgo.Int
 			}
 		}
 	case "maxbattle":
+		if choices != nil {
+			break
+		}
 		switch slashSubcommand(data) {
 		case "boss":
 			if focused.Name == "pokemon" {
@@ -289,6 +319,9 @@ func (d *Discord) handleSlashAutocomplete(s *discordgo.Session, i *discordgo.Int
 			}
 		}
 	case "quest":
+		if choices != nil {
+			break
+		}
 		switch slashSubcommand(data) {
 		case "pokemon":
 			if focused.Name == "pokemon" {
@@ -326,6 +359,9 @@ func (d *Discord) handleSlashAutocomplete(s *discordgo.Session, i *discordgo.Int
 			}
 		}
 	case "egg":
+		if choices != nil {
+			break
+		}
 		if focused.Name == "level" {
 			choices = d.autocompleteRaidLevelChoices(i, query)
 		} else if focused.Name == "gym" {
@@ -334,46 +370,70 @@ func (d *Discord) handleSlashAutocomplete(s *discordgo.Session, i *discordgo.Int
 			choices = d.autocompleteTemplateChoices(query, "egg")
 		}
 	case "invasion":
+		if choices != nil {
+			break
+		}
 		if focused.Name == "type" {
 			choices = d.autocompleteIncidentTypeChoices(i, query)
 		} else if focused.Name == "template" {
 			choices = d.autocompleteTemplateChoices(query, "invasion")
 		}
 	case "rocket":
+		if choices != nil {
+			break
+		}
 		if focused.Name == "type" {
 			choices = d.autocompleteRocketTypeChoices(i, query)
 		} else if focused.Name == "template" {
 			choices = d.autocompleteTemplateChoices(query, "invasion")
 		}
 	case "pokestop-event":
+		if choices != nil {
+			break
+		}
 		if focused.Name == "type" {
 			choices = d.autocompletePokestopEventChoices(i, query)
 		} else if focused.Name == "template" {
 			choices = d.autocompleteTemplateChoices(query, "invasion")
 		}
 	case "gym":
+		if choices != nil {
+			break
+		}
 		if focused.Name == "gym" {
 			choices = d.autocompleteGymChoices(i, query)
 		} else if focused.Name == "template" {
 			choices = d.autocompleteTemplateChoices(query, "gym")
 		}
 	case "fort":
+		if choices != nil {
+			break
+		}
 		if focused.Name == "template" {
 			choices = d.autocompleteTemplateChoices(query, "forts")
 		}
 	case "nest":
+		if choices != nil {
+			break
+		}
 		if focused.Name == "pokemon" {
 			choices = d.autocompletePokemonChoices(query)
 		} else if focused.Name == "template" {
 			choices = d.autocompleteTemplateChoices(query, "nests")
 		}
 	case "weather":
+		if choices != nil {
+			break
+		}
 		if focused.Name == "condition" {
 			choices = d.autocompleteWeatherChoices(query)
 		} else if focused.Name == "template" {
 			choices = d.autocompleteTemplateChoices(query, "weather")
 		}
 	case "lure":
+		if choices != nil {
+			break
+		}
 		if focused.Name == "template" {
 			choices = d.autocompleteTemplateChoices(query, "lure")
 		}
@@ -740,6 +800,10 @@ func (d *Discord) handleSlashComponent(s *discordgo.Session, i *discordgo.Intera
 		d.respondWithFiltersPrompt(s, i, state)
 		return
 	case slashConfirmButton:
+		if state != nil && state.Step != "confirm" && slashTrackingTypeFromCommand(state.Command) != "" {
+			d.promptSlashConfirmationState(s, i, state, d.confirmTitle(i, state.Command), nil)
+			return
+		}
 		if state != nil && state.Command == "location" {
 			d.clearSlashRenderMessage(i.Message)
 			userID, _ := slashUser(i)
@@ -779,14 +843,16 @@ func (d *Discord) handleSlashComponent(s *discordgo.Session, i *discordgo.Intera
 		if state != nil {
 			trackingType = slashTrackingTypeFromCommand(state.Command)
 			if trackingType != "" {
-				if resolved, errText := d.resolveSlashProfileSelection(i, ""); errText == "" {
+				if resolved, errText := d.slashProfileSelectionForState(i, state); errText == "" {
 					selection = resolved
 					beforeRows, table = d.slashTrackingRowsForSelection(selection, trackingType)
 					profileLabel = selection.TargetLabelLocalized(d.slashInteractionTranslator(i))
+					state.ProfileNo = selection.ProfileNo
+					state.ProfileLabel = profileLabel
 				}
 			}
 		}
-		result := d.buildSlashExecutionResult(s, i, line)
+		result := d.buildSlashExecutionResultForProfile(s, i, line, state.ProfileNo)
 		if result.Success() && table != "" && selection.UserID != "" {
 			afterRows, _ := d.slashTrackingRowsForSelection(selection, trackingType)
 			changedRows := slashChangedRows(beforeRows, afterRows)

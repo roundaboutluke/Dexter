@@ -55,7 +55,8 @@ type Context struct {
 	IsAdmin     bool
 	Roles       []string
 
-	TargetOverride *Target
+	TargetOverride  *Target
+	ProfileOverride int
 }
 
 // RenderTemplate renders a DTS template by type/platform/language/id.

@@ -16,6 +16,11 @@ import (
 const (
 	slashFilterRemoveButtonPrefix  = "poracle:filter:remove:"
 	slashFilterRestoreButtonPrefix = "poracle:filter:restore:"
+
+	slashFilterCardColorConfirm  = 0x57F287
+	slashFilterCardColorAdded    = 0x57F287
+	slashFilterCardColorRemoved  = 0xED4245
+	slashFilterCardColorRestored = 0x5865F2
 )
 
 type slashFilterActionState struct {
@@ -374,36 +379,127 @@ func (d *Discord) slashFilterSummary(tr *i18n.Translator, trackingType string, r
 	return strings.Join(lines, "\n")
 }
 
-func (d *Discord) slashFilterMutationEmbed(i *discordgo.InteractionCreate, titleKey, profileKey string, trackingType string, rows []map[string]any, profileLabel string) *discordgo.MessageEmbed {
-	tr := d.slashInteractionTranslator(i)
-	fieldName := tr.Translate("Filters", false)
-	if len(rows) == 1 {
-		fieldName = tr.Translate("Filter", false)
+func slashCardDetailLine(label, value string) string {
+	label = strings.TrimSpace(label)
+	value = strings.TrimSpace(value)
+	if label == "" || value == "" {
+		return ""
 	}
-	description := ""
-	if profileLabel != "" && profileKey != "" {
-		description = tr.TranslateFormat(profileKey, profileLabel)
+	return fmt.Sprintf("- %s: **%s**", label, value)
+}
+
+func slashCardHeading(text string) string {
+	text = strings.TrimSpace(text)
+	text = strings.TrimRight(text, ":")
+	text = strings.TrimRight(text, "：")
+	return strings.TrimSpace(text)
+}
+
+func slashCardDescription(headline, intro string, detailLines []string, summary string) string {
+	sections := []string{}
+	if intro = strings.TrimSpace(intro); intro != "" {
+		sections = append(sections, intro)
+	}
+	if headline = strings.TrimSpace(headline); headline != "" {
+		sections = append(sections, "## "+headline)
+	}
+	lines := []string{}
+	for _, line := range detailLines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		lines = append(lines, line)
+	}
+	if len(lines) > 0 {
+		sections = append(sections, strings.Join(lines, "\n"))
+	}
+	if summary = strings.TrimSpace(summary); summary != "" {
+		sections = append(sections, summary)
+	}
+	return strings.Join(sections, "\n\n")
+}
+
+func slashFilterCardColor(action string) int {
+	switch action {
+	case "added":
+		return slashFilterCardColorAdded
+	case "removed":
+		return slashFilterCardColorRemoved
+	case "restored":
+		return slashFilterCardColorRestored
+	default:
+		return slashFilterCardColorConfirm
+	}
+}
+
+func (d *Discord) slashFilterCardHeadline(tr *i18n.Translator, trackingType string, rows []map[string]any) string {
+	if len(rows) == 1 {
+		if label := strings.TrimSpace(d.slashFilterRowText(tr, trackingType, rows[0])); label != "" {
+			return label
+		}
+	}
+	if len(rows) > 1 {
+		return fmt.Sprintf("%d %s", len(rows), strings.ToLower(translateOrDefault(tr, "Filters")))
+	}
+	return slashTrackingTitle(tr, trackingType)
+}
+
+func (d *Discord) slashFilterPreviewEmbed(i *discordgo.InteractionCreate, title, commandLine, profileLabel string, fields []*discordgo.MessageEmbedField) *discordgo.MessageEmbed {
+	tr := d.slashInteractionTranslator(i)
+	headline := slashCardHeading(title)
+	start := 0
+	if len(fields) > 0 && fields[0] != nil && strings.TrimSpace(fields[0].Value) != "" {
+		headline = strings.TrimSpace(fmt.Sprintf("%s: %s", strings.TrimSpace(fields[0].Name), strings.TrimSpace(fields[0].Value)))
+		start = 1
+	}
+	detailLines := []string{}
+	if profileLabel != "" {
+		detailLines = append(detailLines, slashCardDetailLine(tr.Translate("Profile", false), profileLabel))
+	}
+	for idx := start; idx < len(fields); idx++ {
+		field := fields[idx]
+		if field == nil {
+			continue
+		}
+		if line := slashCardDetailLine(field.Name, field.Value); line != "" {
+			detailLines = append(detailLines, line)
+		}
+	}
+	embed := &discordgo.MessageEmbed{
+		Title:       title,
+		Description: slashCardDescription(headline, "", detailLines, ""),
+		Color:       slashFilterCardColor("confirm"),
+	}
+	if commandLine = strings.TrimSpace(commandLine); commandLine != "" {
+		embed.Footer = &discordgo.MessageEmbedFooter{Text: commandLine}
+	}
+	return embed
+}
+
+func (d *Discord) slashFilterMutationEmbed(i *discordgo.InteractionCreate, action, trackingType string, rows []map[string]any, profileLabel string) *discordgo.MessageEmbed {
+	tr := d.slashInteractionTranslator(i)
+	intro := ""
+	if profileLabel != "" {
+		if profileKey := slashFilterMutationProfileKey(action); profileKey != "" {
+			intro = tr.TranslateFormat(profileKey, profileLabel)
+		}
+	}
+	detailLines := []string{}
+	if profileLabel != "" {
+		detailLines = append(detailLines, slashCardDetailLine(tr.Translate("Profile", false), profileLabel))
+	}
+	if trackingType != "" {
+		detailLines = append(detailLines, slashCardDetailLine(tr.Translate("Type", false), slashTrackingTitle(tr, trackingType)))
+	}
+	summary := ""
+	if len(rows) > 1 {
+		summary = d.slashFilterSummary(tr, trackingType, rows)
 	}
 	return &discordgo.MessageEmbed{
-		Title:       tr.Translate(titleKey, false),
-		Description: description,
-		Fields: []*discordgo.MessageEmbedField{
-			{
-				Name:   fieldName,
-				Value:  d.slashFilterSummary(tr, trackingType, rows),
-				Inline: false,
-			},
-			{
-				Name:   tr.Translate("Type", false),
-				Value:  slashTrackingTitle(tr, trackingType),
-				Inline: true,
-			},
-			{
-				Name:   tr.Translate("Profile", false),
-				Value:  profileLabel,
-				Inline: true,
-			},
-		},
+		Title:       tr.Translate(slashFilterMutationTitleKey(action, len(rows)), false),
+		Description: slashCardDescription(d.slashFilterCardHeadline(tr, trackingType, rows), intro, detailLines, summary),
+		Color:       slashFilterCardColor(action),
 	}
 }
 
@@ -492,7 +588,7 @@ func (d *Discord) slashFilterMutationResponse(i *discordgo.InteractionCreate, ac
 	if customID == "" {
 		return nil, nil, false
 	}
-	embed := d.slashFilterMutationEmbed(i, slashFilterMutationTitleKey(action, len(rows)), slashFilterMutationProfileKey(action), trackingType, rows, profileLabel)
+	embed := d.slashFilterMutationEmbed(i, action, trackingType, rows, profileLabel)
 	return []*discordgo.MessageEmbed{embed}, d.slashFilterMutationComponents(i, trackingType, customID, len(rows), action == "removed"), true
 }
 

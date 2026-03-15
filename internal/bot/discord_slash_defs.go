@@ -1,8 +1,6 @@
 package bot
 
 import (
-	"encoding/json"
-	"fmt"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
@@ -69,6 +67,20 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 				Autocomplete: true,
 			},
 		}
+	}
+
+	profileOption := func() *discordgo.ApplicationCommandOption {
+		return &discordgo.ApplicationCommandOption{
+			Type:         discordgo.ApplicationCommandOptionString,
+			Name:         "profile",
+			Description:  "Choose which profile to add this filter to",
+			Autocomplete: true,
+		}
+	}
+
+	appendCreationOptions := func(options []*discordgo.ApplicationCommandOption) []*discordgo.ApplicationCommandOption {
+		options = append(options, templateOptions()...)
+		return append(options, profileOption())
 	}
 
 	cleanFlagOption := func(description string) *discordgo.ApplicationCommandOption {
@@ -179,7 +191,7 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 		distanceOption(),
 		cleanFlagOption("Auto delete after despawn"),
 	}
-	trackOptions = append(trackOptions, templateOptions()...)
+	trackOptions = appendCreationOptions(trackOptions)
 
 	gymOptions := []*discordgo.ApplicationCommandOption{
 		{
@@ -209,7 +221,7 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 		distanceOption(),
 		cleanFlagOption("Auto delete after expiration"),
 	)
-	gymOptions = append(gymOptions, templateOptions()...)
+	gymOptions = appendCreationOptions(gymOptions)
 
 	fortOptions := []*discordgo.ApplicationCommandOption{
 		{
@@ -230,7 +242,7 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 		{Type: discordgo.ApplicationCommandOptionBoolean, Name: "include_empty", Description: "Include empty POIs"},
 		distanceOption(),
 	}
-	fortOptions = append(fortOptions, templateOptions()...)
+	fortOptions = appendCreationOptions(fortOptions)
 
 	nestOptions := []*discordgo.ApplicationCommandOption{
 		{
@@ -243,7 +255,7 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 		distanceOption(),
 		cleanFlagOption("Auto delete after despawn"),
 	}
-	nestOptions = append(nestOptions, templateOptions()...)
+	nestOptions = appendCreationOptions(nestOptions)
 
 	weatherOptions := []*discordgo.ApplicationCommandOption{
 		{
@@ -255,7 +267,7 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 		{Type: discordgo.ApplicationCommandOptionString, Name: "location", Description: "Optional location. Leave blank to use your saved location."},
 		cleanFlagOption("Auto delete after expiration"),
 	}
-	weatherOptions = append(weatherOptions, templateOptions()...)
+	weatherOptions = appendCreationOptions(weatherOptions)
 
 	raidBossOptions := []*discordgo.ApplicationCommandOption{
 		{Type: discordgo.ApplicationCommandOptionString, Name: "pokemon", Description: "Choose a Pokemon, or leave blank for a guided flow", Autocomplete: true},
@@ -265,7 +277,7 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 		distanceOption(),
 		cleanFlagOption("Auto delete after expiration"),
 	}
-	raidBossOptions = append(raidBossOptions, templateOptions()...)
+	raidBossOptions = appendCreationOptions(raidBossOptions)
 
 	raidLevelOptions := []*discordgo.ApplicationCommandOption{
 		{Type: discordgo.ApplicationCommandOptionString, Name: "level", Description: "Choose a raid level, or leave blank for a guided flow", Autocomplete: true},
@@ -275,7 +287,7 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 		distanceOption(),
 		cleanFlagOption("Auto delete after expiration"),
 	}
-	raidLevelOptions = append(raidLevelOptions, templateOptions()...)
+	raidLevelOptions = appendCreationOptions(raidLevelOptions)
 
 	eggOptions := []*discordgo.ApplicationCommandOption{
 		{Type: discordgo.ApplicationCommandOptionString, Name: "level", Description: "Choose an egg level, or leave blank for a guided flow", Autocomplete: true},
@@ -285,7 +297,7 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 		distanceOption(),
 		cleanFlagOption("Auto delete after expiration"),
 	}
-	eggOptions = append(eggOptions, templateOptions()...)
+	eggOptions = appendCreationOptions(eggOptions)
 
 	maxbattleBossOptions := []*discordgo.ApplicationCommandOption{
 		{Type: discordgo.ApplicationCommandOptionString, Name: "pokemon", Description: "Choose a Pokemon, or leave blank for a guided flow", Autocomplete: true},
@@ -294,7 +306,7 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 		distanceOption(),
 		cleanFlagOption("Auto delete after expiration"),
 	}
-	maxbattleBossOptions = append(maxbattleBossOptions, templateOptions()...)
+	maxbattleBossOptions = appendCreationOptions(maxbattleBossOptions)
 
 	maxbattleLevelOptions := []*discordgo.ApplicationCommandOption{
 		{Type: discordgo.ApplicationCommandOptionString, Name: "level", Description: "Choose a max battle level, or leave blank for a guided flow", Autocomplete: true},
@@ -303,7 +315,7 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 		distanceOption(),
 		cleanFlagOption("Auto delete after expiration"),
 	}
-	maxbattleLevelOptions = append(maxbattleLevelOptions, templateOptions()...)
+	maxbattleLevelOptions = appendCreationOptions(maxbattleLevelOptions)
 
 	questAROption := &discordgo.ApplicationCommandOption{
 		Type:        discordgo.ApplicationCommandOptionString,
@@ -321,7 +333,7 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 		distanceOption(),
 		cleanFlagOption("Auto delete after expiration"),
 	}
-	questPokemonOptions = append(questPokemonOptions, templateOptions()...)
+	questPokemonOptions = appendCreationOptions(questPokemonOptions)
 
 	questItemOptions := []*discordgo.ApplicationCommandOption{
 		{Type: discordgo.ApplicationCommandOptionString, Name: "item", Description: "Choose an item, or leave blank for a guided flow", Autocomplete: true},
@@ -330,7 +342,7 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 		distanceOption(),
 		cleanFlagOption("Auto delete after expiration"),
 	}
-	questItemOptions = append(questItemOptions, templateOptions()...)
+	questItemOptions = appendCreationOptions(questItemOptions)
 
 	questStardustOptions := []*discordgo.ApplicationCommandOption{
 		{Type: discordgo.ApplicationCommandOptionInteger, Name: "min_amount", Description: "Optional minimum value for stardust only", MinValue: floatPtr(0)},
@@ -338,7 +350,7 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 		distanceOption(),
 		cleanFlagOption("Auto delete after expiration"),
 	}
-	questStardustOptions = append(questStardustOptions, templateOptions()...)
+	questStardustOptions = appendCreationOptions(questStardustOptions)
 
 	questCandyOptions := []*discordgo.ApplicationCommandOption{
 		{Type: discordgo.ApplicationCommandOptionString, Name: "pokemon", Description: "Choose a Pokemon, or leave blank for a guided flow", Autocomplete: true},
@@ -347,7 +359,7 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 		distanceOption(),
 		cleanFlagOption("Auto delete after expiration"),
 	}
-	questCandyOptions = append(questCandyOptions, templateOptions()...)
+	questCandyOptions = appendCreationOptions(questCandyOptions)
 
 	questMegaEnergyOptions := []*discordgo.ApplicationCommandOption{
 		{Type: discordgo.ApplicationCommandOptionString, Name: "pokemon", Description: "Choose a Pokemon, or leave blank for a guided flow", Autocomplete: true},
@@ -356,21 +368,21 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 		distanceOption(),
 		cleanFlagOption("Auto delete after expiration"),
 	}
-	questMegaEnergyOptions = append(questMegaEnergyOptions, templateOptions()...)
+	questMegaEnergyOptions = appendCreationOptions(questMegaEnergyOptions)
 
 	rocketOptions := []*discordgo.ApplicationCommandOption{
 		{Type: discordgo.ApplicationCommandOptionString, Name: "type", Description: "Choose a grunt or leader type, or leave blank for a guided flow", Autocomplete: true},
 		distanceOption(),
 		cleanFlagOption("Auto delete after expiration"),
 	}
-	rocketOptions = append(rocketOptions, templateOptions()...)
+	rocketOptions = appendCreationOptions(rocketOptions)
 
 	incidentOptions := []*discordgo.ApplicationCommandOption{
 		{Type: discordgo.ApplicationCommandOptionString, Name: "type", Description: "Choose a Pokestop event type, or leave blank for a guided flow", Autocomplete: true},
 		distanceOption(),
 		cleanFlagOption("Auto delete after expiration"),
 	}
-	incidentOptions = append(incidentOptions, templateOptions()...)
+	incidentOptions = appendCreationOptions(incidentOptions)
 
 	commands := []*discordgo.ApplicationCommand{
 		{
@@ -439,7 +451,7 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 		{
 			Name:        "lure",
 			Description: "Track lure modules",
-			Options: append([]*discordgo.ApplicationCommandOption{
+			Options: appendCreationOptions([]*discordgo.ApplicationCommandOption{
 				{
 					Type:        discordgo.ApplicationCommandOptionString,
 					Name:        "type",
@@ -456,7 +468,7 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 				},
 				distanceOption(),
 				cleanFlagOption("Auto delete after expiration"),
-			}, templateOptions()...),
+			}),
 		},
 		{
 			Name:        "language",
@@ -548,53 +560,6 @@ type slashCommandSyncStats struct {
 	Unchanged int
 	Deleted   int
 	Failed    int
-}
-
-func normalizedSlashCommandType(kind discordgo.ApplicationCommandType) discordgo.ApplicationCommandType {
-	if kind == 0 {
-		return discordgo.ChatApplicationCommand
-	}
-	return kind
-}
-
-func slashCommandKey(cmd *discordgo.ApplicationCommand) string {
-	if cmd == nil {
-		return ""
-	}
-	name := strings.ToLower(strings.TrimSpace(cmd.Name))
-	if name == "" {
-		return ""
-	}
-	return fmt.Sprintf("%d:%s", normalizedSlashCommandType(cmd.Type), name)
-}
-
-func slashCommandSignature(cmd *discordgo.ApplicationCommand) string {
-	if cmd == nil {
-		return ""
-	}
-	raw, err := json.Marshal(cmd)
-	if err != nil {
-		return ""
-	}
-	payload := map[string]any{}
-	if err := json.Unmarshal(raw, &payload); err != nil {
-		return ""
-	}
-	normalizeSlashCommandPayload(payload)
-	raw, err = json.Marshal(payload)
-	if err != nil {
-		return ""
-	}
-	return string(raw)
-}
-
-func legacySlashCommandName(name string) bool {
-	switch strings.ToLower(strings.TrimSpace(name)) {
-	case "track", "egg", "invasion", "tracked", "remove":
-		return true
-	default:
-		return false
-	}
 }
 
 func normalizeSlashCommandPayload(payload map[string]any) {

@@ -71,6 +71,51 @@ func TestSlashCommandDefinitionsProfileAndHelpOptions(t *testing.T) {
 	d := &Discord{manager: &Manager{cfg: config.New(nil)}}
 	commands := d.slashCommandDefinitions()
 
+	addCases := []struct {
+		command string
+		sub     string
+	}{
+		{command: "pokemon"},
+		{command: "raid", sub: "boss"},
+		{command: "raid", sub: "level"},
+		{command: "raid", sub: "egg"},
+		{command: "maxbattle", sub: "boss"},
+		{command: "maxbattle", sub: "level"},
+		{command: "quest", sub: "pokemon"},
+		{command: "quest", sub: "item"},
+		{command: "quest", sub: "stardust"},
+		{command: "quest", sub: "candy"},
+		{command: "quest", sub: "mega-energy"},
+		{command: "rocket"},
+		{command: "pokestop-event"},
+		{command: "gym"},
+		{command: "fort"},
+		{command: "nest"},
+		{command: "weather"},
+		{command: "lure"},
+	}
+	for _, tc := range addCases {
+		cmd := findSlashCommand(commands, tc.command)
+		if cmd == nil {
+			t.Fatalf("command %q not found", tc.command)
+		}
+		options := cmd.Options
+		if tc.sub != "" {
+			subcommand := findSlashSubcommand(cmd.Options, tc.sub)
+			if subcommand == nil {
+				t.Fatalf("subcommand %q not found on command %q", tc.sub, tc.command)
+			}
+			options = subcommand.Options
+		}
+		profile := findSlashOption(options, "profile")
+		if profile == nil || !profile.Autocomplete || profile.Required {
+			t.Fatalf("%s %s profile option should exist, autocomplete, and remain optional", tc.command, tc.sub)
+		}
+		if len(options) == 0 || options[len(options)-1].Name != "profile" {
+			t.Fatalf("%s %s profile option should be last, got %v", tc.command, tc.sub, slashOptionNames(options))
+		}
+	}
+
 	filters := findSlashCommand(commands, "filters")
 	if filters == nil {
 		t.Fatal("filters command not found")
@@ -123,24 +168,24 @@ func TestSlashCommandDefinitionsOptionOrdering(t *testing.T) {
 		sub     string
 		want    []string
 	}{
-		{command: "pokemon", want: []string{"pokemon", "form", "min_iv", "max_iv", "min_cp", "max_cp", "min_level", "max_level", "min_atk", "max_atk", "min_def", "max_def", "min_sta", "max_sta", "size", "gender", "pvp_league", "pvp_ranks", "min_time", "distance", "clean", "template"}},
-		{command: "raid", sub: "boss", want: []string{"pokemon", "gym", "team", "rsvp", "distance", "clean", "template"}},
-		{command: "raid", sub: "level", want: []string{"level", "gym", "team", "rsvp", "distance", "clean", "template"}},
-		{command: "raid", sub: "egg", want: []string{"level", "gym", "team", "rsvp", "distance", "clean", "template"}},
-		{command: "maxbattle", sub: "boss", want: []string{"pokemon", "station", "gmax_only", "distance", "clean", "template"}},
-		{command: "maxbattle", sub: "level", want: []string{"level", "station", "gmax_only", "distance", "clean", "template"}},
-		{command: "quest", sub: "pokemon", want: []string{"pokemon", "ar", "distance", "clean", "template"}},
-		{command: "quest", sub: "item", want: []string{"item", "min_amount", "ar", "distance", "clean", "template"}},
-		{command: "quest", sub: "stardust", want: []string{"min_amount", "ar", "distance", "clean", "template"}},
-		{command: "quest", sub: "candy", want: []string{"pokemon", "min_amount", "ar", "distance", "clean", "template"}},
-		{command: "quest", sub: "mega-energy", want: []string{"pokemon", "min_amount", "ar", "distance", "clean", "template"}},
-		{command: "rocket", want: []string{"type", "distance", "clean", "template"}},
-		{command: "pokestop-event", want: []string{"type", "distance", "clean", "template"}},
-		{command: "gym", want: []string{"team", "gym", "slot_changes", "battle_changes", "distance", "clean", "template"}},
-		{command: "fort", want: []string{"type", "new", "removal", "name", "photo", "location", "include_empty", "distance", "template"}},
-		{command: "nest", want: []string{"pokemon", "min_spawn", "distance", "clean", "template"}},
-		{command: "weather", want: []string{"condition", "location", "clean", "template"}},
-		{command: "lure", want: []string{"type", "distance", "clean", "template"}},
+		{command: "pokemon", want: []string{"pokemon", "form", "min_iv", "max_iv", "min_cp", "max_cp", "min_level", "max_level", "min_atk", "max_atk", "min_def", "max_def", "min_sta", "max_sta", "size", "gender", "pvp_league", "pvp_ranks", "min_time", "distance", "clean", "template", "profile"}},
+		{command: "raid", sub: "boss", want: []string{"pokemon", "gym", "team", "rsvp", "distance", "clean", "template", "profile"}},
+		{command: "raid", sub: "level", want: []string{"level", "gym", "team", "rsvp", "distance", "clean", "template", "profile"}},
+		{command: "raid", sub: "egg", want: []string{"level", "gym", "team", "rsvp", "distance", "clean", "template", "profile"}},
+		{command: "maxbattle", sub: "boss", want: []string{"pokemon", "station", "gmax_only", "distance", "clean", "template", "profile"}},
+		{command: "maxbattle", sub: "level", want: []string{"level", "station", "gmax_only", "distance", "clean", "template", "profile"}},
+		{command: "quest", sub: "pokemon", want: []string{"pokemon", "ar", "distance", "clean", "template", "profile"}},
+		{command: "quest", sub: "item", want: []string{"item", "min_amount", "ar", "distance", "clean", "template", "profile"}},
+		{command: "quest", sub: "stardust", want: []string{"min_amount", "ar", "distance", "clean", "template", "profile"}},
+		{command: "quest", sub: "candy", want: []string{"pokemon", "min_amount", "ar", "distance", "clean", "template", "profile"}},
+		{command: "quest", sub: "mega-energy", want: []string{"pokemon", "min_amount", "ar", "distance", "clean", "template", "profile"}},
+		{command: "rocket", want: []string{"type", "distance", "clean", "template", "profile"}},
+		{command: "pokestop-event", want: []string{"type", "distance", "clean", "template", "profile"}},
+		{command: "gym", want: []string{"team", "gym", "slot_changes", "battle_changes", "distance", "clean", "template", "profile"}},
+		{command: "fort", want: []string{"type", "new", "removal", "name", "photo", "location", "include_empty", "distance", "template", "profile"}},
+		{command: "nest", want: []string{"pokemon", "min_spawn", "distance", "clean", "template", "profile"}},
+		{command: "weather", want: []string{"condition", "location", "clean", "template", "profile"}},
+		{command: "lure", want: []string{"type", "distance", "clean", "template", "profile"}},
 		{command: "filters", sub: "remove", want: []string{"type", "tracking", "profile"}},
 		{command: "filters", sub: "show", want: []string{"profile"}},
 	}
@@ -305,6 +350,59 @@ func TestSlashFilterMutationResponseCreatesActionButtons(t *testing.T) {
 	button, ok = row.Components[0].(discordgo.Button)
 	if !ok || !strings.HasPrefix(button.CustomID, slashFilterRestoreButtonPrefix) {
 		t.Fatalf("remove button=%#v, want restore action", row.Components[0])
+	}
+}
+
+func TestBuildSlashExecutionResultForProfileOverrideTargetsSelectedProfile(t *testing.T) {
+	env := newSlashMutationTestEnv(t, map[string][]map[string]any{
+		"humans": {{
+			"id":                   "user-1",
+			"current_profile_no":   1,
+			"preferred_profile_no": 1,
+			"latitude":             51.5,
+			"longitude":            -0.12,
+		}},
+		"profiles": {
+			{"id": "user-1", "profile_no": 1, "name": "Home"},
+			{"id": "user-1", "profile_no": 2, "name": "Work"},
+		},
+	}, 0)
+	cfg := config.New(map[string]any{
+		"general": map[string]any{
+			"locale": "en",
+		},
+	})
+	env.discord.manager.cfg = cfg
+	env.discord.manager.i18n = i18n.NewFactory(shippedLocaleRoot(t), cfg)
+	env.discord.manager.registry = command.NewRegistry()
+	env.discord.manager.data = &data.GameData{
+		Monsters: map[string]any{
+			"1": map[string]any{
+				"id":   1,
+				"name": "Bulbasaur",
+				"form": map[string]any{"id": 0, "name": "Normal"},
+			},
+		},
+	}
+
+	result := env.discord.buildSlashExecutionResultForProfile(nil, slashTestInteraction("user-1"), "track 1 d500", 2)
+	if result.Status != slashExecutionSuccess {
+		t.Fatalf("status=%q, want %q (%s)", result.Status, slashExecutionSuccess, result.Reply)
+	}
+
+	rows, err := env.query.SelectAllQuery("monsters", map[string]any{"id": "user-1", "profile_no": 2})
+	if err != nil {
+		t.Fatalf("select profile 2 rows: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("profile 2 rows=%v, want 1 row", rows)
+	}
+	profileOneRows, err := env.query.SelectAllQuery("monsters", map[string]any{"id": "user-1", "profile_no": 1})
+	if err != nil {
+		t.Fatalf("select profile 1 rows: %v", err)
+	}
+	if len(profileOneRows) != 0 {
+		t.Fatalf("profile 1 rows=%v, want empty", profileOneRows)
 	}
 }
 
