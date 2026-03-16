@@ -362,7 +362,7 @@ func (d *Discord) slashFilterRowText(tr *i18n.Translator, trackingType string, r
 	if d.manager.data == nil {
 		if uid := slashRowUID(row); uid != "" {
 			if tr != nil {
-				return translateFormatOrDefault(tr,"Filter UID {0}", uid)
+				return translateFormatOrDefault(tr, "Filter UID {0}", uid)
 			}
 			return fmt.Sprintf("Filter UID %s", uid)
 		}
@@ -400,7 +400,7 @@ func (d *Discord) slashFilterSummary(tr *i18n.Translator, trackingType string, r
 	lines := []string{}
 	for idx, row := range rows {
 		if idx >= filterSummaryRowLimit {
-			lines = append(lines, translateFormatOrDefault(tr,"And {0} more...", len(rows)-idx))
+			lines = append(lines, translateFormatOrDefault(tr, "And {0} more...", len(rows)-idx))
 			break
 		}
 		label := d.slashFilterRowText(tr, trackingType, row)
@@ -483,14 +483,14 @@ func (d *Discord) slashFilterMutationEmbed(i *discordgo.InteractionCreate, actio
 	headline := d.slashFilterTypedHeading(tr, trackingType, rows)
 	detailLines := []string{}
 	if profileLabel != "" {
-		detailLines = append(detailLines, slashCardDetailLine(translateOrDefault(tr,"Profile"), profileLabel))
+		detailLines = append(detailLines, slashCardDetailLine(translateOrDefault(tr, "Profile"), profileLabel))
 	}
 	if len(rows) == 1 {
 		detailLines = append(detailLines, slashFilterNonDefaultDetailLines(tr, trackingType, rows[0])...)
 	} else if len(rows) > 1 {
 		for idx, row := range rows {
 			if idx >= filterSummaryRowLimit {
-				detailLines = append(detailLines, fmt.Sprintf("*%s*", translateFormatOrDefault(tr,"And {0} more...", len(rows)-idx)))
+				detailLines = append(detailLines, fmt.Sprintf("*%s*", translateFormatOrDefault(tr, "And {0} more...", len(rows)-idx)))
 				break
 			}
 			label := d.slashFilterRowText(tr, trackingType, row)
@@ -512,16 +512,16 @@ func (d *Discord) slashFilterMutationEmbed(i *discordgo.InteractionCreate, actio
 
 func (d *Discord) slashFilterMutationComponents(i *discordgo.InteractionCreate, trackingType, customID string, count int, restoring bool) []discordgo.MessageComponent {
 	tr := d.slashInteractionTranslator(i)
-	label := translateOrDefault(tr,"Remove Filter")
+	label := translateOrDefault(tr, "Remove Filter")
 	style := discordgo.DangerButton
 	if count > 1 {
-		label = translateOrDefault(tr,"Remove Filters")
+		label = translateOrDefault(tr, "Remove Filters")
 	}
 	if restoring {
-		label = translateOrDefault(tr,"Restore Filter")
+		label = translateOrDefault(tr, "Restore Filter")
 		style = discordgo.SuccessButton
 		if count > 1 {
-			label = translateOrDefault(tr,"Restore Filters")
+			label = translateOrDefault(tr, "Restore Filters")
 		}
 	}
 	return []discordgo.MessageComponent{

@@ -144,7 +144,8 @@ func CleanEggRow(cfg *config.Config, game *data.GameData, scope RuleScope, row m
 func CleanQuestRow(cfg *config.Config, scope RuleScope, row map[string]any) (map[string]any, error) {
 	template := defaultTemplate(templateName(cfg))
 	rewardType := defaultIntRule(row["reward_type"], -1)
-	if rewardType != 3 && rewardType != 12 && rewardType != 4 && rewardType != 7 && rewardType != 2 {
+	validRewardTypes := map[int]bool{1: true, 2: true, 3: true, 4: true, 7: true, 9: true, 12: true}
+	if !validRewardTypes[rewardType] {
 		return nil, fmt.Errorf("Unrecognised reward_type value")
 	}
 	return map[string]any{

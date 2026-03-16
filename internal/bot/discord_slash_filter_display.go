@@ -272,27 +272,26 @@ func (d *Discord) slashQuestRewardName(tr *i18n.Translator, row map[string]any) 
 	case questRewardStardust:
 		return translateOrDefault(tr, "Stardust")
 	case questRewardMegaEnergy:
-		name := translateOrDefault(tr, "Mega Energy")
 		if reward > 0 {
 			fakeRow := map[string]any{"pokemon_id": reward, "form": 0}
 			monName := d.slashMonsterName(tr, fakeRow)
 			if monName != "" {
-				return name + " " + monName
+				return translateFormatOrDefault(tr, "Mega Energy {0}", monName)
 			}
 		}
-		return name
+		return translateOrDefault(tr, "Mega Energy")
 	case questRewardCandy:
 		if reward == 0 {
 			return translateOrDefault(tr, "Rare Candy")
 		}
 		fakeRow := map[string]any{"pokemon_id": reward, "form": 0}
-		return d.slashMonsterName(tr, fakeRow) + " Candy"
+		return translateFormatOrDefault(tr, "{0} Candy", d.slashMonsterName(tr, fakeRow))
 	case questRewardXLCandy:
 		if reward == 0 {
 			return translateOrDefault(tr, "Rare Candy XL")
 		}
 		fakeRow := map[string]any{"pokemon_id": reward, "form": 0}
-		return d.slashMonsterName(tr, fakeRow) + " XL Candy"
+		return translateFormatOrDefault(tr, "{0} XL Candy", d.slashMonsterName(tr, fakeRow))
 	case questRewardExperience:
 		return translateOrDefault(tr, "Experience")
 	default:
@@ -507,41 +506,6 @@ func slashFilterNonDefaultDetailLines(tr *i18n.Translator, trackingType string, 
 	return lines
 }
 
-func monsterDefaultValue(key string) int {
-	switch key {
-	case "min_iv":
-		return -1
-	case "max_iv":
-		return 100
-	case "min_cp":
-		return 0
-	case "max_cp":
-		return defaultMaxCP
-	case "min_level":
-		return 0
-	case "max_level":
-		return 55
-	case "atk", "def", "sta":
-		return 0
-	case "max_atk", "max_def", "max_sta":
-		return 15
-	case "gender":
-		return 0
-	case "size":
-		return -1
-	case "max_size":
-		return 5
-	case "rarity":
-		return -1
-	case "max_rarity":
-		return 6
-	case "distance", "min_time":
-		return 0
-	default:
-		return 0
-	}
-}
-
 func (d *Discord) slashFilterPreviewEmbed(i *discordgo.InteractionCreate, title, commandLine, profileLabel string, fields []*discordgo.MessageEmbedField) *discordgo.MessageEmbed {
 	tr := d.slashInteractionTranslator(i)
 	headline := slashCardHeading(title)
@@ -552,7 +516,7 @@ func (d *Discord) slashFilterPreviewEmbed(i *discordgo.InteractionCreate, title,
 	}
 	detailLines := []string{}
 	if profileLabel != "" {
-		detailLines = append(detailLines, slashCardDetailLine(translateOrDefault(tr,"Profile"), profileLabel))
+		detailLines = append(detailLines, slashCardDetailLine(translateOrDefault(tr, "Profile"), profileLabel))
 	}
 	for idx := start; idx < len(fields); idx++ {
 		field := fields[idx]
