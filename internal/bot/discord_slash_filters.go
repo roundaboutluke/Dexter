@@ -320,20 +320,14 @@ func slashFilterNonDefaultDetailLines(tr *i18n.Translator, trackingType string, 
 	lines := []string{}
 	switch trackingType {
 	case "pokemon":
-		addIfNotDefault := func(label string, keys ...string) {
-			for _, key := range keys {
-				val := toInt(row[key], 0)
-				def := monsterDefaultValue(key)
-				if val != def {
-					lines = append(lines, slashCardDetailLine(label, fmt.Sprintf("%d", val)))
-					return
-				}
-			}
-		}
-		minIV := toInt(row["min_iv"], 0)
+		minIV := toInt(row["min_iv"], -1)
 		maxIV := toInt(row["max_iv"], 100)
-		if minIV != 0 || maxIV != 100 {
-			lines = append(lines, slashCardDetailLine(translateOrDefault(tr, "IV"), fmt.Sprintf("%d%% - %d%%", minIV, maxIV)))
+		if minIV != -1 || maxIV != 100 {
+			displayMin := minIV
+			if displayMin < 0 {
+				displayMin = 0
+			}
+			lines = append(lines, slashCardDetailLine(translateOrDefault(tr, "IV"), fmt.Sprintf("%d%% - %d%%", displayMin, maxIV)))
 		}
 		minCP := toInt(row["min_cp"], 0)
 		maxCP := toInt(row["max_cp"], 9000)
@@ -341,8 +335,8 @@ func slashFilterNonDefaultDetailLines(tr *i18n.Translator, trackingType string, 
 			lines = append(lines, slashCardDetailLine(translateOrDefault(tr, "CP"), fmt.Sprintf("%d - %d", minCP, maxCP)))
 		}
 		minLvl := toInt(row["min_level"], 0)
-		maxLvl := toInt(row["max_level"], 40)
-		if minLvl != 0 || maxLvl != 40 {
+		maxLvl := toInt(row["max_level"], 55)
+		if minLvl != 0 || maxLvl != 55 {
 			lines = append(lines, slashCardDetailLine(translateOrDefault(tr, "Level"), fmt.Sprintf("%d - %d", minLvl, maxLvl)))
 		}
 		atk := toInt(row["atk"], 0)
@@ -365,9 +359,9 @@ func slashFilterNonDefaultDetailLines(tr *i18n.Translator, trackingType string, 
 		} else if gender == 2 {
 			lines = append(lines, slashCardDetailLine(translateOrDefault(tr, "Gender"), "♀"))
 		}
-		size := toInt(row["size"], 0)
+		size := toInt(row["size"], -1)
 		maxSize := toInt(row["max_size"], 5)
-		if size != 0 || maxSize != 5 {
+		if size != -1 || maxSize != 5 {
 			sizeLabels := map[int]string{1: "XXS", 2: "XS", 3: "M", 4: "XL", 5: "XXL"}
 			sizeMin := sizeLabels[size]
 			sizeMax := sizeLabels[maxSize]
@@ -387,7 +381,6 @@ func slashFilterNonDefaultDetailLines(tr *i18n.Translator, trackingType string, 
 		if minTime > 0 {
 			lines = append(lines, slashCardDetailLine(translateOrDefault(tr, "Min time"), fmt.Sprintf("%ds", minTime)))
 		}
-		_ = addIfNotDefault // suppress unused warning for this helper pattern
 	case "raid", "egg", "maxbattle":
 		distance := toInt(row["distance"], 0)
 		if distance > 0 {
@@ -449,7 +442,7 @@ func slashFilterNonDefaultDetailLines(tr *i18n.Translator, trackingType string, 
 func monsterDefaultValue(key string) int {
 	switch key {
 	case "min_iv":
-		return 0
+		return -1
 	case "max_iv":
 		return 100
 	case "min_cp":
@@ -459,17 +452,23 @@ func monsterDefaultValue(key string) int {
 	case "min_level":
 		return 0
 	case "max_level":
-		return 40
+		return 55
 	case "atk", "def", "sta":
 		return 0
 	case "max_atk", "max_def", "max_sta":
 		return 15
-	case "gender", "size", "rarity", "distance", "min_time":
+	case "gender":
 		return 0
+	case "size":
+		return -1
 	case "max_size":
 		return 5
+	case "rarity":
+		return -1
 	case "max_rarity":
 		return 6
+	case "distance", "min_time":
+		return 0
 	default:
 		return 0
 	}
@@ -922,9 +921,6 @@ func (d *Discord) slashFilterPreviewEmbed(i *discordgo.InteractionCreate, title,
 		Title:       title,
 		Description: slashCardDescription(headline, "", detailLines, ""),
 		Color:       slashFilterCardColor("confirm"),
-	}
-	if commandLine = strings.TrimSpace(commandLine); commandLine != "" {
-		embed.Footer = &discordgo.MessageEmbedFooter{Text: commandLine}
 	}
 	if iconURL := d.slashPreviewIconURL(commandLine); iconURL != "" {
 		embed.Thumbnail = &discordgo.MessageEmbedThumbnail{URL: iconURL}
