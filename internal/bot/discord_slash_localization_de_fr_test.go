@@ -27,16 +27,18 @@ func TestShippedDeFrSlashNameKeysCoverCommandInventory(t *testing.T) {
 	}
 
 	for lang, locale := range targets {
-		tr := factory.Translator(lang)
-		for _, cmd := range commands {
-			if cmd == nil {
-				continue
+		t.Run(lang, func(t *testing.T) {
+			tr := factory.Translator(lang)
+			for _, cmd := range commands {
+				if cmd == nil {
+					continue
+				}
+				assertSlashNameKeyCoverage(t, tr, locale, "command", cmd.Name, cmd.NameLocalizations)
+				walkSlashOptions(cmd.Options, func(opt *discordgo.ApplicationCommandOption) {
+					assertSlashOptionNameKeyCoverage(t, tr, locale, opt.Name, opt.NameLocalizations)
+				})
 			}
-			assertSlashNameKeyCoverage(t, tr, locale, "command", cmd.Name, cmd.NameLocalizations)
-			walkSlashOptions(cmd.Options, func(opt *discordgo.ApplicationCommandOption) {
-				assertSlashOptionNameKeyCoverage(t, tr, locale, opt.Name, opt.NameLocalizations)
-			})
-		}
+		})
 	}
 }
 
@@ -57,35 +59,37 @@ func TestShippedDeFrSlashMetadataLocalizesDescriptionsAndChoices(t *testing.T) {
 	}
 
 	for lang, locale := range targets {
-		tr := factory.Translator(lang)
-		for _, cmd := range commands {
-			if cmd == nil {
-				continue
-			}
-			if cmd.DescriptionLocalizations == nil || (*cmd.DescriptionLocalizations)[locale] == "" {
-				t.Fatalf("locale=%q command=%q missing description localization", lang, cmd.Name)
-			}
-			walkSlashOptions(cmd.Options, func(opt *discordgo.ApplicationCommandOption) {
-				if opt.DescriptionLocalizations == nil || opt.DescriptionLocalizations[locale] == "" {
-					t.Fatalf("locale=%q option=%q missing description localization", lang, opt.Name)
+		t.Run(lang, func(t *testing.T) {
+			tr := factory.Translator(lang)
+			for _, cmd := range commands {
+				if cmd == nil {
+					continue
 				}
-				for _, choice := range opt.Choices {
-					if choice == nil {
-						continue
+				if cmd.DescriptionLocalizations == nil || (*cmd.DescriptionLocalizations)[locale] == "" {
+					t.Fatalf("locale=%q command=%q missing description localization", lang, cmd.Name)
+				}
+				walkSlashOptions(cmd.Options, func(opt *discordgo.ApplicationCommandOption) {
+					if opt.DescriptionLocalizations == nil || opt.DescriptionLocalizations[locale] == "" {
+						t.Fatalf("locale=%q option=%q missing description localization", lang, opt.Name)
 					}
-					translated := tr.Translate(choice.Name, false)
-					if translated == choice.Name {
-						if choiceMayRemainUnchanged(choice.Name) {
+					for _, choice := range opt.Choices {
+						if choice == nil {
 							continue
 						}
-						t.Fatalf("locale=%q choice=%q missing localization", lang, choice.Name)
+						translated := tr.Translate(choice.Name, false)
+						if translated == choice.Name {
+							if choiceMayRemainUnchanged(choice.Name) {
+								continue
+							}
+							t.Fatalf("locale=%q choice=%q missing localization", lang, choice.Name)
+						}
+						if choice.NameLocalizations == nil || choice.NameLocalizations[locale] != translated {
+							t.Fatalf("locale=%q choice=%q missing built localization", lang, choice.Name)
+						}
 					}
-					if choice.NameLocalizations == nil || choice.NameLocalizations[locale] != translated {
-						t.Fatalf("locale=%q choice=%q missing built localization", lang, choice.Name)
-					}
-				}
-			})
-		}
+				})
+			}
+		})
 	}
 }
 
@@ -191,12 +195,14 @@ func TestShippedDeFrSlashRuntimeKeysCovered(t *testing.T) {
 	factory := i18n.NewFactory(shippedLocaleRoot(t), cfg)
 
 	for _, lang := range []string{"de", "fr"} {
-		tr := factory.Translator(lang)
-		for _, key := range keys {
-			if got := tr.Translate(key, false); got == key {
-				t.Fatalf("locale=%q key=%q fell back to english", lang, key)
+		t.Run(lang, func(t *testing.T) {
+			tr := factory.Translator(lang)
+			for _, key := range keys {
+				if got := tr.Translate(key, false); got == key {
+					t.Errorf("locale=%q key=%q fell back to english", lang, key)
+				}
 			}
-		}
+		})
 	}
 }
 
@@ -309,19 +315,21 @@ func TestShippedDeFrCanonicalBrandTermsRemainCanonical(t *testing.T) {
 	factory := i18n.NewFactory(shippedLocaleRoot(t), cfg)
 
 	for _, lang := range []string{"de", "fr"} {
-		tr := factory.Translator(lang)
-		if got := tr.Translate("Pokemon", false); got != "Pokemon" {
-			t.Fatalf("locale=%q Pokemon=%q, want Pokemon", lang, got)
-		}
-		if got := tr.Translate("Pokestop", false); got != "Pokestop" {
-			t.Fatalf("locale=%q Pokestop=%q, want Pokestop", lang, got)
-		}
-		if got := tr.Translate("Track Team Rocket invasions", false); !containsSubstring(got, "Team Rocket") {
-			t.Fatalf("locale=%q Team Rocket phrase=%q, want canonical Team Rocket", lang, got)
-		}
-		if got := tr.Translate("RSVP matching", false); !containsSubstring(got, "RSVP") {
-			t.Fatalf("locale=%q RSVP phrase=%q, want canonical RSVP", lang, got)
-		}
+		t.Run(lang, func(t *testing.T) {
+			tr := factory.Translator(lang)
+			if got := tr.Translate("Pokemon", false); got != "Pokemon" {
+				t.Fatalf("locale=%q Pokemon=%q, want Pokemon", lang, got)
+			}
+			if got := tr.Translate("Pokestop", false); got != "Pokestop" {
+				t.Fatalf("locale=%q Pokestop=%q, want Pokestop", lang, got)
+			}
+			if got := tr.Translate("Track Team Rocket invasions", false); !containsSubstring(got, "Team Rocket") {
+				t.Fatalf("locale=%q Team Rocket phrase=%q, want canonical Team Rocket", lang, got)
+			}
+			if got := tr.Translate("RSVP matching", false); !containsSubstring(got, "RSVP") {
+				t.Fatalf("locale=%q RSVP phrase=%q, want canonical RSVP", lang, got)
+			}
+		})
 	}
 }
 

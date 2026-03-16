@@ -85,6 +85,19 @@ func appendQuestSharedSlashArgs(args []string, options []*discordgo.ApplicationC
 	return args
 }
 
+func appendInvasionLikeSlashArgs(args []string, options []*discordgo.ApplicationCommandInteractionDataOption) []string {
+	if value, ok := optionInt(options, "distance"); ok && value > 0 {
+		args = append(args, fmt.Sprintf("d%d", value))
+	}
+	if optionEnabled(options, "clean") {
+		args = append(args, "clean")
+	}
+	if value, ok := optionString(options, "template"); ok && strings.TrimSpace(value) != "" {
+		args = append(args, "template:"+strings.TrimSpace(value))
+	}
+	return args
+}
+
 func quoteSlashCommandValue(value string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {

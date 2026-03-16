@@ -45,25 +45,32 @@ func TestSlashCommandDefinitionsGuidedEntryOptionsAreOptional(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		cmd := findSlashCommand(commands, tc.command)
-		if cmd == nil {
-			t.Fatalf("command %q not found", tc.command)
-		}
-		options := cmd.Options
+		name := tc.command
 		if tc.sub != "" {
-			subcommand := findSlashSubcommand(cmd.Options, tc.sub)
-			if subcommand == nil {
-				t.Fatalf("subcommand %q not found on command %q", tc.sub, tc.command)
+			name += "/" + tc.sub
+		}
+		name += "/" + tc.option
+		t.Run(name, func(t *testing.T) {
+			cmd := findSlashCommand(commands, tc.command)
+			if cmd == nil {
+				t.Fatalf("command %q not found", tc.command)
 			}
-			options = subcommand.Options
-		}
-		option := findSlashOption(options, tc.option)
-		if option == nil {
-			t.Fatalf("option %q not found on command %q", tc.option, tc.command)
-		}
-		if option.Required {
-			t.Fatalf("option %q on command %q should be optional", tc.option, tc.command)
-		}
+			options := cmd.Options
+			if tc.sub != "" {
+				subcommand := findSlashSubcommand(cmd.Options, tc.sub)
+				if subcommand == nil {
+					t.Fatalf("subcommand %q not found on command %q", tc.sub, tc.command)
+				}
+				options = subcommand.Options
+			}
+			option := findSlashOption(options, tc.option)
+			if option == nil {
+				t.Fatalf("option %q not found on command %q", tc.option, tc.command)
+			}
+			if option.Required {
+				t.Fatalf("option %q on command %q should be optional", tc.option, tc.command)
+			}
+		})
 	}
 }
 
@@ -191,21 +198,27 @@ func TestSlashCommandDefinitionsOptionOrdering(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		cmd := findSlashCommand(commands, tc.command)
-		if cmd == nil {
-			t.Fatalf("command %q not found", tc.command)
-		}
-		options := cmd.Options
+		name := tc.command
 		if tc.sub != "" {
-			subcommand := findSlashSubcommand(cmd.Options, tc.sub)
-			if subcommand == nil {
-				t.Fatalf("subcommand %q not found on command %q", tc.sub, tc.command)
+			name += "/" + tc.sub
+		}
+		t.Run(name, func(t *testing.T) {
+			cmd := findSlashCommand(commands, tc.command)
+			if cmd == nil {
+				t.Fatalf("command %q not found", tc.command)
 			}
-			options = subcommand.Options
-		}
-		if got := slashOptionNames(options); strings.Join(got, ",") != strings.Join(tc.want, ",") {
-			t.Fatalf("%s %s option order=%v, want %v", tc.command, tc.sub, got, tc.want)
-		}
+			options := cmd.Options
+			if tc.sub != "" {
+				subcommand := findSlashSubcommand(cmd.Options, tc.sub)
+				if subcommand == nil {
+					t.Fatalf("subcommand %q not found on command %q", tc.sub, tc.command)
+				}
+				options = subcommand.Options
+			}
+			if got := slashOptionNames(options); strings.Join(got, ",") != strings.Join(tc.want, ",") {
+				t.Fatalf("%s %s option order=%v, want %v", tc.command, tc.sub, got, tc.want)
+			}
+		})
 	}
 }
 

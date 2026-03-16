@@ -16,22 +16,22 @@ func (d *Discord) buildAreaShowPayload(i *discordgo.InteractionCreate, selected 
 func (d *Discord) buildAreaShowPayloadState(i *discordgo.InteractionCreate, selected string) (*discordgo.MessageEmbed, []discordgo.MessageComponent, *slashMapRequest, string) {
 	tr := d.slashInteractionTranslator(i)
 	if d.manager == nil || d.manager.fences == nil {
-		return nil, nil, nil, tr.Translate("No available areas found.", false)
+		return nil, nil, nil, translateOrDefault(tr,"No available areas found.")
 	}
 	areas := selectableAreaNames(d.manager.fences.Fences)
 	if len(areas) == 0 {
-		return nil, nil, nil, tr.Translate("No available areas found.", false)
+		return nil, nil, nil, translateOrDefault(tr,"No available areas found.")
 	}
 	userID, _ := slashUser(i)
 	if userID == "" || d.manager.query == nil {
-		return nil, nil, nil, tr.Translate("Target is not registered.", false)
+		return nil, nil, nil, translateOrDefault(tr,"Target is not registered.")
 	}
 	human, err := d.manager.query.SelectOneQuery("humans", map[string]any{"id": userID})
 	if err != nil {
-		return nil, nil, nil, tr.Translate("Unable to load areas.", false)
+		return nil, nil, nil, translateOrDefault(tr,"Unable to load areas.")
 	}
 	if human == nil {
-		return nil, nil, nil, tr.Translate("Target is not registered.", false)
+		return nil, nil, nil, translateOrDefault(tr,"Target is not registered.")
 	}
 	enabledAreas := parseAreaListFromHuman(human)
 	enabledSet := map[string]bool{}
@@ -51,7 +51,7 @@ func (d *Discord) buildAreaShowPayloadState(i *discordgo.InteractionCreate, sele
 	}
 
 	enabled := enabledSet[strings.ToLower(selected)]
-	title := tr.TranslateFormat("Area: {0}", selected)
+	title := translateFormatOrDefault(tr,"Area: {0}", selected)
 	if enabled {
 		title += " ✅"
 	}
@@ -77,23 +77,23 @@ func (d *Discord) buildAreaShowPayloadState(i *discordgo.InteractionCreate, sele
 	menu := discordgo.SelectMenu{
 		CustomID:    slashAreaShowSelect,
 		Options:     options,
-		Placeholder: tr.Translate("Select area", false),
+		Placeholder: translateOrDefault(tr,"Select area"),
 		MaxValues:   1,
 		MinValues:   &min,
 	}
 	buttonID := slashAreaShowAdd + selected
-	buttonLabel := tr.Translate("Add Area", false)
+	buttonLabel := translateOrDefault(tr,"Add Area")
 	buttonStyle := discordgo.SuccessButton
 	if enabled {
 		buttonID = slashAreaShowRemove + selected
-		buttonLabel = tr.Translate("Remove Area", false)
+		buttonLabel = translateOrDefault(tr,"Remove Area")
 		buttonStyle = discordgo.DangerButton
 	}
 	components := []discordgo.MessageComponent{
 		discordgo.ActionsRow{Components: []discordgo.MessageComponent{menu}},
 		discordgo.ActionsRow{Components: []discordgo.MessageComponent{
 			discordgo.Button{CustomID: buttonID, Label: buttonLabel, Style: buttonStyle},
-			discordgo.Button{CustomID: slashProfileAreaBack, Label: tr.Translate("Back to Profiles", false), Style: discordgo.SecondaryButton},
+			discordgo.Button{CustomID: slashProfileAreaBack, Label: translateOrDefault(tr,"Back to Profiles"), Style: discordgo.SecondaryButton},
 		}},
 	}
 	return embed, components, mapReq, ""
@@ -107,19 +107,19 @@ func (d *Discord) buildProfilePayload(i *discordgo.InteractionCreate, selected s
 func (d *Discord) buildProfilePayloadState(i *discordgo.InteractionCreate, selected string) (*discordgo.MessageEmbed, []discordgo.MessageComponent, *slashMapRequest, string) {
 	tr := d.slashInteractionTranslator(i)
 	if d.manager == nil || d.manager.query == nil {
-		return nil, nil, nil, tr.Translate("Target is not registered.", false)
+		return nil, nil, nil, translateOrDefault(tr,"Target is not registered.")
 	}
 	userID, _ := slashUser(i)
 	if userID == "" {
-		return nil, nil, nil, tr.Translate("Target is not registered.", false)
+		return nil, nil, nil, translateOrDefault(tr,"Target is not registered.")
 	}
 	human, err := d.manager.query.SelectOneQuery("humans", map[string]any{"id": userID})
 	if err != nil || human == nil {
-		return nil, nil, nil, tr.Translate("Target is not registered.", false)
+		return nil, nil, nil, translateOrDefault(tr,"Target is not registered.")
 	}
 	profiles, err := d.manager.query.SelectAllQuery("profiles", map[string]any{"id": userID})
 	if err != nil {
-		return nil, nil, nil, tr.Translate("Unable to load profiles.", false)
+		return nil, nil, nil, translateOrDefault(tr,"Unable to load profiles.")
 	}
 	if len(profiles) == 0 {
 		embed, components, mapReq := d.buildProfileEmptyPayloadState(human)
@@ -151,35 +151,35 @@ func (d *Discord) buildProfilePayloadState(i *discordgo.InteractionCreate, selec
 	selectedName := localizedProfileName(tr, selectedRow)
 
 	areas := parseProfileAreas(selectedRow["area"])
-	areaText := tr.Translate("None", false)
+	areaText := translateOrDefault(tr,"None")
 	if len(areas) > 0 {
 		areaText = strings.Join(areas, ", ")
 	}
 	lat := toFloat(selectedRow["latitude"])
 	lon := toFloat(selectedRow["longitude"])
-	locationText := tr.Translate("Not set", false)
+	locationText := translateOrDefault(tr,"Not set")
 	if lat != 0 || lon != 0 {
 		locationText = fmt.Sprintf("%s, %s", formatFloat(lat), formatFloat(lon))
 	}
 	hoursText := profileScheduleTextLocalized(tr, selectedRow["active_hours"])
 	if hoursText == "" {
-		hoursText = tr.Translate("No schedules", false)
+		hoursText = translateOrDefault(tr,"No schedules")
 	}
-	title := tr.TranslateFormat("Profile: {0}", selectedName)
+	title := translateFormatOrDefault(tr,"Profile: {0}", selectedName)
 	if selectedNo == currentProfile {
 		title += " ✅"
 	}
-	description := tr.Translate("Schedules enable alerts only during the listed windows. Outside those windows, alerts are paused. If you have no schedules, alerts run all the time. End times are exclusive, so back-to-back periods can share the same minute. Times use your saved location timezone.", false)
+	description := translateOrDefault(tr,"Schedules enable alerts only during the listed windows. Outside those windows, alerts are paused. If you have no schedules, alerts run all the time. End times are exclusive, so back-to-back periods can share the same minute. Times use your saved location timezone.")
 	if quietHoursEnabled {
-		description = tr.Translate("**Quiet Hours Enabled**\nAlerts are currently paused outside your active schedule windows.", false) + "\n\n" + description
+		description = translateOrDefault(tr,"**Quiet Hours Enabled**\nAlerts are currently paused outside your active schedule windows.") + "\n\n" + description
 	}
 	embed := &discordgo.MessageEmbed{
 		Title:       title,
 		Description: description,
 		Fields: []*discordgo.MessageEmbedField{
-			{Name: tr.Translate("Location", false), Value: locationText, Inline: false},
-			{Name: tr.Translate("Areas", false), Value: areaText, Inline: false},
-			{Name: tr.Translate("Schedule", false), Value: hoursText, Inline: false},
+			{Name: translateOrDefault(tr,"Location"), Value: locationText, Inline: false},
+			{Name: translateOrDefault(tr,"Areas"), Value: areaText, Inline: false},
+			{Name: translateOrDefault(tr,"Schedule"), Value: hoursText, Inline: false},
 		},
 	}
 	mapReq := d.profileMapRequest(lat, lon, areas)
@@ -203,15 +203,15 @@ func (d *Discord) buildProfilePayloadState(i *discordgo.InteractionCreate, selec
 	menu := discordgo.SelectMenu{
 		CustomID:    slashProfileSelect,
 		Options:     options,
-		Placeholder: tr.Translate("Select profile", false),
+		Placeholder: translateOrDefault(tr,"Select profile"),
 		MaxValues:   1,
 		MinValues:   &min,
 	}
 	setDisabled := selectedNo == currentProfile
-	setLabel := tr.Translate("Set Active", false)
+	setLabel := translateOrDefault(tr,"Set Active")
 	if quietHoursEnabled {
 		setDisabled = selectedNo == preferredProfile
-		setLabel = tr.Translate("Set for Active Hours", false)
+		setLabel = translateOrDefault(tr,"Set for Active Hours")
 	}
 	setButton := discordgo.Button{
 		CustomID: slashProfileSet + fmt.Sprintf("%d", selectedNo),
@@ -223,18 +223,18 @@ func (d *Discord) buildProfilePayloadState(i *discordgo.InteractionCreate, selec
 		discordgo.ActionsRow{Components: []discordgo.MessageComponent{menu}},
 		discordgo.ActionsRow{Components: []discordgo.MessageComponent{
 			setButton,
-			discordgo.Button{CustomID: slashProfileCreate, Label: tr.Translate("Create Profile", false), Style: discordgo.SecondaryButton},
-			discordgo.Button{CustomID: slashProfileDelete + fmt.Sprintf("%d", selectedNo), Label: tr.Translate("Delete Profile", false), Style: discordgo.DangerButton, Disabled: len(profiles) <= 1},
+			discordgo.Button{CustomID: slashProfileCreate, Label: translateOrDefault(tr,"Create Profile"), Style: discordgo.SecondaryButton},
+			discordgo.Button{CustomID: slashProfileDelete + fmt.Sprintf("%d", selectedNo), Label: translateOrDefault(tr,"Delete Profile"), Style: discordgo.DangerButton, Disabled: len(profiles) <= 1},
 		}},
 	}
 	clearDisabled := lat == 0 && lon == 0
 	components = append(components, discordgo.ActionsRow{Components: []discordgo.MessageComponent{
-		discordgo.Button{CustomID: slashProfileLocation, Label: tr.Translate("Set Location", false), Style: discordgo.SecondaryButton},
-		discordgo.Button{CustomID: slashProfileArea, Label: tr.Translate("Manage Areas", false), Style: discordgo.SecondaryButton},
-		discordgo.Button{CustomID: slashProfileLocationClear, Label: tr.Translate("Clear Location", false), Style: discordgo.DangerButton, Disabled: clearDisabled},
+		discordgo.Button{CustomID: slashProfileLocation, Label: translateOrDefault(tr,"Set Location"), Style: discordgo.SecondaryButton},
+		discordgo.Button{CustomID: slashProfileArea, Label: translateOrDefault(tr,"Manage Areas"), Style: discordgo.SecondaryButton},
+		discordgo.Button{CustomID: slashProfileLocationClear, Label: translateOrDefault(tr,"Clear Location"), Style: discordgo.DangerButton, Disabled: clearDisabled},
 	}})
 	components = append(components, discordgo.ActionsRow{Components: []discordgo.MessageComponent{
-		discordgo.Button{CustomID: slashProfileScheduleOverview, Label: tr.Translate("Scheduler", false), Style: discordgo.PrimaryButton},
+		discordgo.Button{CustomID: slashProfileScheduleOverview, Label: translateOrDefault(tr,"Scheduler"), Style: discordgo.PrimaryButton},
 	}})
 	return embed, components, mapReq, ""
 }
@@ -247,23 +247,23 @@ func (d *Discord) buildProfileEmptyPayload(human map[string]any) (*discordgo.Mes
 func (d *Discord) buildProfileEmptyPayloadState(human map[string]any) (*discordgo.MessageEmbed, []discordgo.MessageComponent, *slashMapRequest) {
 	tr := d.slashTranslator(d.resolvedHumanLanguage(human))
 	areas := parseAreaListFromHuman(human)
-	areaText := tr.Translate("None", false)
+	areaText := translateOrDefault(tr,"None")
 	if len(areas) > 0 {
 		areaText = strings.Join(areas, ", ")
 	}
 	lat := toFloat(human["latitude"])
 	lon := toFloat(human["longitude"])
-	locationText := tr.Translate("Not set", false)
+	locationText := translateOrDefault(tr,"Not set")
 	if lat != 0 || lon != 0 {
 		locationText = fmt.Sprintf("%s, %s", formatFloat(lat), formatFloat(lon))
 	}
 
 	embed := &discordgo.MessageEmbed{
-		Title:       tr.Translate("No profiles yet", false),
-		Description: tr.Translate("Create your first profile to manage alerts. You can still set location and areas now.", false),
+		Title:       translateOrDefault(tr,"No profiles yet"),
+		Description: translateOrDefault(tr,"Create your first profile to manage alerts. You can still set location and areas now."),
 		Fields: []*discordgo.MessageEmbedField{
-			{Name: tr.Translate("Location", false), Value: locationText, Inline: false},
-			{Name: tr.Translate("Areas", false), Value: areaText, Inline: false},
+			{Name: translateOrDefault(tr,"Location"), Value: locationText, Inline: false},
+			{Name: translateOrDefault(tr,"Areas"), Value: areaText, Inline: false},
 		},
 	}
 	mapReq := d.profileMapRequest(lat, lon, areas)
@@ -272,12 +272,12 @@ func (d *Discord) buildProfileEmptyPayloadState(human map[string]any) (*discordg
 	clearDisabled := lat == 0 && lon == 0
 	components := []discordgo.MessageComponent{
 		discordgo.ActionsRow{Components: []discordgo.MessageComponent{
-			discordgo.Button{CustomID: slashProfileCreate, Label: tr.Translate("Create Profile", false), Style: discordgo.PrimaryButton},
+			discordgo.Button{CustomID: slashProfileCreate, Label: translateOrDefault(tr,"Create Profile"), Style: discordgo.PrimaryButton},
 		}},
 		discordgo.ActionsRow{Components: []discordgo.MessageComponent{
-			discordgo.Button{CustomID: slashProfileLocation, Label: tr.Translate("Set Location", false), Style: discordgo.SecondaryButton},
-			discordgo.Button{CustomID: slashProfileArea, Label: tr.Translate("Manage Areas", false), Style: discordgo.SecondaryButton},
-			discordgo.Button{CustomID: slashProfileLocationClear, Label: tr.Translate("Clear Location", false), Style: discordgo.DangerButton, Disabled: clearDisabled},
+			discordgo.Button{CustomID: slashProfileLocation, Label: translateOrDefault(tr,"Set Location"), Style: discordgo.SecondaryButton},
+			discordgo.Button{CustomID: slashProfileArea, Label: translateOrDefault(tr,"Manage Areas"), Style: discordgo.SecondaryButton},
+			discordgo.Button{CustomID: slashProfileLocationClear, Label: translateOrDefault(tr,"Clear Location"), Style: discordgo.DangerButton, Disabled: clearDisabled},
 		}},
 	}
 	return embed, components, mapReq
@@ -286,33 +286,33 @@ func (d *Discord) buildProfileEmptyPayloadState(human map[string]any) (*discordg
 func (d *Discord) buildProfileDeletePayload(i *discordgo.InteractionCreate, selected string) (*discordgo.MessageEmbed, []discordgo.MessageComponent, string) {
 	tr := d.slashInteractionTranslator(i)
 	if d.manager == nil || d.manager.query == nil {
-		return nil, nil, tr.Translate("Target is not registered.", false)
+		return nil, nil, translateOrDefault(tr,"Target is not registered.")
 	}
 	userID, _ := slashUser(i)
 	if userID == "" {
-		return nil, nil, tr.Translate("Target is not registered.", false)
+		return nil, nil, translateOrDefault(tr,"Target is not registered.")
 	}
 	profiles, err := d.manager.query.SelectAllQuery("profiles", map[string]any{"id": userID})
 	if err != nil {
-		return nil, nil, tr.Translate("Unable to load profiles.", false)
+		return nil, nil, translateOrDefault(tr,"Unable to load profiles.")
 	}
 	if len(profiles) <= 1 {
-		return nil, nil, tr.Translate("You must keep at least one profile.", false)
+		return nil, nil, translateOrDefault(tr,"You must keep at least one profile.")
 	}
 	selectedRow := profileRowByToken(profiles, selected)
 	if selectedRow == nil {
-		return nil, nil, tr.Translate("Profile not found.", false)
+		return nil, nil, translateOrDefault(tr,"Profile not found.")
 	}
 	profileNo := toInt(selectedRow["profile_no"], 0)
 	name := localizedProfileName(tr, selectedRow)
 	embed := &discordgo.MessageEmbed{
-		Title:       tr.Translate("Delete Profile", false),
-		Description: tr.TranslateFormat("Delete **{0}**? This cannot be undone.", name),
+		Title:       translateOrDefault(tr,"Delete Profile"),
+		Description: translateFormatOrDefault(tr,"Delete **{0}**? This cannot be undone.", name),
 	}
 	components := []discordgo.MessageComponent{
 		discordgo.ActionsRow{Components: []discordgo.MessageComponent{
-			discordgo.Button{CustomID: slashProfileDeleteConfirm + fmt.Sprintf("%d", profileNo), Label: tr.Translate("Delete", false), Style: discordgo.DangerButton},
-			discordgo.Button{CustomID: slashProfileDeleteCancel + fmt.Sprintf("%d", profileNo), Label: tr.Translate("Cancel", false), Style: discordgo.SecondaryButton},
+			discordgo.Button{CustomID: slashProfileDeleteConfirm + fmt.Sprintf("%d", profileNo), Label: translateOrDefault(tr,"Delete"), Style: discordgo.DangerButton},
+			discordgo.Button{CustomID: slashProfileDeleteCancel + fmt.Sprintf("%d", profileNo), Label: translateOrDefault(tr,"Cancel"), Style: discordgo.SecondaryButton},
 		}},
 	}
 	return embed, components, ""

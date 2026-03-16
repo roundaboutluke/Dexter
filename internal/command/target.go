@@ -245,15 +245,7 @@ func buildTarget(ctx *Context, args []string) TargetResult {
 		}
 	}
 
-	return TargetResult{
-		CanContinue:  false,
-		Target:       tgt,
-		Language:     ctx.Language,
-		ProfileNo:    1,
-		IsRegistered: false,
-		TargetID:     targetID,
-		Message:      unregisteredMessage(ctx, tr),
-	}
+	return TargetResult{CanContinue: false, Message: unregisteredMessage(ctx, tr)}
 }
 
 func unregisteredMessage(ctx *Context, tr *i18n.Translator) string {

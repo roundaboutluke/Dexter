@@ -151,6 +151,13 @@ func translateOrDefault(tr *i18n.Translator, key string) string {
 	return tr.Translate(key, false)
 }
 
+func translateFormatOrDefault(tr *i18n.Translator, key string, args ...any) string {
+	if tr == nil {
+		return key
+	}
+	return tr.TranslateFormat(key, args...)
+}
+
 func slashLocalizationKey(kind, name string) string {
 	name = strings.ToLower(strings.TrimSpace(name))
 	if name == "" {

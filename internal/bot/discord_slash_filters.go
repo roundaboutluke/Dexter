@@ -24,6 +24,20 @@ const (
 	slashFilterCardColorAdded    = 0x57F287
 	slashFilterCardColorRemoved  = 0xED4245
 	slashFilterCardColorRestored = 0x5865F2
+
+	pokemonIDWildcard     = 9000
+	defaultMaxCP          = 9000
+	allLevelsSentinel     = 90
+	filterActionExpiry    = 15 * time.Minute
+	filterSummaryRowLimit = 5
+
+	questRewardPokemon    = 7
+	questRewardItem       = 2
+	questRewardStardust   = 3
+	questRewardMegaEnergy = 12
+	questRewardCandy      = 4
+	questRewardXLCandy    = 9
+	questRewardExperience = 1
 )
 
 func (d *Discord) slashUiconsClient() *uicons.Client {
@@ -57,8 +71,8 @@ func (d *Discord) slashFilterIconURL(trackingType string, rows []map[string]any)
 		url, _ := client.PokemonIcon(pokemonID, form, evolution, 0, 0, 0, false, 0)
 		return url
 	case "raid", "maxbattle":
-		pokemonID := toInt(row["pokemon_id"], 9000)
-		if pokemonID == 9000 || pokemonID == 0 {
+		pokemonID := toInt(row["pokemon_id"], pokemonIDWildcard)
+		if pokemonID == pokemonIDWildcard || pokemonID == 0 {
 			level := toInt(row["level"], 0)
 			if level > 0 {
 				url, _ := client.RaidEggIcon(level, false, false)
@@ -81,28 +95,28 @@ func (d *Discord) slashFilterIconURL(trackingType string, rows []map[string]any)
 		rewardType := toInt(row["reward_type"], 0)
 		reward := toInt(row["reward"], 0)
 		switch rewardType {
-		case 7:
+		case questRewardPokemon:
 			if reward == 0 {
 				return ""
 			}
 			form := toInt(row["form"], 0)
 			url, _ := client.PokemonIcon(reward, form, 0, 0, 0, 0, false, 0)
 			return url
-		case 2:
+		case questRewardItem:
 			if reward > 0 {
 				url, _ := client.RewardItemIcon(reward)
 				return url
 			}
-		case 3:
+		case questRewardStardust:
 			url, _ := client.RewardStardustIcon(reward)
 			return url
-		case 12:
+		case questRewardMegaEnergy:
 			url, _ := client.RewardMegaEnergyIcon(reward, 0)
 			return url
-		case 4:
+		case questRewardCandy:
 			url, _ := client.RewardCandyIcon(reward, 0)
 			return url
-		case 9:
+		case questRewardXLCandy:
 			url, _ := client.RewardXLCandyIcon(reward, 0)
 			return url
 		}
@@ -175,10 +189,10 @@ func (d *Discord) slashFilterTypedHeading(tr *i18n.Translator, trackingType stri
 	case "pokemon":
 		name = d.slashMonsterName(tr, row)
 	case "raid", "maxbattle":
-		pokemonID := toInt(row["pokemon_id"], 9000)
-		if pokemonID == 9000 || pokemonID == 0 {
+		pokemonID := toInt(row["pokemon_id"], pokemonIDWildcard)
+		if pokemonID == pokemonIDWildcard || pokemonID == 0 {
 			level := toInt(row["level"], 0)
-			if level == 90 {
+			if level == allLevelsSentinel {
 				name = translateOrDefault(tr, "All levels")
 			} else if level > 0 {
 				name = fmt.Sprintf("%s %d", translateOrDefault(tr, "Level"), level)
@@ -188,7 +202,7 @@ func (d *Discord) slashFilterTypedHeading(tr *i18n.Translator, trackingType stri
 		}
 	case "egg":
 		level := toInt(row["level"], 0)
-		if level == 90 {
+		if level == allLevelsSentinel {
 			name = translateOrDefault(tr, "All levels")
 		} else if level > 0 {
 			name = fmt.Sprintf("%s %d", translateOrDefault(tr, "Level"), level)
@@ -264,10 +278,10 @@ func (d *Discord) slashQuestRewardName(tr *i18n.Translator, row map[string]any) 
 	reward := toInt(row["reward"], 0)
 	form := toInt(row["form"], 0)
 	switch rewardType {
-	case 7:
+	case questRewardPokemon:
 		fakeRow := map[string]any{"pokemon_id": reward, "form": form}
 		return d.slashMonsterName(tr, fakeRow)
-	case 2:
+	case questRewardItem:
 		if d.manager != nil && d.manager.data != nil {
 			if item := d.manager.data.Items[fmt.Sprintf("%d", reward)]; item != nil {
 				if m, ok := item.(map[string]any); ok {
@@ -278,9 +292,9 @@ func (d *Discord) slashQuestRewardName(tr *i18n.Translator, row map[string]any) 
 			}
 		}
 		return translateOrDefault(tr, "Item")
-	case 3:
+	case questRewardStardust:
 		return translateOrDefault(tr, "Stardust")
-	case 12:
+	case questRewardMegaEnergy:
 		name := translateOrDefault(tr, "Mega Energy")
 		if reward > 0 {
 			fakeRow := map[string]any{"pokemon_id": reward, "form": 0}
@@ -290,19 +304,19 @@ func (d *Discord) slashQuestRewardName(tr *i18n.Translator, row map[string]any) 
 			}
 		}
 		return name
-	case 4:
+	case questRewardCandy:
 		if reward == 0 {
 			return translateOrDefault(tr, "Rare Candy")
 		}
 		fakeRow := map[string]any{"pokemon_id": reward, "form": 0}
 		return d.slashMonsterName(tr, fakeRow) + " Candy"
-	case 9:
+	case questRewardXLCandy:
 		if reward == 0 {
 			return translateOrDefault(tr, "Rare Candy XL")
 		}
 		fakeRow := map[string]any{"pokemon_id": reward, "form": 0}
 		return d.slashMonsterName(tr, fakeRow) + " XL Candy"
-	case 1:
+	case questRewardExperience:
 		return translateOrDefault(tr, "Experience")
 	default:
 		return translateOrDefault(tr, "Reward")
@@ -330,8 +344,8 @@ func slashFilterNonDefaultDetailLines(tr *i18n.Translator, trackingType string, 
 			lines = append(lines, slashCardDetailLine(translateOrDefault(tr, "IV"), fmt.Sprintf("%d%% - %d%%", displayMin, maxIV)))
 		}
 		minCP := toInt(row["min_cp"], 0)
-		maxCP := toInt(row["max_cp"], 9000)
-		if minCP != 0 || maxCP != 9000 {
+		maxCP := toInt(row["max_cp"], defaultMaxCP)
+		if minCP != 0 || maxCP != defaultMaxCP {
 			lines = append(lines, slashCardDetailLine(translateOrDefault(tr, "CP"), fmt.Sprintf("%d - %d", minCP, maxCP)))
 		}
 		minLvl := toInt(row["min_level"], 0)
@@ -448,7 +462,7 @@ func monsterDefaultValue(key string) int {
 	case "min_cp":
 		return 0
 	case "max_cp":
-		return 9000
+		return defaultMaxCP
 	case "min_level":
 		return 0
 	case "max_level":
@@ -781,7 +795,7 @@ func (d *Discord) slashFilterRowText(tr *i18n.Translator, trackingType string, r
 	if d.manager.data == nil {
 		if uid := slashRowUID(row); uid != "" {
 			if tr != nil {
-				return tr.TranslateFormat("Filter UID {0}", uid)
+				return translateFormatOrDefault(tr,"Filter UID {0}", uid)
 			}
 			return fmt.Sprintf("Filter UID %s", uid)
 		}
@@ -818,8 +832,8 @@ func (d *Discord) slashFilterRowText(tr *i18n.Translator, trackingType string, r
 func (d *Discord) slashFilterSummary(tr *i18n.Translator, trackingType string, rows []map[string]any) string {
 	lines := []string{}
 	for idx, row := range rows {
-		if idx >= 5 {
-			lines = append(lines, tr.TranslateFormat("And {0} more...", len(rows)-idx))
+		if idx >= filterSummaryRowLimit {
+			lines = append(lines, translateFormatOrDefault(tr,"And {0} more...", len(rows)-idx))
 			break
 		}
 		label := d.slashFilterRowText(tr, trackingType, row)
@@ -907,7 +921,7 @@ func (d *Discord) slashFilterPreviewEmbed(i *discordgo.InteractionCreate, title,
 	}
 	detailLines := []string{}
 	if profileLabel != "" {
-		detailLines = append(detailLines, slashCardDetailLine(tr.Translate("Profile", false), profileLabel))
+		detailLines = append(detailLines, slashCardDetailLine(translateOrDefault(tr,"Profile"), profileLabel))
 	}
 	for idx := start; idx < len(fields); idx++ {
 		field := fields[idx]
@@ -1004,14 +1018,14 @@ func (d *Discord) slashFilterMutationEmbed(i *discordgo.InteractionCreate, actio
 	headline := d.slashFilterTypedHeading(tr, trackingType, rows)
 	detailLines := []string{}
 	if profileLabel != "" {
-		detailLines = append(detailLines, slashCardDetailLine(tr.Translate("Profile", false), profileLabel))
+		detailLines = append(detailLines, slashCardDetailLine(translateOrDefault(tr,"Profile"), profileLabel))
 	}
 	if len(rows) == 1 {
 		detailLines = append(detailLines, slashFilterNonDefaultDetailLines(tr, trackingType, rows[0])...)
 	} else if len(rows) > 1 {
 		for idx, row := range rows {
-			if idx >= 5 {
-				detailLines = append(detailLines, fmt.Sprintf("*%s*", tr.TranslateFormat("And {0} more...", len(rows)-idx)))
+			if idx >= filterSummaryRowLimit {
+				detailLines = append(detailLines, fmt.Sprintf("*%s*", translateFormatOrDefault(tr,"And {0} more...", len(rows)-idx)))
 				break
 			}
 			label := d.slashFilterRowText(tr, trackingType, row)
@@ -1021,7 +1035,7 @@ func (d *Discord) slashFilterMutationEmbed(i *discordgo.InteractionCreate, actio
 		}
 	}
 	embed := &discordgo.MessageEmbed{
-		Title:       tr.Translate(slashFilterMutationTitleKey(action, len(rows)), false),
+		Title:       translateOrDefault(tr,slashFilterMutationTitleKey(action, len(rows))),
 		Description: slashCardDescription(headline, "", detailLines, ""),
 		Color:       slashFilterCardColor(action),
 	}
@@ -1033,16 +1047,16 @@ func (d *Discord) slashFilterMutationEmbed(i *discordgo.InteractionCreate, actio
 
 func (d *Discord) slashFilterMutationComponents(i *discordgo.InteractionCreate, trackingType, customID string, count int, restoring bool) []discordgo.MessageComponent {
 	tr := d.slashInteractionTranslator(i)
-	label := tr.Translate("Remove Filter", false)
+	label := translateOrDefault(tr,"Remove Filter")
 	style := discordgo.DangerButton
 	if count > 1 {
-		label = tr.Translate("Remove Filters", false)
+		label = translateOrDefault(tr,"Remove Filters")
 	}
 	if restoring {
-		label = tr.Translate("Restore Filter", false)
+		label = translateOrDefault(tr,"Restore Filter")
 		style = discordgo.SuccessButton
 		if count > 1 {
-			label = tr.Translate("Restore Filters", false)
+			label = translateOrDefault(tr,"Restore Filters")
 		}
 	}
 	return []discordgo.MessageComponent{
@@ -1101,7 +1115,7 @@ func (d *Discord) slashFilterMutationResponse(i *discordgo.InteractionCreate, ac
 			TrackingType: trackingType,
 			Rows:         rows,
 			ProfileLabel: profileLabel,
-			ExpiresAt:    time.Now().Add(15 * time.Minute),
+			ExpiresAt:    time.Now().Add(filterActionExpiry),
 		})
 	case "removed":
 		customID = slashFilterRestoreButtonPrefix + d.storeSlashFilterAction(&slashFilterActionState{
@@ -1110,7 +1124,7 @@ func (d *Discord) slashFilterMutationResponse(i *discordgo.InteractionCreate, ac
 			TrackingType: trackingType,
 			Rows:         rows,
 			ProfileLabel: profileLabel,
-			ExpiresAt:    time.Now().Add(15 * time.Minute),
+			ExpiresAt:    time.Now().Add(filterActionExpiry),
 		})
 	}
 	if customID == "" {
@@ -1121,46 +1135,30 @@ func (d *Discord) slashFilterMutationResponse(i *discordgo.InteractionCreate, ac
 }
 
 func (d *Discord) handleSlashFilterRemoveAction(s *discordgo.Session, i *discordgo.InteractionCreate, id string) {
-	userID, _ := slashUser(i)
-	action, errKey := d.slashFilterAction(id, userID)
-	if errKey != "" {
-		d.respondEphemeralError(s, i, d.slashText(i, errKey))
-		return
-	}
-	removed, err := d.deleteSlashTrackingRows(action.Table, action.Rows)
-	if err != nil {
-		d.respondEphemeralError(s, i, err.Error())
-		return
-	}
-	if removed == 0 {
-		d.respondEphemeralError(s, i, d.slashText(i, "No filters were changed."))
-		return
-	}
-	embeds, components, ok := d.slashFilterMutationResponse(i, "removed", action.TrackingType, action.Table, action.ProfileLabel, userID, action.Rows)
-	if !ok {
-		d.respondEphemeralError(s, i, d.slashText(i, "No filters were changed."))
-		return
-	}
-	d.respondUpdateComponentsEmbed(s, i, "", embeds, components)
+	d.handleSlashFilterMutationAction(s, i, id, "removed", d.deleteSlashTrackingRows)
 }
 
 func (d *Discord) handleSlashFilterRestoreAction(s *discordgo.Session, i *discordgo.InteractionCreate, id string) {
+	d.handleSlashFilterMutationAction(s, i, id, "restored", d.restoreSlashTrackingRows)
+}
+
+func (d *Discord) handleSlashFilterMutationAction(s *discordgo.Session, i *discordgo.InteractionCreate, id, actionLabel string, operationFn func(string, []map[string]any) (int64, error)) {
 	userID, _ := slashUser(i)
 	action, errKey := d.slashFilterAction(id, userID)
 	if errKey != "" {
 		d.respondEphemeralError(s, i, d.slashText(i, errKey))
 		return
 	}
-	restored, err := d.restoreSlashTrackingRows(action.Table, action.Rows)
+	affected, err := operationFn(action.Table, action.Rows)
 	if err != nil {
 		d.respondEphemeralError(s, i, err.Error())
 		return
 	}
-	if restored == 0 {
+	if affected == 0 {
 		d.respondEphemeralError(s, i, d.slashText(i, "No filters were changed."))
 		return
 	}
-	embeds, components, ok := d.slashFilterMutationResponse(i, "restored", action.TrackingType, action.Table, action.ProfileLabel, userID, action.Rows)
+	embeds, components, ok := d.slashFilterMutationResponse(i, actionLabel, action.TrackingType, action.Table, action.ProfileLabel, userID, action.Rows)
 	if !ok {
 		d.respondEphemeralError(s, i, d.slashText(i, "No filters were changed."))
 		return
