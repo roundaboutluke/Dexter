@@ -549,6 +549,7 @@ func (d *Discord) slashFilterAction(id, userID string) (*slashFilterActionState,
 	if state.UserID != "" && userID != "" && state.UserID != userID {
 		return nil, "That filter action belongs to another user."
 	}
+	delete(d.filterActions, id)
 	return &slashFilterActionState{
 		UserID:       state.UserID,
 		Table:        state.Table,

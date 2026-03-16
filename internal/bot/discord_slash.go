@@ -852,7 +852,11 @@ func (d *Discord) handleSlashComponent(s *discordgo.Session, i *discordgo.Intera
 				}
 			}
 		}
-		result := d.buildSlashExecutionResultForProfile(s, i, line, state.ProfileNo)
+		profileNo := 0
+		if state != nil {
+			profileNo = state.ProfileNo
+		}
+		result := d.buildSlashExecutionResultForProfile(s, i, line, profileNo)
 		if result.Success() && table != "" && selection.UserID != "" {
 			afterRows, _ := d.slashTrackingRowsForSelection(selection, trackingType)
 			changedRows := slashChangedRows(beforeRows, afterRows)

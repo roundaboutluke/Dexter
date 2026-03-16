@@ -433,9 +433,7 @@ func removeQuestEntries(ctx *Context, tr *i18n.Translator, result TargetResult, 
 		arWhere = fmt.Sprintf(" AND ar=%d", arMode)
 	}
 	query := fmt.Sprintf(
-		"DELETE FROM quest WHERE id='%s' AND profile_no=%d%s AND ((reward_type=2 AND reward IN (%s)) OR (reward_type=7 AND reward IN (%s)) OR (reward_type=3 AND reward > %d) OR (reward_type=12 AND reward IN (%s)) OR (reward_type=12 AND %d=1) OR (reward_type=4 AND reward IN (%s)) OR (reward_type=4 AND %d=1) OR (reward_type=9 AND reward IN (%s)) OR (reward_type=9 AND %d=1) OR (reward_type=1 AND %d=1))",
-		result.TargetID,
-		result.ProfileNo,
+		"DELETE FROM quest WHERE id=? AND profile_no=?%s AND ((reward_type=2 AND reward IN (%s)) OR (reward_type=7 AND reward IN (%s)) OR (reward_type=3 AND reward > %d) OR (reward_type=12 AND reward IN (%s)) OR (reward_type=12 AND %d=1) OR (reward_type=4 AND reward IN (%s)) OR (reward_type=4 AND %d=1) OR (reward_type=9 AND reward IN (%s)) OR (reward_type=9 AND %d=1) OR (reward_type=1 AND %d=1))",
 		arWhere,
 		joinInts(items),
 		joinInts(monsters),
@@ -448,7 +446,7 @@ func removeQuestEntries(ctx *Context, tr *i18n.Translator, result TargetResult, 
 		options.CommandEverything,
 		expAll,
 	)
-	affected, err := ctx.Query.ExecQuery(query)
+	affected, err := ctx.Query.ExecQuery(query, result.TargetID, result.ProfileNo)
 	if err != nil {
 		return tr.Translate("There was a problem removing entries", false)
 	}
