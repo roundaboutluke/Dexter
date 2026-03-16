@@ -6,6 +6,7 @@ import (
 
 	"poraclego/internal/db"
 	"poraclego/internal/geofence"
+	"poraclego/internal/util"
 )
 
 var trackedTables = []string{
@@ -133,32 +134,5 @@ func clone2DFloats(in [][]float64) [][]float64 {
 	return out
 }
 
-func getString(value any) string {
-	switch v := value.(type) {
-	case string:
-		return v
-	case []byte:
-		return string(v)
-	default:
-		return fmt.Sprintf("%v", value)
-	}
-}
-
-func toInt(value any, fallback int) int {
-	switch v := value.(type) {
-	case int:
-		return v
-	case int64:
-		return int(v)
-	case float64:
-		return int(v)
-	case float32:
-		return int(v)
-	case string:
-		var out int
-		if _, err := fmt.Sscanf(v, "%d", &out); err == nil {
-			return out
-		}
-	}
-	return fallback
-}
+var getString = util.GetString
+var toInt = util.ToInt

@@ -178,9 +178,9 @@ func (d *Discord) getSlashState(member *discordgo.Member, user *discordgo.User) 
 	if userID == "" {
 		return nil
 	}
-	d.slashMu.Lock()
+	d.slashMu.RLock()
 	state := d.slash[userID]
-	d.slashMu.Unlock()
+	d.slashMu.RUnlock()
 	return state
 }
 

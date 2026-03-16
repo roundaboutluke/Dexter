@@ -284,7 +284,11 @@ func (d *Discord) questItemChoices() []questChoice {
 	return entries
 }
 
-func (d *Discord) questMegaEnergyChoices() []questChoice {
+// questRewardMonsterChoices builds autocomplete choices by iterating all monsters,
+// filtering to base forms (form ID 0) and applying an optional extra filter.
+// prefix is used for the value (e.g. "energy", "candy", "xlcandy"),
+// labelFmt is a fmt string with one %s placeholder for the monster name.
+func (d *Discord) questRewardMonsterChoices(prefix, labelFmt string, filter func(mon map[string]any) bool) []questChoice {
 	if d == nil || d.manager == nil || d.manager.data == nil || d.manager.data.Monsters == nil {
 		return nil
 	}
@@ -302,94 +306,41 @@ func (d *Discord) questMegaEnergyChoices() []questChoice {
 		if toIntValue(form["id"]) != 0 {
 			continue
 		}
-		if temp, ok := mon["tempEvolutions"].([]any); !ok || len(temp) == 0 {
+		if filter != nil && !filter(mon) {
 			continue
 		}
 		name := strings.TrimSpace(getStringValue(mon["name"]))
 		if name == "" {
 			continue
 		}
-		value := fmt.Sprintf("energy:%s", strings.ToLower(name))
+		value := fmt.Sprintf("%s:%s", prefix, strings.ToLower(name))
 		if seen[value] {
 			continue
 		}
 		entries = append(entries, questChoice{
-			label: fmt.Sprintf("Mega Energy %s", titleCaseWords(name)),
+			label: fmt.Sprintf(labelFmt, titleCaseWords(name)),
 			value: value,
 		})
 		seen[value] = true
 	}
 	return entries
+}
+
+func hasTempEvolutions(mon map[string]any) bool {
+	temp, ok := mon["tempEvolutions"].([]any)
+	return ok && len(temp) > 0
+}
+
+func (d *Discord) questMegaEnergyChoices() []questChoice {
+	return d.questRewardMonsterChoices("energy", "Mega Energy %s", hasTempEvolutions)
 }
 
 func (d *Discord) questXLCandyMonsterChoices() []questChoice {
-	if d == nil || d.manager == nil || d.manager.data == nil || d.manager.data.Monsters == nil {
-		return nil
-	}
-	entries := []questChoice{}
-	seen := map[string]bool{}
-	for _, raw := range d.manager.data.Monsters {
-		mon, ok := raw.(map[string]any)
-		if !ok {
-			continue
-		}
-		form := map[string]any{}
-		if entry, ok := mon["form"].(map[string]any); ok {
-			form = entry
-		}
-		if toIntValue(form["id"]) != 0 {
-			continue
-		}
-		name := strings.TrimSpace(getStringValue(mon["name"]))
-		if name == "" {
-			continue
-		}
-		value := fmt.Sprintf("xlcandy:%s", strings.ToLower(name))
-		if seen[value] {
-			continue
-		}
-		entries = append(entries, questChoice{
-			label: fmt.Sprintf("%s XL Candy", titleCaseWords(name)),
-			value: value,
-		})
-		seen[value] = true
-	}
-	return entries
+	return d.questRewardMonsterChoices("xlcandy", "%s XL Candy", nil)
 }
 
 func (d *Discord) questCandyMonsterChoices() []questChoice {
-	if d == nil || d.manager == nil || d.manager.data == nil || d.manager.data.Monsters == nil {
-		return nil
-	}
-	entries := []questChoice{}
-	seen := map[string]bool{}
-	for _, raw := range d.manager.data.Monsters {
-		mon, ok := raw.(map[string]any)
-		if !ok {
-			continue
-		}
-		form := map[string]any{}
-		if entry, ok := mon["form"].(map[string]any); ok {
-			form = entry
-		}
-		if toIntValue(form["id"]) != 0 {
-			continue
-		}
-		name := strings.TrimSpace(getStringValue(mon["name"]))
-		if name == "" {
-			continue
-		}
-		value := fmt.Sprintf("candy:%s", strings.ToLower(name))
-		if seen[value] {
-			continue
-		}
-		entries = append(entries, questChoice{
-			label: fmt.Sprintf("%s Candy", titleCaseWords(name)),
-			value: value,
-		})
-		seen[value] = true
-	}
-	return entries
+	return d.questRewardMonsterChoices("candy", "%s Candy", nil)
 }
 
 func (d *Discord) itemNameByID(id int) string {

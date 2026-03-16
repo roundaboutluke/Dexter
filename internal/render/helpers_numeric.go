@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/aymerick/raymond"
+
+	"poraclego/internal/util"
 )
 
 func roundHelper(value interface{}, options *raymond.Options) string {
@@ -215,20 +217,4 @@ func toFloat(value interface{}) float64 {
 	}
 }
 
-func toInt(value interface{}, fallback int) int {
-	switch v := value.(type) {
-	case int:
-		return v
-	case int64:
-		return int(v)
-	case float64:
-		return int(v)
-	case float32:
-		return int(v)
-	case string:
-		if parsed, err := strconv.Atoi(v); err == nil {
-			return parsed
-		}
-	}
-	return fallback
-}
+var toInt = util.ToInt

@@ -20,7 +20,7 @@ type Discord struct {
 	manager       *Manager
 	token         string
 	session       *discordgo.Session
-	slashMu       sync.Mutex
+	slashMu       sync.RWMutex
 	slash         map[string]*slashBuilderState
 	filterMu      sync.Mutex
 	filterActions map[string]*slashFilterActionState

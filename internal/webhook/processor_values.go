@@ -2,10 +2,11 @@ package webhook
 
 import (
 	"encoding/json"
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
+
+	"poraclego/internal/util"
 )
 
 func normalizeHook(item any) (*Hook, bool) {
@@ -43,19 +44,7 @@ func expiryTTL(expireUnix int64, buffer time.Duration) time.Duration {
 	return remaining + buffer
 }
 
-func getString(value any) string {
-	switch v := value.(type) {
-	case string:
-		return v
-	case []byte:
-		return string(v)
-	default:
-		if value == nil {
-			return ""
-		}
-		return fmt.Sprintf("%v", value)
-	}
-}
+var getString = util.GetString
 
 func getInt(value any) int {
 	switch v := value.(type) {

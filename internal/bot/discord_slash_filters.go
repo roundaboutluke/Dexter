@@ -10,6 +10,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"poraclego/internal/db"
 	"poraclego/internal/i18n"
+	"poraclego/internal/logging"
 	"poraclego/internal/tracking"
 )
 
@@ -150,6 +151,7 @@ func slashTrackingTypeFromCommand(command string) string {
 	case "fort":
 		return "fort"
 	default:
+		logging.Get().Discord.Debugf("unrecognized slash tracking command: %s", command)
 		return ""
 	}
 }
