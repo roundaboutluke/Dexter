@@ -114,5 +114,10 @@ func prefixedQuestArg(prefix, value string) string {
 	if value == "" {
 		return prefix
 	}
+	// Autocomplete values may already include the prefix (e.g. "energy:charizard").
+	// Avoid double-prefixing like "energy:energy:charizard".
+	if strings.HasPrefix(strings.ToLower(value), strings.ToLower(prefix)+":") {
+		return value
+	}
 	return prefix + ":" + quoteSlashCommandValue(value)
 }

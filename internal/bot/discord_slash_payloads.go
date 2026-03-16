@@ -8,6 +8,21 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
+func slashErrorEmbed(text string) *discordgo.MessageEmbed {
+	return &discordgo.MessageEmbed{
+		Description: "❌ " + text,
+		Color:       0xED4245, // Discord red
+	}
+}
+
+func (d *Discord) respondEphemeralError(s *discordgo.Session, i *discordgo.InteractionCreate, text string) {
+	d.respondEphemeralComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{slashErrorEmbed(text)}, nil)
+}
+
+func (d *Discord) respondUpdateError(s *discordgo.Session, i *discordgo.InteractionCreate, text string) {
+	d.respondUpdateComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{slashErrorEmbed(text)}, nil)
+}
+
 func (d *Discord) buildAreaShowPayload(i *discordgo.InteractionCreate, selected string) (*discordgo.MessageEmbed, []discordgo.MessageComponent, string) {
 	embed, components, _, errText := d.buildAreaShowPayloadState(i, selected)
 	return embed, components, errText
