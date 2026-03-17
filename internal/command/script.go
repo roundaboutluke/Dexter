@@ -294,12 +294,6 @@ func (c *ScriptCommand) Handle(ctx *Context, args []string) (string, error) {
 		return tr.Translate("The script specified is empty", false), nil
 	}
 	message := strings.Join(output, "\n")
-	if containsWord(args, "link") {
-		if link, err := createHastebinLink(message); err == nil && link != "" {
-			return fmt.Sprintf("%s %s", tr.Translate("Your backup is at", false), link), nil
-		}
-		return tr.Translate("Hastebin seems down", false), nil
-	}
 	reply := buildFileReply(fmt.Sprintf("%s.txt", result.Target.Name), tr.Translate("Your backup", false), message)
 	if reply != "" {
 		return reply, nil

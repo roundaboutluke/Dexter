@@ -44,6 +44,14 @@ type Discord struct {
 	greetMu             sync.Mutex
 	lastGreetingMinute  int64
 	greetingCountMinute int
+
+	roleCacheMu sync.Mutex
+	roleCache   map[string]roleCacheEntry
+}
+
+type roleCacheEntry struct {
+	roles   []string
+	expires time.Time
 }
 
 // NewDiscord constructs a Discord bot.
@@ -330,6 +338,16 @@ func (d *Discord) sendSpecialReply(s *discordgo.Session, channelID, reply string
 }
 
 func (d *Discord) rolesForDM(s *discordgo.Session, userID string) []string {
+	// Check cache first.
+	d.roleCacheMu.Lock()
+	if d.roleCache != nil {
+		if entry, ok := d.roleCache[userID]; ok && time.Now().Before(entry.expires) {
+			d.roleCacheMu.Unlock()
+			return entry.roles
+		}
+	}
+	d.roleCacheMu.Unlock()
+
 	guilds, _ := d.manager.cfg.GetStringSlice("discord.guilds")
 	if len(guilds) == 0 {
 		return nil
@@ -349,13 +367,22 @@ func (d *Discord) rolesForDM(s *discordgo.Session, userID string) []string {
 			}
 		}
 	}
-	if len(roleSet) == 0 {
-		return nil
+	var roles []string
+	if len(roleSet) > 0 {
+		roles = make([]string, 0, len(roleSet))
+		for role := range roleSet {
+			roles = append(roles, role)
+		}
 	}
-	roles := make([]string, 0, len(roleSet))
-	for role := range roleSet {
-		roles = append(roles, role)
+
+	// Store in cache with 5-minute TTL.
+	d.roleCacheMu.Lock()
+	if d.roleCache == nil {
+		d.roleCache = map[string]roleCacheEntry{}
 	}
+	d.roleCache[userID] = roleCacheEntry{roles: roles, expires: time.Now().Add(5 * time.Minute)}
+	d.roleCacheMu.Unlock()
+
 	return roles
 }
 

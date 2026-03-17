@@ -45,6 +45,7 @@ type trackOptions struct {
 	PvpMinCP        int
 	PvpCap          int
 	Error           string
+	Warning         string
 }
 
 type everythingSettings struct {
@@ -118,6 +119,9 @@ func parseTrackOptions(ctx *Context, tr *i18n.Translator, args []string, re *Reg
 			if ok {
 				opt.MinIV = min
 				if hasMax {
+					if min > max {
+						opt.Warning = appendRangeWarning(opt.Warning, "IV", min, max)
+					}
 					opt.MaxIV = max
 				}
 			}
@@ -128,6 +132,9 @@ func parseTrackOptions(ctx *Context, tr *i18n.Translator, args []string, re *Reg
 			if ok {
 				opt.MinLevel = min
 				if hasMax {
+					if min > max {
+						opt.Warning = appendRangeWarning(opt.Warning, "Level", min, max)
+					}
 					opt.MaxLevel = max
 				}
 			}
@@ -138,6 +145,9 @@ func parseTrackOptions(ctx *Context, tr *i18n.Translator, args []string, re *Reg
 			if ok {
 				opt.MinCP = min
 				if hasMax {
+					if min > max {
+						opt.Warning = appendRangeWarning(opt.Warning, "CP", min, max)
+					}
 					opt.MaxCP = max
 				}
 			}
@@ -148,6 +158,9 @@ func parseTrackOptions(ctx *Context, tr *i18n.Translator, args []string, re *Reg
 			if ok {
 				opt.MinAtk = min
 				if hasMax {
+					if min > max {
+						opt.Warning = appendRangeWarning(opt.Warning, "Atk", min, max)
+					}
 					opt.MaxAtk = max
 				}
 			}
@@ -158,6 +171,9 @@ func parseTrackOptions(ctx *Context, tr *i18n.Translator, args []string, re *Reg
 			if ok {
 				opt.MinDef = min
 				if hasMax {
+					if min > max {
+						opt.Warning = appendRangeWarning(opt.Warning, "Def", min, max)
+					}
 					opt.MaxDef = max
 				}
 			}
@@ -168,6 +184,9 @@ func parseTrackOptions(ctx *Context, tr *i18n.Translator, args []string, re *Reg
 			if ok {
 				opt.MinSta = min
 				if hasMax {
+					if min > max {
+						opt.Warning = appendRangeWarning(opt.Warning, "Sta", min, max)
+					}
 					opt.MaxSta = max
 				}
 			}
@@ -178,6 +197,9 @@ func parseTrackOptions(ctx *Context, tr *i18n.Translator, args []string, re *Reg
 			if ok {
 				opt.MinWeight = min
 				if hasMax {
+					if min > max {
+						opt.Warning = appendRangeWarning(opt.Warning, "Weight", min, max)
+					}
 					opt.MaxWeight = max
 				}
 			}
@@ -420,6 +442,14 @@ func normalizeRange(min, max *int, minAllowed, maxAllowed int) {
 	if *max < *min {
 		*max = *min
 	}
+}
+
+func appendRangeWarning(warning, label string, min, max int) string {
+	msg := fmt.Sprintf("⚠️ %s range %d-%d is inverted — treated as %d", label, min, max, min)
+	if warning == "" {
+		return msg
+	}
+	return warning + "\n" + msg
 }
 
 func parseRangeOptionalMax(arg string, re *regexp.Regexp) (int, int, bool, bool) {
