@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 )
 
@@ -91,8 +90,7 @@ func loadLocaleFile(dst map[string]string, path string) {
 func formatString(input string, args ...any) string {
 	result := input
 	for i := len(args) - 1; i >= 0; i-- {
-		re := regexp.MustCompile(fmt.Sprintf("\\{%d\\}", i))
-		result = re.ReplaceAllString(result, fmt.Sprintf("%v", args[i]))
+		result = strings.ReplaceAll(result, fmt.Sprintf("{%d}", i), fmt.Sprintf("%v", args[i]))
 	}
 	return result
 }

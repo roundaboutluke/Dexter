@@ -141,9 +141,10 @@ func (t *Telegram) Start() error {
 	return nil
 }
 
+var telegramCommandRe = regexp.MustCompile(`^/([^@\s]+)@?(?:\S+)?\s*([\s\S]*)$`)
+
 func parseTelegramCommandLines(text, prefix string, translator *i18n.Factory) []string {
-	commandRe := regexp.MustCompile(`^/([^@\s]+)@?(?:\S+)?\s*([\s\S]*)$`)
-	matches := commandRe.FindStringSubmatch(text)
+	matches := telegramCommandRe.FindStringSubmatch(text)
 	if len(matches) < 2 {
 		return nil
 	}

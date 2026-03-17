@@ -12,6 +12,8 @@ import (
 	"poraclego/internal/webhook"
 )
 
+var postalCodeRe = regexp.MustCompile(`^\d{1,5}$`)
+
 // LocationCommand updates a user's location.
 type LocationCommand struct{}
 
@@ -56,7 +58,7 @@ func (c *LocationCommand) Handle(ctx *Context, args []string) (string, error) {
 			}
 		}
 		if lat == 0 && lon == 0 && len(args) == 1 {
-			if !regexp.MustCompile(`^\d{1,5}$`).MatchString(args[0]) {
+			if !postalCodeRe.MatchString(args[0]) {
 				return tr.Translate("Oops, you need to specify more than just a city name to locate accurately your position", false), nil
 			}
 		}

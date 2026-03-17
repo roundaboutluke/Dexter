@@ -273,9 +273,10 @@ func toFloat(value any) float64 {
 	return 0
 }
 
+var latLonStringRe = regexp.MustCompile(`^([-+]?(?:[1-8]?\d(?:\.\d+)?|90(?:\.0+)?)),\s*([-+]?(?:180(\.0+)?|(?:(?:1[0-7]\d)|(?:[1-9]?\d))(?:\.\d+)?))$`)
+
 func parseLatLonString(value string) (float64, float64, bool) {
-	re := regexp.MustCompile(`^([-+]?(?:[1-8]?\d(?:\.\d+)?|90(?:\.0+)?)),\s*([-+]?(?:180(\.0+)?|(?:(?:1[0-7]\d)|(?:[1-9]?\d))(?:\.\d+)?))$`)
-	match := re.FindStringSubmatch(strings.TrimSpace(value))
+	match := latLonStringRe.FindStringSubmatch(strings.TrimSpace(value))
 	if len(match) < 3 {
 		return 0, 0, false
 	}

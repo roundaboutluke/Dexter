@@ -11,6 +11,8 @@ import (
 	"poraclego/internal/webhook"
 )
 
+var postalCodeRe = regexp.MustCompile(`^\d{1,5}$`)
+
 func profileDeleteOutcome(profiles []map[string]any, profileValue string, result slashExecutionResult) (bool, string) {
 	if profileRowByToken(profiles, profileValue) == nil {
 		return true, ""
@@ -407,7 +409,7 @@ func (d *Discord) handleLocationInput(s *discordgo.Session, i *discordgo.Interac
 	placeConfirmation := ""
 	if !ok {
 		parts := strings.Fields(input)
-		if len(parts) == 1 && !regexp.MustCompile(`^\d{1,5}$`).MatchString(parts[0]) {
+		if len(parts) == 1 && !postalCodeRe.MatchString(parts[0]) {
 			d.respondEditMessage(s, i, tr.Translate("Oops, you need to specify more than just a city name to locate accurately your position", false), nil)
 			return
 		}

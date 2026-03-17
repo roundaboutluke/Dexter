@@ -191,30 +191,35 @@ func (c *Client) SearchGyms(query string, limit int) ([]GymEntry, error) {
 			if err != nil {
 				continue
 			}
-			for rows.Next() {
-				var id sql.NullString
-				var name sql.NullString
-				var lat sql.NullFloat64
-				var lon sql.NullFloat64
-				if err := rows.Scan(&id, &name, &lat, &lon); err != nil {
-					_ = rows.Close()
-					return results, err
+			scanErr := func() error {
+				defer rows.Close()
+				for rows.Next() {
+					var id sql.NullString
+					var name sql.NullString
+					var lat sql.NullFloat64
+					var lon sql.NullFloat64
+					if err := rows.Scan(&id, &name, &lat, &lon); err != nil {
+						return err
+					}
+					if !id.Valid || !name.Valid || name.String == "" {
+						continue
+					}
+					entry := GymEntry{ID: id.String, Name: name.String}
+					if lat.Valid && lon.Valid {
+						entry.Latitude = lat.Float64
+						entry.Longitude = lon.Float64
+						entry.HasCoords = true
+					}
+					results = append(results, entry)
+					if len(results) >= limit {
+						break
+					}
 				}
-				if !id.Valid || !name.Valid || name.String == "" {
-					continue
-				}
-				entry := GymEntry{ID: id.String, Name: name.String}
-				if lat.Valid && lon.Valid {
-					entry.Latitude = lat.Float64
-					entry.Longitude = lon.Float64
-					entry.HasCoords = true
-				}
-				results = append(results, entry)
-				if len(results) >= limit {
-					break
-				}
+				return rows.Err()
+			}()
+			if scanErr != nil {
+				return results, scanErr
 			}
-			_ = rows.Close()
 			if len(results) > 0 {
 				return results, nil
 			}
@@ -263,30 +268,35 @@ func (c *Client) SearchGymsNearby(lat, lon float64, limit int) ([]GymEntry, erro
 			if err != nil {
 				continue
 			}
-			for rows.Next() {
-				var id sql.NullString
-				var name sql.NullString
-				var entryLat sql.NullFloat64
-				var entryLon sql.NullFloat64
-				if err := rows.Scan(&id, &name, &entryLat, &entryLon); err != nil {
-					_ = rows.Close()
-					return results, err
+			scanErr := func() error {
+				defer rows.Close()
+				for rows.Next() {
+					var id sql.NullString
+					var name sql.NullString
+					var entryLat sql.NullFloat64
+					var entryLon sql.NullFloat64
+					if err := rows.Scan(&id, &name, &entryLat, &entryLon); err != nil {
+						return err
+					}
+					if !id.Valid || !name.Valid || name.String == "" {
+						continue
+					}
+					entry := GymEntry{ID: id.String, Name: name.String}
+					if entryLat.Valid && entryLon.Valid {
+						entry.Latitude = entryLat.Float64
+						entry.Longitude = entryLon.Float64
+						entry.HasCoords = true
+					}
+					results = append(results, entry)
+					if len(results) >= limit {
+						break
+					}
 				}
-				if !id.Valid || !name.Valid || name.String == "" {
-					continue
-				}
-				entry := GymEntry{ID: id.String, Name: name.String}
-				if entryLat.Valid && entryLon.Valid {
-					entry.Latitude = entryLat.Float64
-					entry.Longitude = entryLon.Float64
-					entry.HasCoords = true
-				}
-				results = append(results, entry)
-				if len(results) >= limit {
-					break
-				}
+				return rows.Err()
+			}()
+			if scanErr != nil {
+				return results, scanErr
 			}
-			_ = rows.Close()
 			if len(results) > 0 {
 				return results, nil
 			}
@@ -397,30 +407,35 @@ func (c *Client) SearchStations(query string, limit int) ([]StationEntry, error)
 			if err != nil {
 				continue
 			}
-			for rows.Next() {
-				var id sql.NullString
-				var name sql.NullString
-				var lat sql.NullFloat64
-				var lon sql.NullFloat64
-				if err := rows.Scan(&id, &name, &lat, &lon); err != nil {
-					_ = rows.Close()
-					return results, err
+			scanErr := func() error {
+				defer rows.Close()
+				for rows.Next() {
+					var id sql.NullString
+					var name sql.NullString
+					var lat sql.NullFloat64
+					var lon sql.NullFloat64
+					if err := rows.Scan(&id, &name, &lat, &lon); err != nil {
+						return err
+					}
+					if !id.Valid || !name.Valid || name.String == "" {
+						continue
+					}
+					entry := StationEntry{ID: id.String, Name: name.String}
+					if lat.Valid && lon.Valid {
+						entry.Latitude = lat.Float64
+						entry.Longitude = lon.Float64
+						entry.HasCoords = true
+					}
+					results = append(results, entry)
+					if len(results) >= limit {
+						break
+					}
 				}
-				if !id.Valid || !name.Valid || name.String == "" {
-					continue
-				}
-				entry := StationEntry{ID: id.String, Name: name.String}
-				if lat.Valid && lon.Valid {
-					entry.Latitude = lat.Float64
-					entry.Longitude = lon.Float64
-					entry.HasCoords = true
-				}
-				results = append(results, entry)
-				if len(results) >= limit {
-					break
-				}
+				return rows.Err()
+			}()
+			if scanErr != nil {
+				return results, scanErr
 			}
-			_ = rows.Close()
 			if len(results) > 0 {
 				return results, nil
 			}
@@ -459,30 +474,35 @@ func (c *Client) SearchStationsNearby(lat, lon float64, limit int) ([]StationEnt
 			if err != nil {
 				continue
 			}
-			for rows.Next() {
-				var id sql.NullString
-				var name sql.NullString
-				var entryLat sql.NullFloat64
-				var entryLon sql.NullFloat64
-				if err := rows.Scan(&id, &name, &entryLat, &entryLon); err != nil {
-					_ = rows.Close()
-					return results, err
+			scanErr := func() error {
+				defer rows.Close()
+				for rows.Next() {
+					var id sql.NullString
+					var name sql.NullString
+					var entryLat sql.NullFloat64
+					var entryLon sql.NullFloat64
+					if err := rows.Scan(&id, &name, &entryLat, &entryLon); err != nil {
+						return err
+					}
+					if !id.Valid || !name.Valid || name.String == "" {
+						continue
+					}
+					entry := StationEntry{ID: id.String, Name: name.String}
+					if entryLat.Valid && entryLon.Valid {
+						entry.Latitude = entryLat.Float64
+						entry.Longitude = entryLon.Float64
+						entry.HasCoords = true
+					}
+					results = append(results, entry)
+					if len(results) >= limit {
+						break
+					}
 				}
-				if !id.Valid || !name.Valid || name.String == "" {
-					continue
-				}
-				entry := StationEntry{ID: id.String, Name: name.String}
-				if entryLat.Valid && entryLon.Valid {
-					entry.Latitude = entryLat.Float64
-					entry.Longitude = entryLon.Float64
-					entry.HasCoords = true
-				}
-				results = append(results, entry)
-				if len(results) >= limit {
-					break
-				}
+				return rows.Err()
+			}()
+			if scanErr != nil {
+				return results, scanErr
 			}
-			_ = rows.Close()
 			if len(results) > 0 {
 				return results, nil
 			}

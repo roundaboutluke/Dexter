@@ -283,12 +283,12 @@ func chunkLines(lines []string, maxLen int) []string {
 		return nil
 	}
 	pages := []string{}
-	current := ""
+	var buf strings.Builder
 	push := func() {
-		if strings.TrimSpace(current) != "" {
-			pages = append(pages, current)
+		if s := buf.String(); strings.TrimSpace(s) != "" {
+			pages = append(pages, s)
 		}
-		current = ""
+		buf.Reset()
 	}
 	for _, raw := range lines {
 		line := strings.TrimRight(raw, "\n")
@@ -298,21 +298,22 @@ func chunkLines(lines []string, maxLen int) []string {
 		for len(line) > maxLen {
 			part := line[:maxLen]
 			line = line[maxLen:]
-			if current != "" {
+			if buf.Len() > 0 {
 				push()
 			}
 			pages = append(pages, part)
 		}
-		if current == "" {
-			current = line
+		if buf.Len() == 0 {
+			buf.WriteString(line)
 			continue
 		}
-		if len(current)+1+len(line) <= maxLen {
-			current = current + "\n" + line
+		if buf.Len()+1+len(line) <= maxLen {
+			buf.WriteByte('\n')
+			buf.WriteString(line)
 			continue
 		}
 		push()
-		current = line
+		buf.WriteString(line)
 	}
 	push()
 	return pages
