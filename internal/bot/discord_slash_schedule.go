@@ -2,7 +2,6 @@ package bot
 
 import (
 	"fmt"
-	"sort"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -28,20 +27,12 @@ func (d *Discord) buildProfileScheduleDayPayload(i *discordgo.InteractionCreate,
 	embed := &discordgo.MessageEmbed{
 		Title:       tr.TranslateFormat("Add schedule for {0}", name),
 		Description: tr.Translate("Select a day for this schedule slot.", false),
-	}
-	options := []discordgo.SelectMenuOption{
-		{Label: localizedDayLabel(tr, 1), Value: "mon"},
-		{Label: localizedDayLabel(tr, 2), Value: "tue"},
-		{Label: localizedDayLabel(tr, 3), Value: "wed"},
-		{Label: localizedDayLabel(tr, 4), Value: "thu"},
-		{Label: localizedDayLabel(tr, 5), Value: "fri"},
-		{Label: localizedDayLabel(tr, 6), Value: "sat"},
-		{Label: localizedDayLabel(tr, 7), Value: "sun"},
+		Color:       0x5865F2,
 	}
 	min := 1
 	menu := discordgo.SelectMenu{
 		CustomID:    slashProfileScheduleDay + fmt.Sprintf("%d", toInt(selected["profile_no"], 0)),
-		Options:     options,
+		Options:     slashDayOptions(tr, 0),
 		Placeholder: tr.Translate("Select day", false),
 		MaxValues:   1,
 		MinValues:   &min,
@@ -60,20 +51,12 @@ func (d *Discord) buildProfileScheduleDayPayloadGlobal(i *discordgo.InteractionC
 	embed := &discordgo.MessageEmbed{
 		Title:       tr.Translate("Add schedule", false),
 		Description: tr.Translate("Select a day for this schedule slot.", false),
-	}
-	options := []discordgo.SelectMenuOption{
-		{Label: localizedDayLabel(tr, 1), Value: "mon"},
-		{Label: localizedDayLabel(tr, 2), Value: "tue"},
-		{Label: localizedDayLabel(tr, 3), Value: "wed"},
-		{Label: localizedDayLabel(tr, 4), Value: "thu"},
-		{Label: localizedDayLabel(tr, 5), Value: "fri"},
-		{Label: localizedDayLabel(tr, 6), Value: "sat"},
-		{Label: localizedDayLabel(tr, 7), Value: "sun"},
+		Color:       0x5865F2,
 	}
 	min := 1
 	menu := discordgo.SelectMenu{
 		CustomID:    slashProfileScheduleDayGlobal,
-		Options:     options,
+		Options:     slashDayOptions(tr, 0),
 		Placeholder: tr.Translate("Select day(s)", false),
 		MaxValues:   7,
 		MinValues:   &min,
@@ -103,30 +86,18 @@ func (d *Discord) buildProfileScheduleAssignPayload(i *discordgo.InteractionCrea
 	if len(profiles) == 0 {
 		return nil, nil, tr.Translate("You do not have any profiles.", false)
 	}
-	sort.Slice(profiles, func(i, j int) bool { return toInt(profiles[i]["profile_no"], 0) < toInt(profiles[j]["profile_no"], 0) })
-	options := []discordgo.SelectMenuOption{}
-	for _, row := range profiles {
-		number := toInt(row["profile_no"], 0)
-		name := localizedProfileName(tr, row)
-		options = append(options, discordgo.SelectMenuOption{
-			Label: fmt.Sprintf("%d. %s", number, name),
-			Value: fmt.Sprintf("%d", number),
-		})
-		if len(options) >= 25 {
-			break
-		}
-	}
 	min := 1
 	menu := discordgo.SelectMenu{
 		CustomID:    fmt.Sprintf("%s%s-%d-%d", slashProfileScheduleAssign, joinDayList(days), startMin, endMin),
-		Options:     options,
+		Options:     slashProfileSelectOptions(tr, profiles, 0),
 		Placeholder: tr.Translate("Select profile", false),
 		MaxValues:   1,
 		MinValues:   &min,
 	}
 	embed := &discordgo.MessageEmbed{
 		Title:       tr.Translate("Choose profile", false),
-		Description: tr.TranslateFormat("Schedule {0} {1}-{2}", labelDayListLocalized(tr, days), fmt.Sprintf("%02d:%02d", startMin/60, startMin%60), fmt.Sprintf("%02d:%02d", endMin/60, endMin%60)),
+		Description: tr.TranslateFormat("Schedule {0} {1}-{2}", labelDayList(tr, days), fmt.Sprintf("%02d:%02d", startMin/60, startMin%60), fmt.Sprintf("%02d:%02d", endMin/60, endMin%60)),
+		Color:       0x5865F2,
 	}
 	components := []discordgo.MessageComponent{
 		discordgo.ActionsRow{Components: []discordgo.MessageComponent{menu}},
@@ -142,20 +113,12 @@ func (d *Discord) buildProfileScheduleEditDayPayload(i *discordgo.InteractionCre
 	embed := &discordgo.MessageEmbed{
 		Title:       tr.Translate("Edit schedule", false),
 		Description: tr.Translate("Select a new day for this schedule slot.", false),
-	}
-	options := []discordgo.SelectMenuOption{
-		{Label: localizedDayLabel(tr, 1), Value: "mon", Default: entry.Day == 1},
-		{Label: localizedDayLabel(tr, 2), Value: "tue", Default: entry.Day == 2},
-		{Label: localizedDayLabel(tr, 3), Value: "wed", Default: entry.Day == 3},
-		{Label: localizedDayLabel(tr, 4), Value: "thu", Default: entry.Day == 4},
-		{Label: localizedDayLabel(tr, 5), Value: "fri", Default: entry.Day == 5},
-		{Label: localizedDayLabel(tr, 6), Value: "sat", Default: entry.Day == 6},
-		{Label: localizedDayLabel(tr, 7), Value: "sun", Default: entry.Day == 7},
+		Color:       0x5865F2,
 	}
 	min := 1
 	menu := discordgo.SelectMenu{
 		CustomID:    slashProfileScheduleEditDay + fmt.Sprintf("%d|%s", entry.ProfileNo, scheduleEntryValue(entry)),
-		Options:     options,
+		Options:     slashDayOptions(tr, entry.Day),
 		Placeholder: tr.Translate("Select day", false),
 		MaxValues:   1,
 		MinValues:   &min,
@@ -185,24 +148,10 @@ func (d *Discord) buildProfileScheduleEditAssignPayload(i *discordgo.Interaction
 	if len(profiles) == 0 {
 		return nil, nil, tr.Translate("You do not have any profiles.", false)
 	}
-	sort.Slice(profiles, func(i, j int) bool { return toInt(profiles[i]["profile_no"], 0) < toInt(profiles[j]["profile_no"], 0) })
-	options := []discordgo.SelectMenuOption{}
-	for _, row := range profiles {
-		number := toInt(row["profile_no"], 0)
-		name := localizedProfileName(tr, row)
-		options = append(options, discordgo.SelectMenuOption{
-			Label:   fmt.Sprintf("%d. %s", number, name),
-			Value:   fmt.Sprintf("%d", number),
-			Default: number == entry.ProfileNo,
-		})
-		if len(options) >= 25 {
-			break
-		}
-	}
 	min := 1
 	menu := discordgo.SelectMenu{
 		CustomID:    fmt.Sprintf("%s%d|%s:%d-%d-%d", slashProfileScheduleEditAssign, entry.ProfileNo, scheduleEntryValue(entry), day, startMin, endMin),
-		Options:     options,
+		Options:     slashProfileSelectOptions(tr, profiles, entry.ProfileNo),
 		Placeholder: tr.Translate("Select profile", false),
 		MaxValues:   1,
 		MinValues:   &min,
@@ -210,6 +159,7 @@ func (d *Discord) buildProfileScheduleEditAssignPayload(i *discordgo.Interaction
 	embed := &discordgo.MessageEmbed{
 		Title:       tr.Translate("Edit schedule", false),
 		Description: tr.TranslateFormat("Schedule {0} {1}-{2}", localizedDayLabel(tr, day), fmt.Sprintf("%02d:%02d", startMin/60, startMin%60), fmt.Sprintf("%02d:%02d", endMin/60, endMin%60)),
+		Color:       0x5865F2,
 	}
 	components := []discordgo.MessageComponent{
 		discordgo.ActionsRow{Components: []discordgo.MessageComponent{menu}},

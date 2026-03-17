@@ -41,10 +41,6 @@ type Discord struct {
 	commandEditor      func(*discordgo.Session, string, string, string, *discordgo.ApplicationCommand) (*discordgo.ApplicationCommand, error)
 	commandDeleter     func(*discordgo.Session, string, string, string) error
 
-	channelFetcher     func(*discordgo.Session, string) (*discordgo.Channel, error)
-	guildMemberFetcher func(*discordgo.Session, string, string) (*discordgo.Member, error)
-	guildMembersLoader func(*discordgo.Session, string) ([]*discordgo.Member, error)
-
 	greetMu             sync.Mutex
 	lastGreetingMinute  int64
 	greetingCountMinute int

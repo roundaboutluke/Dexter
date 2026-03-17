@@ -116,7 +116,7 @@ func TestBuildScheduleEditAssignUpdatesSameProfileReplacesOriginalEntry(t *testi
 	}}
 	original := scheduleEntry{ProfileNo: 1, Day: 1, StartMin: 9 * 60, EndMin: 10 * 60}
 
-	updates, errText := buildScheduleEditAssignUpdates(profiles, profileRowByNo(profiles, 1), original, 2, 11*60, 12*60)
+	updates, errText := buildScheduleEditAssignUpdates(nil, profiles, profileRowByNo(profiles, 1), original, 2, 11*60, 12*60)
 	if errText != "" {
 		t.Fatalf("build edit updates errText=%q", errText)
 	}
@@ -155,7 +155,7 @@ func TestPersistSlashScheduleMoveRefreshesAlertState(t *testing.T) {
 		t.Fatalf("load profiles: %v", err)
 	}
 	original := scheduleEntry{ProfileNo: 1, Day: 1, StartMin: 9 * 60, EndMin: 10 * 60}
-	updates, errText := buildScheduleEditAssignUpdates(profiles, profileRowByNo(profiles, 2), original, 2, 18*60, 19*60)
+	updates, errText := buildScheduleEditAssignUpdates(nil, profiles, profileRowByNo(profiles, 2), original, 2, 18*60, 19*60)
 	if errText != "" {
 		t.Fatalf("build move updates errText=%q", errText)
 	}
@@ -208,7 +208,7 @@ func TestPersistSlashScheduleMoveRollbackSkipsRefreshOnFailure(t *testing.T) {
 		t.Fatalf("load profiles: %v", err)
 	}
 	original := scheduleEntry{ProfileNo: 1, Day: 1, StartMin: 9 * 60, EndMin: 10 * 60}
-	updates, errText := buildScheduleEditAssignUpdates(profiles, profileRowByNo(profiles, 2), original, 2, 18*60, 19*60)
+	updates, errText := buildScheduleEditAssignUpdates(nil, profiles, profileRowByNo(profiles, 2), original, 2, 18*60, 19*60)
 	if errText != "" {
 		t.Fatalf("build move updates errText=%q", errText)
 	}

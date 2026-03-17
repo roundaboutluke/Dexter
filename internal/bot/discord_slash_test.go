@@ -867,7 +867,7 @@ func TestAddScheduleEntriesForDaysLocalizedUsesTranslator(t *testing.T) {
 		t.Fatalf("new translator: %v", err)
 	}
 
-	_, errText := addScheduleEntriesForDaysLocalized(tr, nil, map[string]any{"profile_no": 1}, nil, 9*60, 10*60)
+	_, errText := addScheduleEntriesForDays(tr, nil, map[string]any{"profile_no": 1}, nil, 9*60, 10*60)
 	if errText != "Veuillez choisir au moins un jour." {
 		t.Fatalf("errText=%q, want %q", errText, "Veuillez choisir au moins un jour.")
 	}
@@ -882,7 +882,7 @@ func TestBuildScheduleEditAssignUpdatesLocalizedUsesTranslator(t *testing.T) {
 		t.Fatalf("new translator: %v", err)
 	}
 
-	_, errText := buildScheduleEditAssignUpdatesLocalized(tr, nil, nil, scheduleEntry{}, 1, 9*60, 10*60)
+	_, errText := buildScheduleEditAssignUpdates(tr, nil, nil, scheduleEntry{}, 1, 9*60, 10*60)
 	if errText != "Profil introuvable." {
 		t.Fatalf("errText=%q, want %q", errText, "Profil introuvable.")
 	}
