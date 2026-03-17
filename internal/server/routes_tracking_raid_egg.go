@@ -114,7 +114,7 @@ func handleTrackingRaidDeleteBatch(w http.ResponseWriter, s *Server, id string, 
 
 func handleTrackingRaidUpsert(w http.ResponseWriter, s *Server, id string, r *http.Request) {
 	handleTrackingUpsertGeneric(w, s, id, r, raidTrackingRouteConfig(s), func(translator *i18n.Translator, row map[string]any) string {
-		return tracking.RaidRowText(s.cfg, translator, s.data, row, s.scanner)
+		return tracking.RaidRowText(s.cfg, translator, s.getData(), row, s.scanner)
 	})
 }
 
@@ -132,6 +132,6 @@ func handleTrackingEggDeleteBatch(w http.ResponseWriter, s *Server, id string, r
 
 func handleTrackingEggUpsert(w http.ResponseWriter, s *Server, id string, r *http.Request) {
 	handleTrackingUpsertGeneric(w, s, id, r, eggTrackingRouteConfig(s), func(translator *i18n.Translator, row map[string]any) string {
-		return tracking.EggRowText(s.cfg, translator, s.data, row, s.scanner)
+		return tracking.EggRowText(s.cfg, translator, s.getData(), row, s.scanner)
 	})
 }

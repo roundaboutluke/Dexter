@@ -132,10 +132,10 @@ func raidTrackingRouteConfig(s *Server) trackingRouteConfig {
 		table:       "raid",
 		responseKey: "raid",
 		describe: func(s *Server, tr *i18n.Translator, row map[string]any) string {
-			return tracking.RaidRowText(s.cfg, tr, s.data, row, s.scanner)
+			return tracking.RaidRowText(s.cfg, tr, s.getData(), row, s.scanner)
 		},
 		clean: func(s *Server, scope tracking.RuleScope, row map[string]any) (map[string]any, error) {
-			return tracking.CleanRaidRow(s.cfg, s.data, scope, row)
+			return tracking.CleanRaidRow(s.cfg, s.getData(), scope, row)
 		},
 		sameIdentity: func(candidate, existing map[string]any) bool {
 			return intFromAny(existing["team"]) == intFromAny(candidate["team"])
@@ -149,10 +149,10 @@ func eggTrackingRouteConfig(s *Server) trackingRouteConfig {
 		table:       "egg",
 		responseKey: "egg",
 		describe: func(s *Server, tr *i18n.Translator, row map[string]any) string {
-			return tracking.EggRowText(s.cfg, tr, s.data, row, s.scanner)
+			return tracking.EggRowText(s.cfg, tr, s.getData(), row, s.scanner)
 		},
 		clean: func(s *Server, scope tracking.RuleScope, row map[string]any) (map[string]any, error) {
-			return tracking.CleanEggRow(s.cfg, s.data, scope, row)
+			return tracking.CleanEggRow(s.cfg, s.getData(), scope, row)
 		},
 		sameIdentity: func(candidate, existing map[string]any) bool {
 			return intFromAny(existing["team"]) == intFromAny(candidate["team"])
@@ -223,7 +223,7 @@ func gymTrackingRouteConfig(s *Server) trackingRouteConfig {
 		table:       "gym",
 		responseKey: "gym",
 		describe: func(s *Server, tr *i18n.Translator, row map[string]any) string {
-			return tracking.GymRowText(s.cfg, tr, s.data, row, s.scanner)
+			return tracking.GymRowText(s.cfg, tr, s.getData(), row, s.scanner)
 		},
 		clean: func(s *Server, scope tracking.RuleScope, row map[string]any) (map[string]any, error) {
 			return tracking.CleanGymRow(s.cfg, scope, row)
@@ -240,7 +240,7 @@ func maxbattleTrackingRouteConfig(s *Server) trackingRouteConfig {
 		table:       "maxbattle",
 		responseKey: "maxbattle",
 		describe: func(s *Server, tr *i18n.Translator, row map[string]any) string {
-			return tracking.MaxbattleRowText(s.cfg, tr, s.data, row)
+			return tracking.MaxbattleRowText(s.cfg, tr, s.getData(), row)
 		},
 		clean: func(s *Server, scope tracking.RuleScope, row map[string]any) (map[string]any, error) {
 			return tracking.CleanMaxbattleRow(s.cfg, scope, row)
@@ -263,7 +263,7 @@ func monsterTrackingRouteConfig(s *Server) trackingRouteConfig {
 		table:       "monsters",
 		responseKey: "pokemon",
 		describe: func(s *Server, tr *i18n.Translator, row map[string]any) string {
-			return tracking.MonsterRowText(s.cfg, tr, s.data, row)
+			return tracking.MonsterRowText(s.cfg, tr, s.getData(), row)
 		},
 	}
 }

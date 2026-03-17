@@ -86,6 +86,9 @@ func (s *Sender) scheduleTelegramDelete(token, chatID string, messageID int, del
 	})
 }
 
+// maxCleanRetries caps the number of retry attempts for clean deletes.
+const maxCleanRetries = 10
+
 func (s *Sender) scheduleDiscordDeleteAttempt(entry cleanEntry, channelID, token, updateKey string, attempt int) {
 	deleteAt := time.Unix(0, entry.DeleteAt*int64(time.Millisecond))
 	delay := time.Until(deleteAt)
@@ -100,6 +103,15 @@ func (s *Sender) scheduleDiscordDeleteAttempt(entry cleanEntry, channelID, token
 			}
 			if updateKey != "" && s.updateDiscord != nil {
 				s.updateDiscord.Remove(entry.Target, updateKey)
+			}
+			return
+		}
+		if attempt >= maxCleanRetries {
+			if logger := logging.Get().Discord; logger != nil {
+				logger.Warnf("discord clean delete giving up after %d attempts (%s/%s): %v", attempt, channelID, entry.MessageID, err)
+			}
+			if s.cleanDiscord != nil {
+				s.cleanDiscord.Remove(entry)
 			}
 			return
 		}
@@ -129,6 +141,15 @@ func (s *Sender) scheduleDiscordWebhookDeleteAttempt(entry cleanEntry, url, upda
 			}
 			if updateKey != "" && s.updateWebhook != nil {
 				s.updateWebhook.Remove(url, updateKey)
+			}
+			return
+		}
+		if attempt >= maxCleanRetries {
+			if logger := logging.Get().Discord; logger != nil {
+				logger.Warnf("discord webhook clean delete giving up after %d attempts (%s): %v", attempt, entry.MessageID, err)
+			}
+			if s.cleanWebhook != nil {
+				s.cleanWebhook.Remove(entry)
 			}
 			return
 		}
@@ -223,15 +244,21 @@ func (s *Sender) LoadCleanCaches(kind string) {
 }
 
 func (s *Sender) SaveCleanCaches(kind string) {
+	logger := logging.Get().General
+	logSaveErr := func(name string, err error) {
+		if err != nil && logger != nil {
+			logger.Warnf("failed to save %s cache: %v", name, err)
+		}
+	}
 	switch kind {
 	case "discord":
-		_ = s.cleanDiscord.Save()
-		_ = s.cleanWebhook.Save()
-		_ = s.updateDiscord.Save()
-		_ = s.updateWebhook.Save()
+		logSaveErr("cleanDiscord", s.cleanDiscord.Save())
+		logSaveErr("cleanWebhook", s.cleanWebhook.Save())
+		logSaveErr("updateDiscord", s.updateDiscord.Save())
+		logSaveErr("updateWebhook", s.updateWebhook.Save())
 	case "telegram":
-		_ = s.cleanTelegram.Save()
-		_ = s.updateTelegram.Save()
+		logSaveErr("cleanTelegram", s.cleanTelegram.Save())
+		logSaveErr("updateTelegram", s.updateTelegram.Save())
 	}
 }
 

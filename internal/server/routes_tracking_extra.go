@@ -364,7 +364,7 @@ func handleTrackingAllProfiles(w http.ResponseWriter, s *Server, id string) {
 		for key, value := range row {
 			clone[key] = value
 		}
-		clone["description"] = tracking.GymRowText(s.cfg, translator, s.data, row, s.scanner)
+		clone["description"] = tracking.GymRowText(s.cfg, translator, s.getData(), row, s.scanner)
 		gymWithDesc = append(gymWithDesc, clone)
 	}
 	raidWithDesc := make([]map[string]any, 0, len(raid))
@@ -373,7 +373,7 @@ func handleTrackingAllProfiles(w http.ResponseWriter, s *Server, id string) {
 		for key, value := range row {
 			clone[key] = value
 		}
-		clone["description"] = tracking.RaidRowText(s.cfg, translator, s.data, row, s.scanner)
+		clone["description"] = tracking.RaidRowText(s.cfg, translator, s.getData(), row, s.scanner)
 		raidWithDesc = append(raidWithDesc, clone)
 	}
 	eggWithDesc := make([]map[string]any, 0, len(egg))
@@ -382,7 +382,7 @@ func handleTrackingAllProfiles(w http.ResponseWriter, s *Server, id string) {
 		for key, value := range row {
 			clone[key] = value
 		}
-		clone["description"] = tracking.EggRowText(s.cfg, translator, s.data, row, s.scanner)
+		clone["description"] = tracking.EggRowText(s.cfg, translator, s.getData(), row, s.scanner)
 		eggWithDesc = append(eggWithDesc, clone)
 	}
 	maxbattleWithDesc := make([]map[string]any, 0, len(maxbattle))
@@ -391,7 +391,7 @@ func handleTrackingAllProfiles(w http.ResponseWriter, s *Server, id string) {
 		for key, value := range row {
 			clone[key] = value
 		}
-		clone["description"] = tracking.MaxbattleRowText(s.cfg, translator, s.data, row)
+		clone["description"] = tracking.MaxbattleRowText(s.cfg, translator, s.getData(), row)
 		maxbattleWithDesc = append(maxbattleWithDesc, clone)
 	}
 	pokemonWithDesc := make([]map[string]any, 0, len(pokemon))
@@ -400,7 +400,7 @@ func handleTrackingAllProfiles(w http.ResponseWriter, s *Server, id string) {
 		for key, value := range row {
 			clone[key] = value
 		}
-		clone["description"] = tracking.MonsterRowText(s.cfg, translator, s.data, row)
+		clone["description"] = tracking.MonsterRowText(s.cfg, translator, s.getData(), row)
 		pokemonWithDesc = append(pokemonWithDesc, clone)
 	}
 
@@ -434,7 +434,7 @@ func handleTrackingQuestDeleteBatch(w http.ResponseWriter, s *Server, id string,
 
 func handleTrackingQuestUpsert(w http.ResponseWriter, s *Server, id string, r *http.Request) {
 	handleTrackingUpsertGeneric(w, s, id, r, questTrackingRouteConfig(s), func(translator *i18n.Translator, row map[string]any) string {
-		return tracking.QuestRowText(s.cfg, translator, s.data, row)
+		return tracking.QuestRowText(s.cfg, translator, s.getData(), row)
 	})
 }
 
@@ -452,7 +452,7 @@ func handleTrackingInvasionDeleteBatch(w http.ResponseWriter, s *Server, id stri
 
 func handleTrackingInvasionUpsert(w http.ResponseWriter, s *Server, id string, r *http.Request) {
 	handleTrackingUpsertGeneric(w, s, id, r, invasionTrackingRouteConfig(s), func(translator *i18n.Translator, row map[string]any) string {
-		return tracking.InvasionRowText(s.cfg, translator, s.data, row)
+		return tracking.InvasionRowText(s.cfg, translator, s.getData(), row)
 	})
 }
 
@@ -470,7 +470,7 @@ func handleTrackingLureDeleteBatch(w http.ResponseWriter, s *Server, id string, 
 
 func handleTrackingLureUpsert(w http.ResponseWriter, s *Server, id string, r *http.Request) {
 	handleTrackingUpsertGeneric(w, s, id, r, lureTrackingRouteConfig(s), func(translator *i18n.Translator, row map[string]any) string {
-		return tracking.LureRowText(s.cfg, translator, s.data, row)
+		return tracking.LureRowText(s.cfg, translator, s.getData(), row)
 	})
 }
 
@@ -488,7 +488,7 @@ func handleTrackingNestDeleteBatch(w http.ResponseWriter, s *Server, id string, 
 
 func handleTrackingNestUpsert(w http.ResponseWriter, s *Server, id string, r *http.Request) {
 	handleTrackingUpsertGeneric(w, s, id, r, nestTrackingRouteConfig(s), func(translator *i18n.Translator, row map[string]any) string {
-		return tracking.NestRowText(s.cfg, translator, s.data, row)
+		return tracking.NestRowText(s.cfg, translator, s.getData(), row)
 	})
 }
 
@@ -506,7 +506,7 @@ func handleTrackingGymDeleteBatch(w http.ResponseWriter, s *Server, id string, r
 
 func handleTrackingGymUpsert(w http.ResponseWriter, s *Server, id string, r *http.Request) {
 	handleTrackingUpsertGeneric(w, s, id, r, gymTrackingRouteConfig(s), func(translator *i18n.Translator, row map[string]any) string {
-		return tracking.GymRowText(s.cfg, translator, s.data, row, s.scanner)
+		return tracking.GymRowText(s.cfg, translator, s.getData(), row, s.scanner)
 	})
 }
 
@@ -524,6 +524,6 @@ func handleTrackingMaxbattleDeleteBatch(w http.ResponseWriter, s *Server, id str
 
 func handleTrackingMaxbattleUpsert(w http.ResponseWriter, s *Server, id string, r *http.Request) {
 	handleTrackingUpsertGeneric(w, s, id, r, maxbattleTrackingRouteConfig(s), func(translator *i18n.Translator, row map[string]any) string {
-		return tracking.MaxbattleRowText(s.cfg, translator, s.data, row)
+		return tracking.MaxbattleRowText(s.cfg, translator, s.getData(), row)
 	})
 }

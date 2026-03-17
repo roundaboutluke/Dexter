@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"poraclego/internal/config"
 	"poraclego/internal/dispatch"
 	"poraclego/internal/i18n"
 )
@@ -162,7 +163,7 @@ func loadBroadcastMessages(root string) ([]broadcastEntry, error) {
 	if err != nil {
 		return nil, fmt.Errorf("broadcast.json not found")
 	}
-	payload = stripJSONComments(payload)
+	payload = config.StripJSONComments(payload)
 	var entries []broadcastEntry
 	if err := json.Unmarshal(payload, &entries); err != nil {
 		return nil, err
@@ -231,41 +232,4 @@ func sendBroadcastJob(ctx *Context, tr *i18n.Translator, targetID, targetName, t
 		}
 	}
 	return "✅"
-}
-
-func stripJSONComments(input []byte) []byte {
-	out := make([]byte, 0, len(input))
-	inString := false
-	for i := 0; i < len(input); i++ {
-		ch := input[i]
-		if ch == '"' {
-			if i == 0 || input[i-1] != '\\' {
-				inString = !inString
-			}
-			out = append(out, ch)
-			continue
-		}
-		if !inString && ch == '/' && i+1 < len(input) {
-			next := input[i+1]
-			if next == '/' {
-				for i < len(input) && input[i] != '\n' {
-					i++
-				}
-				if i < len(input) {
-					out = append(out, '\n')
-				}
-				continue
-			}
-			if next == '*' {
-				i += 2
-				for i+1 < len(input) && !(input[i] == '*' && input[i+1] == '/') {
-					i++
-				}
-				i++
-				continue
-			}
-		}
-		out = append(out, ch)
-	}
-	return out
 }

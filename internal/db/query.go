@@ -286,12 +286,13 @@ func (q *Query) ExecQuery(sqlQuery string, args ...any) (int64, error) {
 }
 
 // MysteryQuery runs a raw SQL query and returns rows.
-func (q *Query) MysteryQuery(sqlQuery string) ([]map[string]any, error) {
+// Pass args to use parameterized placeholders and avoid SQL injection.
+func (q *Query) MysteryQuery(sqlQuery string, args ...any) ([]map[string]any, error) {
 	runner := q.runner()
 	if runner == nil {
 		return nil, fmt.Errorf("mysteryQuery: database not initialized")
 	}
-	rows, err := runner.Query(sqlQuery)
+	rows, err := runner.Query(sqlQuery, args...)
 	if err != nil {
 		return nil, fmt.Errorf("mysteryQuery: %w", err)
 	}
@@ -403,12 +404,9 @@ func quoteIdent(key string) string {
 	if key == "" {
 		return key
 	}
-	for _, r := range key {
-		if !(r == '_' || (r >= '0' && r <= '9') || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')) {
-			return key
-		}
-	}
-	return fmt.Sprintf("`%s`", key)
+	// Escape embedded backticks by doubling them, then wrap in backticks.
+	escaped := strings.ReplaceAll(key, "`", "``")
+	return "`" + escaped + "`"
 }
 
 func sortedKeys(values map[string]any) []string {

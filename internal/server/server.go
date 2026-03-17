@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"poraclego/internal/bot"
@@ -29,11 +30,11 @@ type Server struct {
 
 	cfg       *config.Config
 	query     *db.Query
-	fences    *geofence.Store
+	fences    atomic.Pointer[geofence.Store]
 	root      string
-	data      *data.GameData
+	data      atomic.Pointer[data.GameData]
 	i18n      *i18n.Factory
-	dts       []dts.Template
+	dts       atomic.Pointer[[]dts.Template]
 	scanner   *scanner.Client
 	processor *webhook.Processor
 
@@ -56,17 +57,20 @@ func New(cfg *config.Config, queue *webhook.Queue, processor *webhook.Processor,
 	s := &Server{
 		cfg:           cfg,
 		query:         query,
-		fences:        fences,
 		root:          root,
-		data:          gameData,
 		i18n:          i18nFactory,
-		dts:           templates,
 		scanner:       scannerClient,
 		processor:     processor,
 		discordQueue:  discordQueue,
 		telegramQueue: telegramQueue,
 	}
+	s.fences.Store(fences)
+	s.data.Store(gameData)
+	s.dts.Store(&templates)
 	s.registerRoutes(mux)
+	// maxBodySize limits webhook request bodies to 50 MB.
+	const maxBodySize = 50 << 20
+
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			w.WriteHeader(http.StatusMethodNotAllowed)
@@ -76,6 +80,7 @@ func New(cfg *config.Config, queue *webhook.Queue, processor *webhook.Processor,
 			return
 		}
 
+		r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 		var payload any
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 			if logger := logging.Get().General; logger != nil {
@@ -138,20 +143,28 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return s.srv.Shutdown(ctx)
 }
 
-// UpdateTemplates replaces the DTS template list.
+// UpdateTemplates replaces the DTS template list atomically.
 func (s *Server) UpdateTemplates(templates []dts.Template) {
 	if s == nil {
 		return
 	}
-	s.dts = templates
+	s.dts.Store(&templates)
 }
 
-// UpdateData replaces the game data used by API handlers.
+// UpdateData replaces the game data used by API handlers atomically.
 func (s *Server) UpdateData(game *data.GameData) {
 	if s == nil || game == nil {
 		return
 	}
-	s.data = game
+	s.data.Store(game)
+}
+
+// UpdateFences replaces the geofence store atomically.
+func (s *Server) UpdateFences(store *geofence.Store) {
+	if s == nil || store == nil {
+		return
+	}
+	s.fences.Store(store)
 }
 
 // SetBotManager supplies the bot manager for API integrations that need Discord access.
@@ -160,6 +173,31 @@ func (s *Server) SetBotManager(manager *bot.Manager) {
 		return
 	}
 	s.botManager = manager
+}
+
+func (s *Server) getFences() *geofence.Store {
+	if s == nil {
+		return nil
+	}
+	return s.fences.Load()
+}
+
+func (s *Server) getData() *data.GameData {
+	if s == nil {
+		return nil
+	}
+	return s.data.Load()
+}
+
+func (s *Server) getTemplates() []dts.Template {
+	if s == nil {
+		return nil
+	}
+	ptr := s.dts.Load()
+	if ptr == nil {
+		return nil
+	}
+	return *ptr
 }
 
 func ipAllowed(cfg *config.Config, r *http.Request) bool {

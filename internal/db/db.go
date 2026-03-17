@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 	"poraclego/internal/config"
@@ -38,6 +39,19 @@ func New(cfg *config.Config) (*DB, error) {
 		conn.SetMaxOpenConns(maxConns)
 		conn.SetMaxIdleConns(maxConns)
 	}
+
+	// Connection lifetime defaults prevent stale connections from accumulating.
+	connMaxLifetime := 30 * time.Minute
+	if minutes, ok := cfg.GetInt("tuning.connMaxLifetimeMinutes"); ok && minutes > 0 {
+		connMaxLifetime = time.Duration(minutes) * time.Minute
+	}
+	conn.SetConnMaxLifetime(connMaxLifetime)
+
+	connMaxIdleTime := 10 * time.Minute
+	if minutes, ok := cfg.GetInt("tuning.connMaxIdleTimeMinutes"); ok && minutes > 0 {
+		connMaxIdleTime = time.Duration(minutes) * time.Minute
+	}
+	conn.SetConnMaxIdleTime(connMaxIdleTime)
 
 	return &DB{Conn: conn}, nil
 }

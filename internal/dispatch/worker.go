@@ -17,7 +17,7 @@ type Worker struct {
 	name        string
 	cfg         *config.Config
 	sender      *Sender
-	running     bool
+	startOnce   sync.Once
 	sem         chan struct{}
 	semWebhook  chan struct{}
 	mu          sync.Mutex
@@ -54,26 +54,28 @@ func (w *Worker) logger() *logging.Logger {
 }
 
 // Start begins draining the queue in a goroutine.
+// It is safe to call multiple times; only the first call has effect.
 func (w *Worker) Start() {
-	if w == nil || w.running {
+	if w == nil {
 		return
 	}
-	w.running = true
-	w.configureConcurrency()
-	if w.sender != nil {
-		w.sender.LoadCleanCaches(w.name)
-	}
-	go func() {
-		ticker := time.NewTicker(w.interval)
-		defer ticker.Stop()
-		for range ticker.C {
-			jobs := w.queue.Drain()
-			if len(jobs) == 0 {
-				continue
-			}
-			w.enqueue(jobs)
+	w.startOnce.Do(func() {
+		w.configureConcurrency()
+		if w.sender != nil {
+			w.sender.LoadCleanCaches(w.name)
 		}
-	}()
+		go func() {
+			ticker := time.NewTicker(w.interval)
+			defer ticker.Stop()
+			for range ticker.C {
+				jobs := w.queue.Drain()
+				if len(jobs) == 0 {
+					continue
+				}
+				w.enqueue(jobs)
+			}
+		}()
+	})
 }
 
 func (w *Worker) enqueue(jobs []MessageJob) {

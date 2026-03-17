@@ -51,6 +51,9 @@ func (q *Queue) Push(job MessageJob) {
 func (q *Queue) Drain() []MessageJob {
 	q.mu.Lock()
 	defer q.mu.Unlock()
+	if len(q.jobs) == 0 {
+		return nil
+	}
 	out := make([]MessageJob, len(q.jobs))
 	copy(out, q.jobs)
 	q.jobs = q.jobs[:0]
