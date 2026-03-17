@@ -31,8 +31,14 @@ func (t *Telegram) startReconciliation() {
 	})
 	ticker := time.NewTicker(time.Duration(intervalHours) * time.Hour)
 	go func() {
-		for range ticker.C {
-			t.runReconciliation()
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				t.runReconciliation()
+			case <-t.stopCh:
+				return
+			}
 		}
 	}()
 }

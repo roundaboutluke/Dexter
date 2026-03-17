@@ -125,6 +125,21 @@ func (m *Manager) Start() {
 	}
 }
 
+// Stop signals all bot instances to shut down their background goroutines.
+func (m *Manager) Stop() {
+	if m == nil {
+		return
+	}
+	if m.discordBot != nil {
+		m.discordBot.Stop()
+	}
+	for _, t := range m.telegramBots {
+		if t != nil {
+			t.Stop()
+		}
+	}
+}
+
 // UpdateData replaces the game data used by bot commands and autocompletes.
 func (m *Manager) UpdateData(game *data.GameData) {
 	if m == nil || game == nil {

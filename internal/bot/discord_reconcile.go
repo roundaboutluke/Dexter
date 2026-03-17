@@ -121,8 +121,14 @@ func (d *Discord) startReconciliation(s *discordgo.Session) {
 	})
 	ticker := time.NewTicker(time.Duration(intervalHours) * time.Hour)
 	go func() {
-		for range ticker.C {
-			d.runReconciliation(s)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				d.runReconciliation(s)
+			case <-d.stopCh:
+				return
+			}
 		}
 	}()
 }

@@ -243,6 +243,7 @@ func preloadAlertState(preloader alertStatePreloader, forcedMigrationFailure boo
 func (a *App) Shutdown(ctx context.Context) error {
 	logf("Poracle shutdown - starting save of cache")
 	if a.processor != nil {
+		a.processor.Stop()
 		a.processor.SaveCaches()
 	}
 	if a.weatherTracker != nil {
@@ -253,6 +254,9 @@ func (a *App) Shutdown(ctx context.Context) error {
 	}
 	if a.telegramWorker != nil {
 		a.telegramWorker.SaveCaches()
+	}
+	if a.botManager != nil {
+		a.botManager.Stop()
 	}
 	if a.statsWorker != nil {
 		a.statsWorker.Stop()

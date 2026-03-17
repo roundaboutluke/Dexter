@@ -462,32 +462,36 @@ func (d *Discord) queueSlashMapResolution(s *discordgo.Session, mapReq *slashMap
 		return
 	}
 	d.ensureSlashMapState()
+	if !d.tryQueueMapJob(mapReq) {
+		return
+	}
+	go d.resolveSlashMapAsync(s, mapReq)
+}
+
+func (d *Discord) tryQueueMapJob(mapReq *slashMapRequest) bool {
 	now := time.Now()
 	d.mapMu.Lock()
+	defer d.mapMu.Unlock()
 	d.cleanupSlashMapCacheLocked(now)
 	if entry, ok := d.mapCache[mapReq.Key]; ok {
 		if entry.URL != "" && entry.ExpiresAt.After(now) {
-			d.mapMu.Unlock()
-			return
+			return false
 		}
 		if entry.RetryAfter.After(now) {
-			d.mapMu.Unlock()
 			if logger := logging.Get().Discord; logger != nil {
 				logger.Debugf("Slash map backoff active (%s)", mapReq.Key)
 			}
-			return
+			return false
 		}
 	}
 	if _, ok := d.mapJobs[mapReq.Key]; ok {
-		d.mapMu.Unlock()
 		if logger := logging.Get().Discord; logger != nil {
 			logger.Debugf("Slash map job reused (%s)", mapReq.Key)
 		}
-		return
+		return false
 	}
 	d.mapJobs[mapReq.Key] = &slashMapJob{StartedAt: now}
-	d.mapMu.Unlock()
-	go d.resolveSlashMapAsync(s, mapReq)
+	return true
 }
 
 func (d *Discord) resolveSlashMapAsync(s *discordgo.Session, mapReq *slashMapRequest) {

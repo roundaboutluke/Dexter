@@ -47,6 +47,8 @@ type Discord struct {
 
 	roleCacheMu sync.Mutex
 	roleCache   map[string]roleCacheEntry
+
+	stopCh chan struct{}
 }
 
 type roleCacheEntry struct {
@@ -64,6 +66,7 @@ func NewDiscord(manager *Manager, token string) *Discord {
 		mapCache:      map[string]slashMapCacheEntry{},
 		mapJobs:       map[string]*slashMapJob{},
 		renderState:   map[string]*slashRenderState{},
+		stopCh:        make(chan struct{}),
 	}
 }
 
@@ -87,6 +90,21 @@ func (d *Discord) Start() error {
 	d.session = session
 	d.startReconciliation(session)
 	return nil
+}
+
+// Stop signals background goroutines to exit and closes the session.
+func (d *Discord) Stop() {
+	if d == nil {
+		return
+	}
+	select {
+	case <-d.stopCh:
+	default:
+		close(d.stopCh)
+	}
+	if d.session != nil {
+		_ = d.session.Close()
+	}
 }
 
 func discordIntents() discordgo.Intent {

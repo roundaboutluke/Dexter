@@ -18,11 +18,27 @@ type Telegram struct {
 	manager *Manager
 	token   string
 	bot     *tgbotapi.BotAPI
+	stopCh  chan struct{}
 }
 
 // NewTelegram constructs a Telegram bot.
 func NewTelegram(manager *Manager, token string) *Telegram {
-	return &Telegram{manager: manager, token: token}
+	return &Telegram{manager: manager, token: token, stopCh: make(chan struct{})}
+}
+
+// Stop signals background goroutines to exit.
+func (t *Telegram) Stop() {
+	if t == nil {
+		return
+	}
+	select {
+	case <-t.stopCh:
+	default:
+		close(t.stopCh)
+	}
+	if t.bot != nil {
+		t.bot.StopReceivingUpdates()
+	}
 }
 
 // Start begins polling updates.

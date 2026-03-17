@@ -18,20 +18,25 @@ func (p *Processor) startCachePruner() {
 	}
 	ticker := time.NewTicker(10 * time.Minute)
 	defer ticker.Stop()
-	for range ticker.C {
-		now := time.Now()
-		if p.cache != nil {
-			p.cache.PruneExpired(now)
-		}
-		p.pruneRaidSeen(now)
-		if p.gymCache != nil {
-			p.gymCache.PruneStale(now.Add(-24 * time.Hour))
-		}
-		if p.geocoder != nil {
-			p.geocoder.PruneStale(now.Add(-24 * time.Hour))
-		}
-		if p.weatherData != nil {
-			p.weatherData.PruneStaleCares(now.Unix())
+	for {
+		select {
+		case <-ticker.C:
+			now := time.Now()
+			if p.cache != nil {
+				p.cache.PruneExpired(now)
+			}
+			p.pruneRaidSeen(now)
+			if p.gymCache != nil {
+				p.gymCache.PruneStale(now.Add(-24 * time.Hour))
+			}
+			if p.geocoder != nil {
+				p.geocoder.PruneStale(now.Add(-24 * time.Hour))
+			}
+			if p.weatherData != nil {
+				p.weatherData.PruneStaleCares(now.Unix())
+			}
+		case <-p.stopCh:
+			return
 		}
 	}
 }
@@ -58,6 +63,18 @@ func (p *Processor) UpdateTemplates(templates []dts.Template) {
 		return
 	}
 	p.templates.Store(&templates)
+}
+
+// Stop signals background goroutines to exit.
+func (p *Processor) Stop() {
+	if p == nil {
+		return
+	}
+	select {
+	case <-p.stopCh:
+	default:
+		close(p.stopCh)
+	}
 }
 
 // SaveCaches persists cache data to disk for warm restarts.
