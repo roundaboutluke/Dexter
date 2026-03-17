@@ -75,6 +75,7 @@ type Processor struct {
 
 	startOnce sync.Once
 	workCh    chan any
+	stopCh    chan struct{}
 }
 
 // NewProcessor returns a processor that drains the queue on the given interval.
@@ -109,6 +110,7 @@ func NewProcessor(queue *Queue, cfg *config.Config, query *db.Query, fences *geo
 		root:          root,
 		customEmoji:   loadCustomEmoji(root),
 		alertState:    alertstate.NewManager(),
+		stopCh:        make(chan struct{}),
 	}
 	p.fences.Store(fences)
 	p.data.Store(gameData)

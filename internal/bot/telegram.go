@@ -18,11 +18,27 @@ type Telegram struct {
 	manager *Manager
 	token   string
 	bot     *tgbotapi.BotAPI
+	stopCh  chan struct{}
 }
 
 // NewTelegram constructs a Telegram bot.
 func NewTelegram(manager *Manager, token string) *Telegram {
-	return &Telegram{manager: manager, token: token}
+	return &Telegram{manager: manager, token: token, stopCh: make(chan struct{})}
+}
+
+// Stop signals background goroutines to exit.
+func (t *Telegram) Stop() {
+	if t == nil {
+		return
+	}
+	select {
+	case <-t.stopCh:
+	default:
+		close(t.stopCh)
+	}
+	if t.bot != nil {
+		t.bot.StopReceivingUpdates()
+	}
 }
 
 // Start begins polling updates.
@@ -141,9 +157,10 @@ func (t *Telegram) Start() error {
 	return nil
 }
 
+var telegramCommandRe = regexp.MustCompile(`^/([^@\s]+)@?(?:\S+)?\s*([\s\S]*)$`)
+
 func parseTelegramCommandLines(text, prefix string, translator *i18n.Factory) []string {
-	commandRe := regexp.MustCompile(`^/([^@\s]+)@?(?:\S+)?\s*([\s\S]*)$`)
-	matches := commandRe.FindStringSubmatch(text)
+	matches := telegramCommandRe.FindStringSubmatch(text)
 	if len(matches) < 2 {
 		return nil
 	}

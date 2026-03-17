@@ -10,6 +10,8 @@ import (
 	"time"
 )
 
+var disappearRe = regexp.MustCompile(`(?i)^disapeardt:?(20\d\d-(0\d|1[0-2])-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d)$`)
+
 // PoracleTestCommand queues test webhook payloads (admin only).
 type PoracleTestCommand struct{}
 
@@ -49,7 +51,6 @@ func (c *PoracleTestCommand) Handle(ctx *Context, args []string) (string, error)
 	}
 	template := defaultTemplateName(ctx)
 	language, _ := ctx.Config.GetString("general.locale")
-	disappearRe := regexp.MustCompile(`(?i)^disapeardt:?(20\d\d-(0\d|1[0-2])-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d)$`)
 	disappearOverride := ""
 	trimmed := []string{args[0]}
 	languageNames := map[string]string{}
