@@ -12,6 +12,7 @@ import (
 	"poraclego/internal/community"
 	"poraclego/internal/db"
 	"poraclego/internal/logging"
+	"poraclego/internal/util"
 )
 
 type discordUserInfo struct {
@@ -501,17 +502,7 @@ func (d *Discord) communitiesForRoles(roles []string) []string {
 	return result
 }
 
-func getString(value any) string {
-	switch v := value.(type) {
-	case string:
-		return v
-	default:
-		if value == nil {
-			return ""
-		}
-		return fmt.Sprintf("%v", value)
-	}
-}
+var getString = util.GetString
 
 func hasDisabledDate(user map[string]any) bool {
 	if user == nil {

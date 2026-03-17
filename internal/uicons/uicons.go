@@ -5,11 +5,15 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
+var httpClient = &http.Client{Timeout: 10 * time.Second}
+
 // Client fetches and resolves uicons image URLs.
 type Client struct {
+	mu        sync.RWMutex
 	baseURL   string
 	imageType string
 	index     *indexData
@@ -43,13 +47,26 @@ func NewClient(baseURL, imageType string) *Client {
 
 // IsUiconsRepository verifies that the base URL exposes index.json.
 func (c *Client) IsUiconsRepository() (bool, error) {
+	c.mu.RLock()
 	if c.index != nil && time.Since(c.loadedAt) < time.Hour {
+		c.mu.RUnlock()
 		return true, nil
 	}
+	c.mu.RUnlock()
+
 	if c.baseURL == "" {
 		return false, fmt.Errorf("missing base url")
 	}
-	resp, err := http.Get(c.baseURL + "/index.json")
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// Re-check under write lock to avoid redundant fetches.
+	if c.index != nil && time.Since(c.loadedAt) < time.Hour {
+		return true, nil
+	}
+
+	resp, err := httpClient.Get(c.baseURL + "/index.json")
 	if err != nil {
 		return false, err
 	}
@@ -179,6 +196,8 @@ func (c *Client) InvasionIcon(gruntType int) (string, bool) {
 }
 
 func (c *Client) resolve(folder string, id int, available map[string]bool) (string, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	if id <= 0 || c.index == nil {
 		return "", false
 	}
@@ -190,6 +209,8 @@ func (c *Client) resolve(folder string, id int, available map[string]bool) (stri
 }
 
 func (c *Client) resolveCandidates(folder string, candidates []string, available map[string]bool) (string, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	if len(candidates) == 0 || c.index == nil {
 		return "", false
 	}
@@ -377,4 +398,50 @@ func suffixFlag(enabled bool, suffix string) []string {
 		return []string{suffix, ""}
 	}
 	return []string{""}
+}
+
+var (
+	cachedClients   = map[string]*Client{}
+	cachedClientsMu sync.RWMutex
+)
+
+// CachedClient returns a shared Client for the given base URL and image type.
+// Clients are cached by key and reused across calls. Thread-safe.
+func CachedClient(baseURL, imageType string) *Client {
+	if baseURL == "" {
+		return nil
+	}
+	if imageType == "" {
+		imageType = "png"
+	}
+	key := baseURL + "|" + imageType
+
+	// Fast path: read lock for cache hits.
+	cachedClientsMu.RLock()
+	client, ok := cachedClients[key]
+	cachedClientsMu.RUnlock()
+	if ok {
+		return client
+	}
+
+	// Slow path: write lock for cache misses.
+	cachedClientsMu.Lock()
+	defer cachedClientsMu.Unlock()
+	// Double-check under write lock.
+	if client, ok := cachedClients[key]; ok {
+		return client
+	}
+	client = NewClient(baseURL, imageType)
+	cachedClients[key] = client
+	return client
+}
+
+// IsCachedRepo checks whether a cached client for the given URL is a valid uicons repository.
+func IsCachedRepo(baseURL, imageType string) bool {
+	client := CachedClient(baseURL, imageType)
+	if client == nil {
+		return false
+	}
+	ok, _ := client.IsUiconsRepository()
+	return ok
 }

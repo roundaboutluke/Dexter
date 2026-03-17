@@ -11,6 +11,24 @@ import (
 	"poraclego/internal/logging"
 )
 
+type slashExecutionStatus string
+
+const (
+	slashExecutionSuccess slashExecutionStatus = "success"
+	slashExecutionBlocked slashExecutionStatus = "blocked"
+	slashExecutionError   slashExecutionStatus = "error"
+)
+
+type slashExecutionResult struct {
+	Status slashExecutionStatus
+	Reply  string
+}
+
+func (r slashExecutionResult) Success() bool {
+	return r.Status == slashExecutionSuccess
+}
+
+
 func (d *Discord) respondDeferredEphemeral(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	response := &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
@@ -32,6 +50,17 @@ func (d *Discord) respondDeferred(s *discordgo.Session, i *discordgo.Interaction
 	if err := s.InteractionRespond(i.Interaction, response); err != nil {
 		if logger := logging.Get().Discord; logger != nil {
 			logger.Warnf("Discord deferred interaction respond failed: %v", err)
+		}
+	}
+}
+
+func (d *Discord) respondDeferredUpdate(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	response := &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseDeferredMessageUpdate,
+	}
+	if err := s.InteractionRespond(i.Interaction, response); err != nil {
+		if logger := logging.Get().Discord; logger != nil {
+			logger.Warnf("Discord deferred interaction update failed: %v", err)
 		}
 	}
 }
@@ -61,7 +90,7 @@ func (d *Discord) respondEphemeralComponentsEmbed(s *discordgo.Session, i *disco
 	d.respondComponentsEmbed(s, i, text, embeds, components, true)
 }
 
-func (d *Discord) respondEditMessage(s *discordgo.Session, i *discordgo.InteractionCreate, text string, embeds []*discordgo.MessageEmbed) {
+func (d *Discord) respondEditMessage(s *discordgo.Session, i *discordgo.InteractionCreate, text string, embeds []*discordgo.MessageEmbed) (*discordgo.Message, error) {
 	content := text
 	var embedPtr *[]*discordgo.MessageEmbed
 	if embeds != nil {
@@ -71,11 +100,14 @@ func (d *Discord) respondEditMessage(s *discordgo.Session, i *discordgo.Interact
 		Content: &content,
 		Embeds:  embedPtr,
 	}
-	if _, err := s.InteractionResponseEdit(i.Interaction, edit); err != nil {
+	msg, err := s.InteractionResponseEdit(i.Interaction, edit)
+	if err != nil {
 		if logger := logging.Get().Discord; logger != nil {
 			logger.Warnf("Discord interaction edit failed: %v", err)
 		}
+		return nil, err
 	}
+	return msg, nil
 }
 
 func (d *Discord) followupEphemeralSlashReply(s *discordgo.Session, i *discordgo.InteractionCreate, reply string) {
@@ -163,7 +195,7 @@ func (d *Discord) sendSpecialSlashFollowup(s *discordgo.Session, i *discordgo.In
 	return false
 }
 
-func (d *Discord) respondEditComponentsEmbed(s *discordgo.Session, i *discordgo.InteractionCreate, text string, embeds []*discordgo.MessageEmbed, components []discordgo.MessageComponent) {
+func (d *Discord) respondEditComponentsEmbed(s *discordgo.Session, i *discordgo.InteractionCreate, text string, embeds []*discordgo.MessageEmbed, components []discordgo.MessageComponent) (*discordgo.Message, error) {
 	content := text
 	var embedPtr *[]*discordgo.MessageEmbed
 	if embeds != nil {
@@ -178,7 +210,14 @@ func (d *Discord) respondEditComponentsEmbed(s *discordgo.Session, i *discordgo.
 		Embeds:     embedPtr,
 		Components: componentPtr,
 	}
-	_, _ = s.InteractionResponseEdit(i.Interaction, edit)
+	msg, err := s.InteractionResponseEdit(i.Interaction, edit)
+	if err != nil {
+		if logger := logging.Get().Discord; logger != nil {
+			logger.Warnf("Discord interaction edit failed: %v", err)
+		}
+		return nil, err
+	}
+	return msg, nil
 }
 
 func (d *Discord) respondUpdateComponentsEmbed(s *discordgo.Session, i *discordgo.InteractionCreate, text string, embeds []*discordgo.MessageEmbed, components []discordgo.MessageComponent) {
@@ -286,10 +325,10 @@ func (d *Discord) respondWithModal(s *discordgo.Session, i *discordgo.Interactio
 	}
 }
 
-func (d *Discord) respondWithScheduleModal(s *discordgo.Session, i *discordgo.InteractionCreate, customID, startPlaceholder, endPlaceholder, startValue, endValue string) {
+func (d *Discord) respondWithScheduleModal(s *discordgo.Session, i *discordgo.InteractionCreate, customID, title, startLabel, endLabel, startPlaceholder, endPlaceholder, startValue, endValue string) {
 	startInput := discordgo.TextInput{
 		CustomID:    "start",
-		Label:       "Start time (HH:MM)",
+		Label:       startLabel,
 		Style:       discordgo.TextInputShort,
 		Placeholder: startPlaceholder,
 		Value:       startValue,
@@ -297,7 +336,7 @@ func (d *Discord) respondWithScheduleModal(s *discordgo.Session, i *discordgo.In
 	}
 	endInput := discordgo.TextInput{
 		CustomID:    "end",
-		Label:       "End time (HH:MM)",
+		Label:       endLabel,
 		Style:       discordgo.TextInputShort,
 		Placeholder: endPlaceholder,
 		Value:       endValue,
@@ -307,7 +346,7 @@ func (d *Discord) respondWithScheduleModal(s *discordgo.Session, i *discordgo.In
 		Type: discordgo.InteractionResponseModal,
 		Data: &discordgo.InteractionResponseData{
 			CustomID: customID,
-			Title:    "Add schedule",
+			Title:    title,
 			Components: []discordgo.MessageComponent{
 				discordgo.ActionsRow{Components: []discordgo.MessageComponent{startInput}},
 				discordgo.ActionsRow{Components: []discordgo.MessageComponent{endInput}},
@@ -487,6 +526,17 @@ func (d *Discord) startSlashGuide(i *discordgo.InteractionCreate, commandName, s
 	d.setSlashState(i.Member, i.User, state)
 }
 
+func (d *Discord) startSlashGuideWithProfile(i *discordgo.InteractionCreate, commandName, step string, selection slashProfileSelection) {
+	state := &slashBuilderState{
+		Command:      commandName,
+		Step:         step,
+		ProfileNo:    selection.ProfileNo,
+		ProfileLabel: selection.TargetLabelLocalized(d.slashInteractionTranslator(i)),
+		ExpiresAt:    time.Now().Add(5 * time.Minute),
+	}
+	d.setSlashState(i.Member, i.User, state)
+}
+
 func (d *Discord) logSlashUX(i *discordgo.InteractionCreate, commandName, action, detail string) {
 	logger := logging.Get().Discord
 	if logger == nil || i == nil {
@@ -501,28 +551,53 @@ func (d *Discord) logSlashUX(i *discordgo.InteractionCreate, commandName, action
 }
 
 func (d *Discord) effectiveProfileInfo(i *discordgo.InteractionCreate) (int, string) {
+	tr := d.slashInteractionTranslator(i)
 	if d == nil || d.manager == nil || d.manager.query == nil {
-		return 1, "Profile 1"
+		return 1, localizedProfileLabel(tr, 1)
 	}
 	userID, _ := slashUser(i)
 	if userID == "" {
-		return 1, "Profile 1"
+		return 1, localizedProfileLabel(tr, 1)
 	}
 	profileNo := d.userProfileNo(userID)
 	profiles, err := d.manager.query.SelectAllQuery("profiles", map[string]any{"id": userID})
 	if err != nil {
-		return profileNo, fmt.Sprintf("Profile %d", profileNo)
+		return profileNo, localizedProfileLabel(tr, profileNo)
 	}
 	if row := profileRowByNo(profiles, profileNo); row != nil {
-		return profileNo, profileDisplayName(row)
+		return profileNo, localizedProfileDisplayName(tr, row)
 	}
-	return profileNo, fmt.Sprintf("Profile %d", profileNo)
+	return profileNo, localizedProfileLabel(tr, profileNo)
+}
+
+func (d *Discord) resolveSlashTrackingProfileSelection(i *discordgo.InteractionCreate, token string) (slashProfileSelection, string) {
+	selection, errText := d.resolveSlashProfileSelection(i, token)
+	if errText != "" {
+		return slashProfileSelection{}, errText
+	}
+	if selection.Mode == slashProfileScopeAll {
+		return slashProfileSelection{}, d.slashText(i, "Please choose a specific profile.")
+	}
+	if selection.ProfileNo <= 0 {
+		return slashProfileSelection{}, d.slashText(i, "Profile not found.")
+	}
+	return selection, ""
+}
+
+func (d *Discord) slashProfileSelectionForState(i *discordgo.InteractionCreate, state *slashBuilderState) (slashProfileSelection, string) {
+	if state == nil {
+		return d.resolveSlashTrackingProfileSelection(i, "")
+	}
+	if state.ProfileNo > 0 {
+		return d.resolveSlashTrackingProfileSelection(i, fmt.Sprintf("%d", state.ProfileNo))
+	}
+	return d.resolveSlashTrackingProfileSelection(i, "")
 }
 
 func (d *Discord) guidedWeatherArgs(i *discordgo.InteractionCreate, condition string) ([]string, string) {
 	condition = strings.TrimSpace(condition)
 	if condition == "" {
-		return nil, "Please pick a weather condition."
+		return nil, d.slashText(i, "Please pick a weather condition.")
 	}
 	userID, _ := slashUser(i)
 	location := ""
@@ -549,7 +624,7 @@ func (d *Discord) guidedWeatherArgs(i *discordgo.InteractionCreate, condition st
 		}
 	}
 	if location == "" {
-		return nil, "Set a saved location in `/profile`, or provide a location with `/weather condition:<condition> location:<place>`."
+		return nil, d.slashText(i, "Set a saved location in `/profile`, or provide a location with `/weather condition:<condition> location:<place>`.")
 	}
 	args := append(strings.Fields(location), "|", condition)
 	return args, ""
@@ -575,27 +650,24 @@ func profileDisplayName(row map[string]any) string {
 
 func (d *Discord) executeSlashCommand(s *discordgo.Session, i *discordgo.InteractionCreate, state *slashBuilderState) {
 	if state == nil {
-		d.respondEphemeral(s, i, "No command to run.")
+		d.respondEphemeral(s, i, d.buildSlashExecutionResult(s, i, "").Reply)
 		return
 	}
 	line := strings.TrimSpace(state.Command + " " + strings.Join(state.Args, " "))
 	if line == "" {
-		d.respondEphemeral(s, i, "No command to run.")
+		d.respondEphemeral(s, i, d.buildSlashExecutionResult(s, i, "").Reply)
 		return
 	}
 	d.executeSlashLineDeferred(s, i, line)
 }
 
 func (d *Discord) executeSlashLine(s *discordgo.Session, i *discordgo.InteractionCreate, line string) {
-	reply := d.buildSlashReply(s, i, line)
-	if reply == "" {
-		reply = "Done."
-	}
-	if d.sendSpecialSlashReply(s, i, reply) {
+	result := d.buildSlashExecutionResult(s, i, line)
+	if d.sendSpecialSlashReply(s, i, result.Reply) {
 		return
 	}
 	const discordLimit = 1900
-	chunks := splitDiscordMessage(reply, discordLimit)
+	chunks := splitDiscordMessage(result.Reply, discordLimit)
 	d.respondEphemeral(s, i, chunks[0])
 	for _, chunk := range chunks[1:] {
 		content := chunk
@@ -610,15 +682,12 @@ func (d *Discord) executeSlashLine(s *discordgo.Session, i *discordgo.Interactio
 
 func (d *Discord) executeSlashLineDeferred(s *discordgo.Session, i *discordgo.InteractionCreate, line string) {
 	d.respondDeferredEphemeral(s, i)
-	reply := d.buildSlashReply(s, i, line)
-	if reply == "" {
-		reply = "Done."
-	}
-	if d.sendSpecialSlashReply(s, i, reply) {
+	result := d.buildSlashExecutionResult(s, i, line)
+	if d.sendSpecialSlashReply(s, i, result.Reply) {
 		return
 	}
 	const discordLimit = 1900
-	chunks := splitDiscordMessage(reply, discordLimit)
+	chunks := splitDiscordMessage(result.Reply, discordLimit)
 	d.respondEditMessage(s, i, chunks[0], nil)
 	for _, chunk := range chunks[1:] {
 		content := chunk
@@ -660,31 +729,68 @@ func (d *Discord) buildSlashContext(s *discordgo.Session, i *discordgo.Interacti
 			}
 		}
 	}
-	return d.manager.Context("discord", "", "/", userID, userName, i.ChannelID, channelName, isDM, isAdmin, roles, ".")
+	return d.manager.Context("discord", d.userLanguage(userID), "/", userID, userName, i.ChannelID, channelName, isDM, isAdmin, roles, ".")
 }
 
-func (d *Discord) buildSlashReply(s *discordgo.Session, i *discordgo.InteractionCreate, line string) string {
+func (d *Discord) buildSlashExecutionResult(s *discordgo.Session, i *discordgo.InteractionCreate, line string) slashExecutionResult {
+	return d.buildSlashExecutionResultForProfile(s, i, line, 0)
+}
+
+func (d *Discord) buildSlashExecutionResultForProfile(s *discordgo.Session, i *discordgo.InteractionCreate, line string, profileNo int) slashExecutionResult {
+	line = strings.TrimSpace(line)
 	if line == "" {
-		return "No command to run."
+		return slashExecutionResult{
+			Status: slashExecutionBlocked,
+			Reply:  d.slashText(i, "No command to run."),
+		}
 	}
 	ctx := d.buildSlashContext(s, i)
 	if ctx == nil {
-		return "No command to run."
+		return slashExecutionResult{
+			Status: slashExecutionBlocked,
+			Reply:  d.slashText(i, "No command to run."),
+		}
+	}
+	if profileNo > 0 {
+		ctx.ProfileOverride = profileNo
 	}
 	tokens := splitQuotedArgs(line)
-	if len(tokens) > 0 {
+	if len(tokens) > 0 && ctx.Config != nil {
 		if disabled, ok := ctx.Config.GetStringSlice("general.disabledCommands"); ok {
 			if containsString(disabled, tokens[0]) {
-				return "That command is disabled."
+				return slashExecutionResult{
+					Status: slashExecutionBlocked,
+					Reply:  d.slashText(i, "That command is disabled."),
+				}
 			}
 		}
 	}
-	reply, err := d.manager.Registry().Execute(ctx, line)
+	registry := d.manager.Registry()
+	if registry == nil {
+		return slashExecutionResult{
+			Status: slashExecutionBlocked,
+			Reply:  d.slashText(i, "No command to run."),
+		}
+	}
+	reply, err := registry.Execute(ctx, line)
 	if err != nil {
-		return err.Error()
+		return slashExecutionResult{
+			Status: slashExecutionError,
+			Reply:  err.Error(),
+		}
 	}
 	if reply == "" {
-		return "Done."
+		return slashExecutionResult{
+			Status: slashExecutionSuccess,
+			Reply:  d.slashText(i, "Done."),
+		}
 	}
-	return reply
+	return slashExecutionResult{
+		Status: slashExecutionSuccess,
+		Reply:  reply,
+	}
+}
+
+func (d *Discord) buildSlashReply(s *discordgo.Session, i *discordgo.InteractionCreate, line string) string {
+	return d.buildSlashExecutionResult(s, i, line).Reply
 }

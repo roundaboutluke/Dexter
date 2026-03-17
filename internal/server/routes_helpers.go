@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"poraclego/internal/config"
+	"poraclego/internal/util"
 )
 
 func isAdmin(cfg *config.Config, id string) bool {
@@ -253,9 +254,4 @@ func getStringValue(value any, cfg *config.Config, path string) string {
 	return fmt.Sprintf("%v", value)
 }
 
-func getString(value any) string {
-	if value == nil {
-		return ""
-	}
-	return fmt.Sprintf("%v", value)
-}
+var getString = util.GetString

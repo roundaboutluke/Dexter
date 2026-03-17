@@ -19,6 +19,7 @@ func NewTranslator(root string, region string) (*Translator, error) {
 	data := map[string]string{}
 	loadLocaleFile(data, filepath.Join(root, "util", "locale", fmt.Sprintf("%s.json", region)))
 	loadLocaleFile(data, filepath.Join(root, "locale", fmt.Sprintf("%s.json", region)))
+	loadLocaleFile(data, filepath.Join(root, "locale", "slash", fmt.Sprintf("%s.json", region)))
 	loadLocaleFile(data, filepath.Join(root, "config", fmt.Sprintf("custom.%s.json", region)))
 
 	for key, value := range data {

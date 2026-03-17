@@ -69,6 +69,8 @@ type slashBuilderState struct {
 	Command         string
 	Args            []string
 	Step            string
+	ProfileNo       int
+	ProfileLabel    string
 	ExpiresAt       time.Time
 	OriginMessageID string
 	OriginChannelID string
@@ -109,16 +111,51 @@ func (d *Discord) handleSlashCommand(s *discordgo.Session, i *discordgo.Interact
 		return
 	}
 	switch data.Name {
+	case "pokemon":
+		d.handleSlashTrack(s, i)
 	case "track":
 		d.handleSlashTrack(s, i)
 	case "raid":
-		d.handleSlashRaid(s, i)
+		switch slashSubcommand(data) {
+		case "boss":
+			d.handleSlashRaidBoss(s, i)
+		case "level":
+			d.handleSlashRaidLevel(s, i)
+		case "egg":
+			d.handleSlashRaidEgg(s, i)
+		default:
+			d.handleSlashRaid(s, i)
+		}
 	case "egg":
 		d.handleSlashEgg(s, i)
 	case "maxbattle":
-		d.handleSlashMaxbattle(s, i)
+		switch slashSubcommand(data) {
+		case "boss":
+			d.handleSlashMaxbattleBoss(s, i)
+		case "level":
+			d.handleSlashMaxbattleLevel(s, i)
+		default:
+			d.handleSlashMaxbattle(s, i)
+		}
 	case "quest":
-		d.handleSlashQuest(s, i)
+		switch slashSubcommand(data) {
+		case "pokemon":
+			d.handleSlashQuestPokemon(s, i)
+		case "item":
+			d.handleSlashQuestItem(s, i)
+		case "stardust":
+			d.handleSlashQuestStardust(s, i)
+		case "candy":
+			d.handleSlashQuestCandy(s, i)
+		case "mega-energy":
+			d.handleSlashQuestMegaEnergy(s, i)
+		default:
+			d.handleSlashQuest(s, i)
+		}
+	case "rocket":
+		d.handleSlashRocket(s, i)
+	case "pokestop-event":
+		d.handleSlashPokestopEvent(s, i)
 	case "invasion":
 		d.handleSlashIncident(s, i)
 	case "gym":
@@ -133,10 +170,13 @@ func (d *Discord) handleSlashCommand(s *discordgo.Session, i *discordgo.Interact
 		d.handleSlashLure(s, i)
 	case "profile":
 		d.handleSlashProfile(s, i)
-	case "tracked":
-		d.handleSlashTracked(s, i)
-	case "remove":
-		d.handleSlashRemove(s, i)
+	case "filters":
+		switch slashSubcommand(data) {
+		case "show":
+			d.handleSlashTracked(s, i)
+		case "remove":
+			d.handleSlashRemove(s, i)
+		}
 	case "language":
 		d.handleSlashLanguage(s, i)
 	case "start":
@@ -147,6 +187,16 @@ func (d *Discord) handleSlashCommand(s *discordgo.Session, i *discordgo.Interact
 		d.handleSlashHelp(s, i)
 	case "info":
 		d.handleSlashInfo(s, i)
+	}
+}
+
+func slashCommandAddsTracking(data discordgo.ApplicationCommandInteractionData) bool {
+	switch data.Name {
+	case "pokemon", "track", "rocket", "pokestop-event", "invasion", "gym", "fort", "nest",
+		"weather", "lure", "egg", "raid", "maxbattle", "quest":
+		return true
+	default:
+		return false
 	}
 }
 
@@ -169,8 +219,26 @@ func (d *Discord) handleSlashAutocomplete(s *discordgo.Session, i *discordgo.Int
 	}
 
 	var choices []*discordgo.ApplicationCommandOptionChoice
+	if focused.Name == "profile" && slashCommandAddsTracking(data) {
+		choices = d.autocompleteProfileChoices(i, query, false)
+	}
 	switch data.Name {
+	case "pokemon":
+		if choices != nil {
+			break
+		}
+		if focused.Name == "pokemon" {
+			choices = d.autocompletePokemonChoices(query)
+		} else if focused.Name == "form" {
+			pokemon, _ := optionString(options, "pokemon")
+			choices = d.autocompletePokemonFormChoices(query, pokemon)
+		} else if focused.Name == "template" {
+			choices = d.autocompleteTemplateChoices(query, "monster")
+		}
 	case "track":
+		if choices != nil {
+			break
+		}
 		if focused.Name == "pokemon" {
 			choices = d.autocompletePokemonChoices(query)
 		} else if focused.Name == "form" {
@@ -180,64 +248,189 @@ func (d *Discord) handleSlashAutocomplete(s *discordgo.Session, i *discordgo.Int
 			choices = d.autocompleteTemplateChoices(query, "monster")
 		}
 	case "raid":
-		if focused.Name == "type" {
-			choices = d.autocompleteRaidTypeChoices(query)
-		} else if focused.Name == "gym" {
-			choices = d.autocompleteGymChoices(i, query)
-		} else if focused.Name == "template" {
-			choices = d.autocompleteTemplateChoices(query, "raid")
+		if choices != nil {
+			break
+		}
+		switch slashSubcommand(data) {
+		case "boss":
+			if focused.Name == "pokemon" {
+				choices = d.autocompletePokemonChoices(query)
+			} else if focused.Name == "gym" {
+				choices = d.autocompleteGymChoices(i, query)
+			} else if focused.Name == "template" {
+				choices = d.autocompleteTemplateChoices(query, "raid")
+			}
+		case "level":
+			if focused.Name == "level" {
+				choices = d.autocompleteRaidLevelChoices(i, query)
+			} else if focused.Name == "gym" {
+				choices = d.autocompleteGymChoices(i, query)
+			} else if focused.Name == "template" {
+				choices = d.autocompleteTemplateChoices(query, "raid")
+			}
+		case "egg":
+			if focused.Name == "level" {
+				choices = d.autocompleteRaidLevelChoices(i, query)
+			} else if focused.Name == "gym" {
+				choices = d.autocompleteGymChoices(i, query)
+			} else if focused.Name == "template" {
+				choices = d.autocompleteTemplateChoices(query, "egg")
+			}
+		default:
+			if focused.Name == "type" {
+				choices = d.autocompleteRaidTypeChoices(i, query)
+			} else if focused.Name == "gym" {
+				choices = d.autocompleteGymChoices(i, query)
+			} else if focused.Name == "template" {
+				choices = d.autocompleteTemplateChoices(query, "raid")
+			}
 		}
 	case "maxbattle":
-		if focused.Name == "type" {
-			choices = d.autocompleteMaxbattleTypeChoices(query)
-		} else if focused.Name == "station" {
-			choices = d.autocompleteStationChoices(i, query)
-		} else if focused.Name == "template" {
-			choices = d.autocompleteTemplateChoices(query, "maxbattle")
+		if choices != nil {
+			break
+		}
+		switch slashSubcommand(data) {
+		case "boss":
+			if focused.Name == "pokemon" {
+				choices = d.autocompletePokemonChoices(query)
+			} else if focused.Name == "station" {
+				choices = d.autocompleteStationChoices(i, query)
+			} else if focused.Name == "template" {
+				choices = d.autocompleteTemplateChoices(query, "maxbattle")
+			}
+		case "level":
+			if focused.Name == "level" {
+				choices = d.autocompleteMaxbattleLevelChoices(i, query)
+			} else if focused.Name == "station" {
+				choices = d.autocompleteStationChoices(i, query)
+			} else if focused.Name == "template" {
+				choices = d.autocompleteTemplateChoices(query, "maxbattle")
+			}
+		default:
+			if focused.Name == "type" {
+				choices = d.autocompleteMaxbattleTypeChoices(i, query)
+			} else if focused.Name == "station" {
+				choices = d.autocompleteStationChoices(i, query)
+			} else if focused.Name == "template" {
+				choices = d.autocompleteTemplateChoices(query, "maxbattle")
+			}
 		}
 	case "quest":
-		if focused.Name == "type" {
-			choices = d.autocompleteQuestTypeChoices(query)
-		} else if focused.Name == "template" {
-			choices = d.autocompleteTemplateChoices(query, "quest")
+		if choices != nil {
+			break
+		}
+		switch slashSubcommand(data) {
+		case "pokemon":
+			if focused.Name == "pokemon" {
+				choices = d.autocompleteQuestPokemonChoices(i, query)
+			} else if focused.Name == "template" {
+				choices = d.autocompleteTemplateChoices(query, "quest")
+			}
+		case "item":
+			if focused.Name == "item" {
+				choices = d.autocompleteQuestItemRewardChoices(i, query)
+			} else if focused.Name == "template" {
+				choices = d.autocompleteTemplateChoices(query, "quest")
+			}
+		case "candy":
+			if focused.Name == "pokemon" {
+				choices = d.autocompleteQuestCandyRewardChoices(i, query)
+			} else if focused.Name == "template" {
+				choices = d.autocompleteTemplateChoices(query, "quest")
+			}
+		case "mega-energy":
+			if focused.Name == "pokemon" {
+				choices = d.autocompleteQuestMegaEnergyRewardChoices(i, query)
+			} else if focused.Name == "template" {
+				choices = d.autocompleteTemplateChoices(query, "quest")
+			}
+		case "stardust":
+			if focused.Name == "template" {
+				choices = d.autocompleteTemplateChoices(query, "quest")
+			}
+		default:
+			if focused.Name == "type" {
+				choices = d.autocompleteQuestTypeChoices(i, query)
+			} else if focused.Name == "template" {
+				choices = d.autocompleteTemplateChoices(query, "quest")
+			}
 		}
 	case "egg":
+		if choices != nil {
+			break
+		}
 		if focused.Name == "level" {
-			choices = d.autocompleteRaidLevelChoices(query)
+			choices = d.autocompleteRaidLevelChoices(i, query)
 		} else if focused.Name == "gym" {
 			choices = d.autocompleteGymChoices(i, query)
 		} else if focused.Name == "template" {
 			choices = d.autocompleteTemplateChoices(query, "egg")
 		}
 	case "invasion":
+		if choices != nil {
+			break
+		}
 		if focused.Name == "type" {
-			choices = d.autocompleteIncidentTypeChoices(query)
+			choices = d.autocompleteIncidentTypeChoices(i, query)
+		} else if focused.Name == "template" {
+			choices = d.autocompleteTemplateChoices(query, "invasion")
+		}
+	case "rocket":
+		if choices != nil {
+			break
+		}
+		if focused.Name == "type" {
+			choices = d.autocompleteRocketTypeChoices(i, query)
+		} else if focused.Name == "template" {
+			choices = d.autocompleteTemplateChoices(query, "invasion")
+		}
+	case "pokestop-event":
+		if choices != nil {
+			break
+		}
+		if focused.Name == "type" {
+			choices = d.autocompletePokestopEventChoices(i, query)
 		} else if focused.Name == "template" {
 			choices = d.autocompleteTemplateChoices(query, "invasion")
 		}
 	case "gym":
+		if choices != nil {
+			break
+		}
 		if focused.Name == "gym" {
 			choices = d.autocompleteGymChoices(i, query)
 		} else if focused.Name == "template" {
 			choices = d.autocompleteTemplateChoices(query, "gym")
 		}
 	case "fort":
+		if choices != nil {
+			break
+		}
 		if focused.Name == "template" {
 			choices = d.autocompleteTemplateChoices(query, "forts")
 		}
 	case "nest":
+		if choices != nil {
+			break
+		}
 		if focused.Name == "pokemon" {
 			choices = d.autocompletePokemonChoices(query)
 		} else if focused.Name == "template" {
 			choices = d.autocompleteTemplateChoices(query, "nests")
 		}
 	case "weather":
+		if choices != nil {
+			break
+		}
 		if focused.Name == "condition" {
 			choices = d.autocompleteWeatherChoices(query)
 		} else if focused.Name == "template" {
 			choices = d.autocompleteTemplateChoices(query, "weather")
 		}
 	case "lure":
+		if choices != nil {
+			break
+		}
 		if focused.Name == "template" {
 			choices = d.autocompleteTemplateChoices(query, "lure")
 		}
@@ -249,17 +442,20 @@ func (d *Discord) handleSlashAutocomplete(s *discordgo.Session, i *discordgo.Int
 		if focused.Name == "pokemon" {
 			choices = d.autocompleteInfoPokemonChoices(query)
 		}
-	case "remove":
-		if focused.Name == "profile" {
-			choices = d.autocompleteProfileChoices(i, query, true)
-		} else if focused.Name == "tracking" {
-			trackingType, _ := optionString(options, "type")
-			profileToken, _ := optionString(options, "profile")
-			choices = d.autocompleteRemoveTrackingChoices(query, trackingType, profileToken, i)
-		}
-	case "tracked":
-		if focused.Name == "profile" {
-			choices = d.autocompleteProfileChoices(i, query, true)
+	case "filters":
+		switch slashSubcommand(data) {
+		case "remove":
+			if focused.Name == "profile" {
+				choices = d.autocompleteProfileChoices(i, query, true)
+			} else if focused.Name == "tracking" {
+				trackingType, _ := optionString(options, "type")
+				profileToken, _ := optionString(options, "profile")
+				choices = d.autocompleteRemoveTrackingChoices(query, trackingType, profileToken, i)
+			}
+		case "show":
+			if focused.Name == "profile" {
+				choices = d.autocompleteProfileChoices(i, query, true)
+			}
 		}
 	case "help":
 		if focused.Name == "command" {
@@ -278,209 +474,24 @@ func (d *Discord) handleSlashAutocomplete(s *discordgo.Session, i *discordgo.Int
 
 func (d *Discord) handleSlashComponent(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	data := i.MessageComponentData()
-	if data.CustomID == slashInfoCancelButton {
-		d.respondEphemeral(s, i, "Canceled.")
+	customID := data.CustomID
+
+	if handler, ok := slashComponentExactHandlers[customID]; ok {
+		handler(d, s, i)
 		return
 	}
-	if data.CustomID == slashInfoTypeSelect {
-		if len(data.Values) == 0 {
+	for _, entry := range slashComponentPrefixHandlers {
+		if strings.HasPrefix(customID, entry.prefix) {
+			suffix := strings.TrimPrefix(customID, entry.prefix)
+			entry.handler(d, s, i, suffix)
 			return
 		}
-		d.handleSlashInfoTypeChoice(s, i, data.Values[0])
-		return
-	}
-	if data.CustomID == slashInfoWeatherUseSaved {
-		d.executeSlashLineDeferred(s, i, "info weather")
-		return
-	}
-	if data.CustomID == slashInfoWeatherEnterCoordinates {
-		d.respondWithModal(s, i, slashInfoWeatherModal, "Weather info", "Coordinates (lat,lon)", "51.5,-0.12")
-		return
-	}
-	if data.CustomID == slashAreaShowSelect {
-		if len(data.Values) == 0 {
-			return
-		}
-		d.handleAreaShowSelect(s, i, data.Values[0])
-		return
-	}
-	if data.CustomID == slashProfileSelect {
-		if len(data.Values) == 0 {
-			return
-		}
-		d.handleProfileSelect(s, i, data.Values[0])
-		return
-	}
-	if strings.HasPrefix(data.CustomID, slashAreaShowAdd) {
-		area := strings.TrimPrefix(data.CustomID, slashAreaShowAdd)
-		if strings.TrimSpace(area) != "" {
-			d.handleAreaShowToggle(s, i, area, true)
-		}
-		return
-	}
-	if strings.HasPrefix(data.CustomID, slashProfileSet) {
-		value := strings.TrimPrefix(data.CustomID, slashProfileSet)
-		if strings.TrimSpace(value) != "" {
-			d.handleProfileSet(s, i, value)
-		}
-		return
-	}
-	if data.CustomID == slashProfileScheduleAddGlobal {
-		d.handleProfileScheduleAddGlobal(s, i)
-		return
-	}
-	if strings.HasPrefix(data.CustomID, slashProfileScheduleAdd) {
-		value := strings.TrimPrefix(data.CustomID, slashProfileScheduleAdd)
-		if strings.TrimSpace(value) != "" {
-			d.handleProfileScheduleAdd(s, i, value)
-		}
-		return
-	}
-	if data.CustomID == slashProfileScheduleOverview {
-		d.handleProfileScheduleOverview(s, i)
-		return
-	}
-	if strings.HasPrefix(data.CustomID, slashProfileScheduleBack) {
-		d.handleProfileShow(s, i)
-		return
-	}
-	if strings.HasPrefix(data.CustomID, slashProfileScheduleClear) {
-		value := strings.TrimPrefix(data.CustomID, slashProfileScheduleClear)
-		if strings.TrimSpace(value) != "" {
-			d.handleProfileScheduleClear(s, i, value)
-		}
-		return
-	}
-	if strings.HasPrefix(data.CustomID, slashProfileScheduleRemoveGlobal) {
-		if len(data.Values) == 0 {
-			return
-		}
-		d.handleProfileScheduleRemoveGlobal(s, i, data.Values[0])
-		return
-	}
-	if strings.HasPrefix(data.CustomID, slashProfileScheduleRemove) {
-		if len(data.Values) == 0 {
-			return
-		}
-		value := strings.TrimPrefix(data.CustomID, slashProfileScheduleRemove)
-		if strings.TrimSpace(value) != "" {
-			d.handleProfileScheduleRemove(s, i, value, data.Values[0])
-		}
-		return
-	}
-	if data.CustomID == slashProfileScheduleToggle {
-		d.handleProfileScheduleToggle(s, i)
-		return
-	}
-	if data.CustomID == slashProfileLocation {
-		d.setSlashState(i.Member, i.User, &slashBuilderState{
-			Step:            "profile-location",
-			ExpiresAt:       time.Now().Add(5 * time.Minute),
-			OriginMessageID: i.Message.ID,
-			OriginChannelID: i.ChannelID,
-		})
-		d.respondWithModal(s, i, slashProfileLocationMod, "Set location", "Address or coordinates", "51.5,-0.12")
-		return
-	}
-	if data.CustomID == slashProfileLocationClear {
-		d.handleProfileLocationClear(s, i)
-		return
-	}
-	if data.CustomID == slashProfileArea {
-		d.handleProfileAreaShow(s, i)
-		return
-	}
-	if data.CustomID == slashProfileAreaBack {
-		d.handleProfileShow(s, i)
-		return
-	}
-	if data.CustomID == slashProfileBack {
-		d.handleProfileShow(s, i)
-		return
-	}
-	if strings.HasPrefix(data.CustomID, slashProfileDeleteConfirm) {
-		value := strings.TrimPrefix(data.CustomID, slashProfileDeleteConfirm)
-		if strings.TrimSpace(value) != "" {
-			d.handleProfileDeleteConfirm(s, i, value)
-		}
-		return
-	}
-	if strings.HasPrefix(data.CustomID, slashProfileDeleteCancel) {
-		value := strings.TrimPrefix(data.CustomID, slashProfileDeleteCancel)
-		d.handleProfileDeleteCancel(s, i, value)
-		return
-	}
-	if strings.HasPrefix(data.CustomID, slashProfileDelete) {
-		value := strings.TrimPrefix(data.CustomID, slashProfileDelete)
-		if strings.TrimSpace(value) != "" {
-			d.handleProfileDeletePrompt(s, i, value)
-		}
-		return
-	}
-	if strings.HasPrefix(data.CustomID, slashProfileScheduleEditGlobal) {
-		if len(data.Values) == 0 {
-			return
-		}
-		d.handleProfileScheduleEditSelect(s, i, data.Values[0])
-		return
-	}
-	if data.CustomID == slashProfileScheduleDayGlobal {
-		if len(data.Values) == 0 {
-			return
-		}
-		d.handleProfileScheduleDayGlobal(s, i, data.Values)
-		return
-	}
-	if strings.HasPrefix(data.CustomID, slashProfileScheduleDay) {
-		if len(data.Values) == 0 {
-			return
-		}
-		value := strings.TrimPrefix(data.CustomID, slashProfileScheduleDay)
-		if strings.TrimSpace(value) != "" {
-			d.handleProfileScheduleDay(s, i, value, data.Values[0])
-		}
-		return
-	}
-	if strings.HasPrefix(data.CustomID, slashProfileScheduleAssign) {
-		if len(data.Values) == 0 {
-			return
-		}
-		value := strings.TrimPrefix(data.CustomID, slashProfileScheduleAssign)
-		d.handleProfileScheduleAssign(s, i, value, data.Values[0])
-		return
-	}
-	if strings.HasPrefix(data.CustomID, slashProfileScheduleEditDay) {
-		if len(data.Values) == 0 {
-			return
-		}
-		value := strings.TrimPrefix(data.CustomID, slashProfileScheduleEditDay)
-		d.handleProfileScheduleEditDay(s, i, value, data.Values[0])
-		return
-	}
-	if strings.HasPrefix(data.CustomID, slashProfileScheduleEditAssign) {
-		if len(data.Values) == 0 {
-			return
-		}
-		value := strings.TrimPrefix(data.CustomID, slashProfileScheduleEditAssign)
-		d.handleProfileScheduleEditAssign(s, i, value, data.Values[0])
-		return
-	}
-	if strings.HasPrefix(data.CustomID, slashAreaShowRemove) {
-		area := strings.TrimPrefix(data.CustomID, slashAreaShowRemove)
-		if strings.TrimSpace(area) != "" {
-			d.handleAreaShowToggle(s, i, area, false)
-		}
-		return
-	}
-	if data.CustomID == slashProfileCreate {
-		d.respondWithModal(s, i, slashProfileCreateMod, "New profile", "Profile name", "home")
-		return
 	}
 
 	state := d.getSlashState(i.Member, i.User)
 	if state == nil || state.ExpiresAt.Before(time.Now()) {
 		d.clearSlashState(i.Member, i.User)
-		d.respondEphemeral(s, i, "Slash command expired. Please run the command again.")
+		d.respondEphemeralError(s, i, d.slashExpiredText(i))
 		return
 	}
 
@@ -590,44 +601,87 @@ func (d *Discord) handleSlashComponent(s *discordgo.Session, i *discordgo.Intera
 		d.respondWithFiltersPrompt(s, i, state)
 		return
 	case slashConfirmButton:
+		if state != nil && state.Step != "confirm" && slashTrackingTypeFromCommand(state.Command) != "" {
+			d.promptSlashConfirmationState(s, i, state, d.confirmTitle(i, state.Command), nil)
+			return
+		}
 		if state != nil && state.Command == "location" {
-			line := strings.TrimSpace(state.Command + " " + strings.Join(state.Args, " "))
-			_ = d.buildSlashReply(s, i, line)
-			embed, components, errText := d.buildProfilePayload(i, "")
-			if errText != "" {
-				d.respondEphemeral(s, i, errText)
-			} else {
-				d.respondUpdateComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, components)
+			d.clearSlashRenderMessage(i.Message)
+			userID, _ := slashUser(i)
+			if userID == "" || d.manager == nil || d.manager.query == nil {
+				d.respondEphemeralError(s, i, d.slashText(i, "Target is not registered."))
+				return
 			}
+			line := strings.TrimSpace(state.Command + " " + strings.Join(state.Args, " "))
+			result := d.buildSlashExecutionResult(s, i, line)
+			human, err := d.manager.query.SelectOneQuery("humans", map[string]any{"id": userID})
+			if err != nil {
+				d.respondEphemeralError(s, i, d.slashText(i, "Target is not registered."))
+				return
+			}
+			target := ""
+			if len(state.Args) > 0 {
+				target = state.Args[0]
+			}
+			refreshProfile, message := profileLocationOutcome(human, target, result)
+			if !refreshProfile {
+				d.respondEphemeral(s, i, message)
+				return
+			}
+			d.respondProfilePayload(s, i, "")
 			d.clearSlashState(i.Member, i.User)
 			return
 		}
-		// Clear the confirmation prompt buttons immediately, then send the command output as a follow-up.
-		d.respondUpdateComponentsEmbed(s, i, "Confirmed ✅", nil, []discordgo.MessageComponent{})
 		line := ""
 		if state != nil {
 			line = strings.TrimSpace(state.Command + " " + strings.Join(state.Args, " "))
 		}
-		reply := d.buildSlashReply(s, i, line)
-		if reply == "" {
-			reply = "Done."
+		trackingType := ""
+		table := ""
+		profileLabel := ""
+		beforeRows := []map[string]any(nil)
+		selection := slashProfileSelection{}
+		if state != nil {
+			trackingType = slashTrackingTypeFromCommand(state.Command)
+			if trackingType != "" {
+				if resolved, errText := d.slashProfileSelectionForState(i, state); errText == "" {
+					selection = resolved
+					beforeRows, table = d.slashTrackingRowsForSelection(selection, trackingType)
+					profileLabel = selection.TargetLabelLocalized(d.slashInteractionTranslator(i))
+					state.ProfileNo = selection.ProfileNo
+					state.ProfileLabel = profileLabel
+				}
+			}
 		}
-		d.followupEphemeralSlashReply(s, i, reply)
+		profileNo := 0
+		if state != nil {
+			profileNo = state.ProfileNo
+		}
+		result := d.buildSlashExecutionResultForProfile(s, i, line, profileNo)
+		if result.Success() && table != "" && selection.UserID != "" {
+			afterRows, _ := d.slashTrackingRowsForSelection(selection, trackingType)
+			changedRows := slashChangedRows(beforeRows, afterRows)
+			if embeds, components, ok := d.slashFilterMutationResponse(i, "added", trackingType, table, profileLabel, selection.UserID, changedRows); ok {
+				d.respondUpdateComponentsEmbed(s, i, "", embeds, components)
+				d.clearSlashState(i.Member, i.User)
+				return
+			}
+		}
+		// Clear the confirmation prompt buttons immediately, then send the command output as a follow-up.
+		text, embeds, components := slashConfirmCloseoutPayload(i)
+		d.respondUpdateComponentsEmbed(s, i, text, embeds, components)
+		d.followupEphemeralSlashReply(s, i, result.Reply)
 		d.clearSlashState(i.Member, i.User)
 		return
 	case slashCancelButton:
 		if state != nil && state.Command == "location" {
-			embed, components, errText := d.buildProfilePayload(i, "")
-			if errText != "" {
-				d.respondEphemeral(s, i, errText)
-			} else {
-				d.respondUpdateComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, components)
-			}
+			d.clearSlashRenderMessage(i.Message)
+			d.respondProfilePayload(s, i, "")
 			d.clearSlashState(i.Member, i.User)
 			return
 		}
 		// Clear the confirmation prompt buttons once canceled.
-		d.respondUpdateComponentsEmbed(s, i, "Canceled.", nil, []discordgo.MessageComponent{})
+		d.respondUpdateComponentsEmbed(s, i, d.slashText(i, "Canceled."), nil, []discordgo.MessageComponent{})
 		d.clearSlashState(i.Member, i.User)
 		return
 	case slashFiltersModal:
@@ -636,59 +690,44 @@ func (d *Discord) handleSlashComponent(s *discordgo.Session, i *discordgo.Intera
 	}
 }
 
+func slashConfirmCloseoutPayload(i *discordgo.InteractionCreate) (string, []*discordgo.MessageEmbed, []discordgo.MessageComponent) {
+	if i == nil || i.Message == nil {
+		return "", nil, []discordgo.MessageComponent{}
+	}
+	return i.Message.Content, i.Message.Embeds, []discordgo.MessageComponent{}
+}
+
 func (d *Discord) handleSlashModal(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	data := i.ModalSubmitData()
-	if data.CustomID == slashInfoTranslateModal {
-		query := strings.TrimSpace(modalTextValue(data, "query"))
-		if query == "" {
-			d.respondEphemeral(s, i, "Please enter text to translate.")
+	customID := data.CustomID
+
+	if handler, ok := slashModalExactHandlers[customID]; ok {
+		handler(d, s, i)
+		return
+	}
+	for _, entry := range slashModalPrefixHandlers {
+		if strings.HasPrefix(customID, entry.prefix) {
+			suffix := strings.TrimPrefix(customID, entry.prefix)
+			entry.handler(d, s, i, suffix)
 			return
 		}
-		d.executeSlashLineDeferred(s, i, "info translate "+query)
-		return
 	}
-	if data.CustomID == slashInfoWeatherModal {
-		query := strings.TrimSpace(modalTextValue(data, "query"))
-		if query == "" {
-			d.respondEphemeral(s, i, "Please enter coordinates (lat,lon).")
-			return
-		}
-		d.executeSlashLineDeferred(s, i, "info weather "+query)
-		return
-	}
-	if data.CustomID == slashProfileCreateMod {
-		d.handleProfileCreate(s, i, strings.TrimSpace(modalTextValue(data, "query")))
-		return
-	}
-	if data.CustomID == slashProfileLocationMod {
-		d.handleLocationInput(s, i, strings.TrimSpace(modalTextValue(data, "query")))
-		return
-	}
-	if strings.HasPrefix(data.CustomID, slashProfileScheduleTime) {
-		value := strings.TrimPrefix(data.CustomID, slashProfileScheduleTime)
-		d.handleProfileScheduleTime(s, i, value, data)
-		return
-	}
-	if strings.HasPrefix(data.CustomID, slashProfileScheduleEditTime) {
-		value := strings.TrimPrefix(data.CustomID, slashProfileScheduleEditTime)
-		d.handleProfileScheduleEditTime(s, i, value, data)
-		return
-	}
+
 	state := d.getSlashState(i.Member, i.User)
 	if state == nil || state.ExpiresAt.Before(time.Now()) {
 		d.clearSlashState(i.Member, i.User)
-		d.respondEphemeral(s, i, "Slash command expired. Please run the command again.")
+		d.respondEphemeralError(s, i, d.slashExpiredText(i))
 		return
 	}
 	switch data.CustomID {
 	case slashMonsterSearch:
 		query := modalTextValue(data, "query")
 		if strings.TrimSpace(query) == "" {
-			d.respondEphemeral(s, i, "Please enter a Pokemon name or ID.")
+			d.respondEphemeral(s, i, d.slashText(i, "Please enter a Pokemon name or ID."))
 			return
 		}
 		if state.Command == "info" && state.Step == "info-pokemon" && strings.EqualFold(strings.TrimSpace(query), "everything") {
-			d.respondEphemeral(s, i, "Please pick a specific Pokemon.")
+			d.respondEphemeral(s, i, d.slashText(i, "Please pick a specific Pokemon."))
 			return
 		}
 		if strings.EqualFold(strings.TrimSpace(query), "everything") {
@@ -698,14 +737,14 @@ func (d *Discord) handleSlashModal(s *discordgo.Session, i *discordgo.Interactio
 		}
 		options := d.monsterSearchOptions(query)
 		if len(options) == 0 {
-			d.respondEphemeral(s, i, "No Pokemon matched that search.")
+			d.respondEphemeralError(s, i, d.slashText(i, "No Pokemon matched that search."))
 			return
 		}
-		d.respondWithSelectMenu(s, i, "Select a Pokemon", slashMonsterSelect, options)
+		d.respondWithSelectMenu(s, i, d.slashText(i, "Select a Pokemon"), slashMonsterSelect, options)
 	case slashRaidInput:
 		query := strings.TrimSpace(modalTextValue(data, "query"))
 		if query == "" {
-			d.respondEphemeral(s, i, "Please enter a raid boss name or level.")
+			d.respondEphemeral(s, i, d.slashText(i, "Please enter a raid boss name or level."))
 			return
 		}
 		if strings.EqualFold(query, "everything") {
@@ -718,7 +757,7 @@ func (d *Discord) handleSlashModal(s *discordgo.Session, i *discordgo.Interactio
 	case slashQuestInput:
 		query := strings.TrimSpace(modalTextValue(data, "query"))
 		if query == "" {
-			d.respondEphemeral(s, i, "Please enter quest filters (e.g. reward:items).")
+			d.respondEphemeral(s, i, d.slashText(i, "Please enter quest filters (e.g. reward:items)."))
 			return
 		}
 		state.Args = splitQuotedArgs(query)
@@ -726,7 +765,7 @@ func (d *Discord) handleSlashModal(s *discordgo.Session, i *discordgo.Interactio
 	case slashInvasionInput:
 		query := strings.TrimSpace(modalTextValue(data, "query"))
 		if query == "" {
-			d.respondEphemeral(s, i, "Please enter invasion filters (e.g. grunt type).")
+			d.respondEphemeral(s, i, d.slashText(i, "Please enter invasion filters (e.g. grunt type)."))
 			return
 		}
 		state.Args = splitQuotedArgs(query)

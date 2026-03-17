@@ -7,6 +7,7 @@ import (
 	"poraclego/internal/config"
 	"poraclego/internal/data"
 	"poraclego/internal/i18n"
+	"poraclego/internal/util"
 )
 
 // MonsterRowText mirrors PoracleJS monster tracking formatting.
@@ -202,19 +203,7 @@ func formatMinValue(value int) string {
 	return fmt.Sprintf("%d", value)
 }
 
-func getString(value any) string {
-	switch v := value.(type) {
-	case string:
-		return v
-	case []byte:
-		return string(v)
-	default:
-		if value == nil {
-			return ""
-		}
-		return fmt.Sprintf("%v", v)
-	}
-}
+var getString = util.GetString
 
 func getMap(value any) map[string]any {
 	if m, ok := value.(map[string]any); ok {

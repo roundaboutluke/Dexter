@@ -1,43 +1,39 @@
 package bot
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
 )
 
 func (d *Discord) handleSlashRemove(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	tr := d.slashInteractionTranslator(i)
 	options := slashOptions(i.ApplicationCommandData())
 	trackType, ok := optionString(options, "type")
 	if !ok || strings.TrimSpace(trackType) == "" {
-		d.respondEphemeral(s, i, "Please pick a tracking type.")
+		d.respondEphemeral(s, i, translateOrDefault(tr, "Please pick a tracking type."))
 		return
 	}
 	value, ok := optionString(options, "tracking")
 	if !ok || strings.TrimSpace(value) == "" {
-		d.respondEphemeral(s, i, "Please pick a tracking entry.")
+		d.respondEphemeral(s, i, translateOrDefault(tr, "Please pick a tracking entry."))
 		return
 	}
 
 	trackingType, uid := parseRemoveSelection(trackType, value)
 	if trackingType == "" || uid == "" {
-		d.respondEphemeral(s, i, "That tracking entry could not be parsed.")
+		d.respondEphemeral(s, i, translateOrDefault(tr, "That tracking entry could not be parsed."))
 		return
 	}
 	if strings.Contains(value, "|") {
 		expected := strings.ToLower(strings.TrimSpace(trackType))
-		if expected == "incident" {
-			expected = "invasion"
-		}
 		if expected != "" && trackingType != expected {
-			d.respondEphemeral(s, i, "Tracking type changed; please clear the tracking selection and pick again.")
+			d.respondEphemeral(s, i, translateOrDefault(tr, "Tracking type changed; please clear the tracking selection and pick again."))
 			return
 		}
 	}
-	table := removeTrackingTable(trackingType)
-	if table == "" || d.manager == nil || d.manager.query == nil {
-		d.respondEphemeral(s, i, "That tracking entry could not be removed.")
+	if d.manager == nil || d.manager.query == nil {
+		d.respondEphemeral(s, i, translateOrDefault(tr, "That tracking entry could not be removed."))
 		return
 	}
 
@@ -47,37 +43,34 @@ func (d *Discord) handleSlashRemove(s *discordgo.Session, i *discordgo.Interacti
 		d.respondEphemeral(s, i, errText)
 		return
 	}
-	where := map[string]any{"id": selection.UserID}
-	if selection.Mode != slashProfileScopeAll && selection.ProfileNo > 0 {
-		where["profile_no"] = selection.ProfileNo
+	rows, table := d.slashTrackingRowsForSelection(selection, trackingType)
+	if table == "" {
+		d.respondEphemeral(s, i, translateOrDefault(tr, "That tracking entry could not be removed."))
+		return
 	}
+	targetRows := rows
 	if !strings.EqualFold(uid, "all") && !strings.EqualFold(uid, "everything") {
-		where["uid"] = parseUID(uid)
+		targetRows = slashFilterRowsByUID(rows, uid)
 	}
-	removed, err := d.manager.query.DeleteQuery(table, where)
+	removed, err := d.deleteSlashTrackingRows(table, targetRows)
 	if err != nil {
 		d.respondEphemeral(s, i, err.Error())
 		return
 	}
 	if removed == 0 {
-		target := selection.TargetLabel()
+		target := selection.TargetLabelLocalized(tr)
 		if strings.EqualFold(uid, "all") || strings.EqualFold(uid, "everything") {
-			d.respondEphemeral(s, i, fmt.Sprintf("No tracking entries found in %s.", target))
+			d.respondEphemeral(s, i, translateFormatOrDefault(tr, "No filters found in {0}.", target))
 			return
 		}
-		d.respondEphemeral(s, i, fmt.Sprintf("Tracking not found in %s.", target))
+		d.respondEphemeral(s, i, translateFormatOrDefault(tr, "Filter not found in {0}.", target))
 		return
-	}
-	// Keep slash removals in parity with text commands and legacy API deletes:
-	// monster alerts may still match from the fastMonsters cache until it is refreshed.
-	if d.manager != nil && d.manager.processor != nil {
-		d.manager.processor.RefreshAlertCacheAsync()
 	}
 	d.logSlashUX(i, "remove", "scope", selection.LogValue())
-	if strings.EqualFold(uid, "all") || strings.EqualFold(uid, "everything") {
-		target := selection.TargetLabel()
-		d.respondEphemeral(s, i, fmt.Sprintf("Removed %d tracking entries from %s. Next: use `/tracked` to review your alerts.", removed, target))
+	embeds, components, ok := d.slashFilterMutationResponse(i, "removed", trackingType, table, selection.TargetLabelLocalized(tr), selection.UserID, targetRows)
+	if !ok {
+		d.respondEphemeral(s, i, translateOrDefault(tr, "No filters were changed."))
 		return
 	}
-	d.respondEphemeral(s, i, fmt.Sprintf("Tracking removed from %s. Next: use `/tracked` to review your alerts.", selection.TargetLabel()))
+	d.respondEphemeralComponentsEmbed(s, i, "", embeds, components)
 }

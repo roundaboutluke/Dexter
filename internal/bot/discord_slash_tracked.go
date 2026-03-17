@@ -15,7 +15,7 @@ func (d *Discord) handleSlashTracked(s *discordgo.Session, i *discordgo.Interact
 	d.respondDeferredEphemeral(s, i)
 	reply := d.buildSlashTrackedReply(s, i)
 	if reply == "" {
-		reply = "Done."
+		reply = d.slashText(i, "Done.")
 	}
 	if d.sendSpecialSlashReply(s, i, reply) {
 		return
@@ -38,6 +38,14 @@ func (d *Discord) handleSlashHelp(s *discordgo.Session, i *discordgo.Interaction
 	options := slashOptions(i.ApplicationCommandData())
 	commandName, _ := optionString(options, "command")
 	commandName = strings.ToLower(strings.TrimSpace(commandName))
+	switch commandName {
+	case "pokemon":
+		commandName = "track"
+	case "rocket", "pokestop-event":
+		commandName = "invasion"
+	case "filters":
+		commandName = "tracked"
+	}
 	line := "help slash"
 	if commandName != "" {
 		line = "help " + commandName
@@ -45,13 +53,13 @@ func (d *Discord) handleSlashHelp(s *discordgo.Session, i *discordgo.Interaction
 	reply := d.buildSlashReply(s, i, line)
 	if strings.TrimSpace(reply) == "🙅" {
 		if commandName != "" {
-			reply = fmt.Sprintf("No dedicated help is available for `%s` yet. Try `/help`.", commandName)
+			reply = d.slashTextf(i, "No dedicated help is available for `{0}` yet. Try `/help`.", commandName)
 		} else {
 			reply = d.buildSlashReply(s, i, "help")
 		}
 	}
 	if reply == "" {
-		reply = "Done."
+		reply = d.slashText(i, "Done.")
 	}
 	if d.sendSpecialSlashReply(s, i, reply) {
 		return
@@ -60,6 +68,7 @@ func (d *Discord) handleSlashHelp(s *discordgo.Session, i *discordgo.Interaction
 }
 
 func (d *Discord) handleSlashInfo(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	tr := d.slashInteractionTranslator(i)
 	data := i.ApplicationCommandData()
 	options := slashOptions(data)
 
@@ -80,29 +89,30 @@ func (d *Discord) handleSlashInfo(s *discordgo.Session, i *discordgo.Interaction
 			return
 		}
 		if strings.EqualFold(pokemon, "everything") {
-			d.respondEphemeral(s, i, "Please pick a specific Pokemon (\"Everything\" is not supported here).")
+			d.respondEphemeral(s, i, tr.Translate("Please pick a specific Pokemon (`Everything` is not supported here).", false))
 			return
 		}
 		d.executeSlashLineDeferred(s, i, "info "+pokemon)
 	case "moves", "items", "rarity", "shiny":
 		d.executeSlashLineDeferred(s, i, "info "+infoType)
 	case "weather":
-		d.respondWithButtons(s, i, "Weather info: use your saved location or enter coordinates?", []discordgo.MessageComponent{
-			discordgo.Button{CustomID: slashInfoWeatherUseSaved, Label: "Use saved location", Style: discordgo.PrimaryButton},
-			discordgo.Button{CustomID: slashInfoWeatherEnterCoordinates, Label: "Enter coordinates", Style: discordgo.SecondaryButton},
-			discordgo.Button{CustomID: slashInfoCancelButton, Label: "Cancel", Style: discordgo.DangerButton},
+		d.respondWithButtons(s, i, tr.Translate("Weather info: use your saved location or enter coordinates?", false), []discordgo.MessageComponent{
+			discordgo.Button{CustomID: slashInfoWeatherUseSaved, Label: tr.Translate("Use saved location", false), Style: discordgo.PrimaryButton},
+			discordgo.Button{CustomID: slashInfoWeatherEnterCoordinates, Label: tr.Translate("Enter coordinates", false), Style: discordgo.SecondaryButton},
+			discordgo.Button{CustomID: slashInfoCancelButton, Label: tr.Translate("Cancel", false), Style: discordgo.DangerButton},
 		})
 	case "translate":
-		d.respondWithModal(s, i, slashInfoTranslateModal, "Translate", "Text", "Bonjour")
+		d.respondWithModal(s, i, slashInfoTranslateModal, tr.Translate("Translate", false), tr.Translate("Text", false), "Bonjour")
 	default:
 		d.executeSlashLineDeferred(s, i, "info")
 	}
 }
 
 func (d *Discord) handleSlashInfoTypeChoice(s *discordgo.Session, i *discordgo.InteractionCreate, value string) {
+	tr := d.slashInteractionTranslator(i)
 	infoType := strings.ToLower(strings.TrimSpace(value))
 	if infoType == "" {
-		d.respondEphemeral(s, i, "Please pick something to look up.")
+		d.respondEphemeral(s, i, tr.Translate("Please pick something to look up.", false))
 		return
 	}
 	d.logSlashUX(i, "info", "guide_choice", infoType)
@@ -113,13 +123,13 @@ func (d *Discord) handleSlashInfoTypeChoice(s *discordgo.Session, i *discordgo.I
 	case "moves", "items", "rarity", "shiny":
 		d.executeSlashLineDeferred(s, i, "info "+infoType)
 	case "weather":
-		d.respondWithButtons(s, i, "Weather info: use your saved location or enter coordinates?", []discordgo.MessageComponent{
-			discordgo.Button{CustomID: slashInfoWeatherUseSaved, Label: "Use saved location", Style: discordgo.PrimaryButton},
-			discordgo.Button{CustomID: slashInfoWeatherEnterCoordinates, Label: "Enter coordinates", Style: discordgo.SecondaryButton},
-			discordgo.Button{CustomID: slashInfoCancelButton, Label: "Cancel", Style: discordgo.DangerButton},
+		d.respondWithButtons(s, i, tr.Translate("Weather info: use your saved location or enter coordinates?", false), []discordgo.MessageComponent{
+			discordgo.Button{CustomID: slashInfoWeatherUseSaved, Label: tr.Translate("Use saved location", false), Style: discordgo.PrimaryButton},
+			discordgo.Button{CustomID: slashInfoWeatherEnterCoordinates, Label: tr.Translate("Enter coordinates", false), Style: discordgo.SecondaryButton},
+			discordgo.Button{CustomID: slashInfoCancelButton, Label: tr.Translate("Cancel", false), Style: discordgo.DangerButton},
 		})
 	case "translate":
-		d.respondWithModal(s, i, slashInfoTranslateModal, "Translate", "Text", "Bonjour")
+		d.respondWithModal(s, i, slashInfoTranslateModal, tr.Translate("Translate", false), tr.Translate("Text", false), "Bonjour")
 	default:
 		d.executeSlashLineDeferred(s, i, "info "+infoType)
 	}
@@ -234,9 +244,9 @@ func (d *Discord) buildSlashTrackedAllProfilesSummary(selection slashProfileSele
 		if len(counts) == 0 {
 			continue
 		}
-		label := profileDisplayName(row)
+		label := localizedProfileDisplayName(tr, row)
 		if profileNo == selection.EffectiveNo {
-			label += " (current)"
+			label += " (" + translateOrDefault(tr, "current") + ")"
 		}
 		parts := []string{}
 		for _, spec := range tracking.CountSpecs() {
@@ -250,28 +260,28 @@ func (d *Discord) buildSlashTrackedAllProfilesSummary(selection slashProfileSele
 		lines = append(lines, fmt.Sprintf("%s: %s", label, strings.Join(parts, ", ")))
 	}
 	if len(lines) == 0 {
-		return "You're not tracking anything in any profile."
+		return translateOrDefault(tr, "You're not tracking anything in any profile.")
 	}
-	header := "Tracking summary across all profiles."
+	header := translateOrDefault(tr, "Filter summary across all profiles.")
 	if row := profileRowByNo(selection.Profiles, selection.EffectiveNo); row != nil {
-		header = fmt.Sprintf("Tracking summary across all profiles. Current profile: %s.", profileDisplayName(row))
+		header = tr.TranslateFormat("Filter summary across all profiles. Current profile: {0}.", localizedProfileDisplayName(tr, row))
 	}
-	return header + "\n\n" + strings.Join(lines, "\n") + "\n\nUse `/tracked profile:<profile>` for full details."
+	return header + "\n\n" + strings.Join(lines, "\n") + "\n\n" + translateOrDefault(tr, "Use `/filters show profile:<profile>` for full details.")
 }
 
 func (d *Discord) buildSlashTrackedReply(s *discordgo.Session, i *discordgo.InteractionCreate) string {
 	if d == nil || d.manager == nil || d.manager.query == nil {
-		return "Target is not registered."
+		return d.slashText(i, "Target is not registered.")
 	}
 	ctx := d.buildSlashContext(s, i)
 	if ctx == nil {
-		return "Target is not registered."
+		return d.slashText(i, "Target is not registered.")
 	}
 	lang := d.userLanguage(ctx.UserID)
 	tr := d.slashTranslator(lang)
 	if ctx.Config != nil {
 		if disabled, ok := ctx.Config.GetStringSlice("general.disabledCommands"); ok && containsString(disabled, "tracked") {
-			return "That command is disabled."
+			return d.slashText(i, "That command is disabled.")
 		}
 	}
 	if !slashCommandAllowed(ctx, "tracked") {
@@ -290,7 +300,7 @@ func (d *Discord) buildSlashTrackedReply(s *discordgo.Session, i *discordgo.Inte
 		return d.buildSlashTrackedAllProfilesSummary(selection, tr)
 	}
 
-	lines := []string{fmt.Sprintf("Viewing tracking for %s.", selection.TargetLabel())}
+	lines := []string{tr.TranslateFormat("Viewing filters for {0}.", selection.TargetLabelLocalized(tr))}
 	alertStatus := map[bool]string{
 		true:  tr.Translate("enabled", false),
 		false: tr.Translate("disabled", false),
@@ -305,7 +315,7 @@ func (d *Discord) buildSlashTrackedReply(s *discordgo.Session, i *discordgo.Inte
 	}
 	if selection.Mode == slashProfileScopeSpecific && selection.ProfileNo != selection.EffectiveNo {
 		if row := profileRowByNo(selection.Profiles, selection.EffectiveNo); row != nil {
-			lines = append(lines, fmt.Sprintf("Current profile: %s.", profileDisplayName(row)))
+			lines = append(lines, tr.TranslateFormat("Current profile: {0}.", localizedProfileDisplayName(tr, row)))
 		}
 	}
 	sections := []string{strings.Join(lines, "\n"), d.slashTrackedAreaText(tr, selection.Human), d.slashTrackedCategoryDetails(selection.UserID, selection.ProfileNo, d.slashTrackedBlockedAlerts(selection.Human), tr)}
@@ -313,8 +323,8 @@ func (d *Discord) buildSlashTrackedReply(s *discordgo.Session, i *discordgo.Inte
 	if len(message) < 4000 {
 		return message
 	}
-	fileName := fmt.Sprintf("tracked-p%d.txt", selection.ProfileNo)
-	return command.FileReply(fileName, fmt.Sprintf("Tracking for %s is attached as a file:", selection.TargetLabel()), message)
+	fileName := fmt.Sprintf("filters-p%d.txt", selection.ProfileNo)
+	return command.FileReply(fileName, tr.TranslateFormat("Filters for {0} are attached as a file:", selection.TargetLabelLocalized(tr)), message)
 }
 
 func (d *Discord) handleSlashLanguage(s *discordgo.Session, i *discordgo.InteractionCreate) {

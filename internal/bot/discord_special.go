@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -15,6 +14,7 @@ import (
 	"poraclego/internal/command"
 	"poraclego/internal/i18n"
 	"poraclego/internal/uicons"
+	"poraclego/internal/util"
 )
 
 func (d *Discord) handlePoracleClean(s *discordgo.Session, m *discordgo.MessageCreate, ctx *command.Context) {
@@ -621,24 +621,4 @@ func fetchEmojiData(url string) (string, error) {
 	return fmt.Sprintf("data:%s;base64,%s", mime, encoded), nil
 }
 
-func toInt(value any, fallback int) int {
-	switch v := value.(type) {
-	case int:
-		return v
-	case int64:
-		return int(v)
-	case float64:
-		return int(v)
-	case float32:
-		return int(v)
-	case string:
-		if parsed, err := strconv.Atoi(strings.TrimSpace(v)); err == nil {
-			return parsed
-		}
-	case []byte:
-		if parsed, err := strconv.Atoi(strings.TrimSpace(string(v))); err == nil {
-			return parsed
-		}
-	}
-	return fallback
-}
+var toInt = util.ToInt

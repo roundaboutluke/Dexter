@@ -17,11 +17,29 @@ import (
 
 // Discord bot wrapper.
 type Discord struct {
-	manager *Manager
-	token   string
-	session *discordgo.Session
-	slashMu sync.Mutex
-	slash   map[string]*slashBuilderState
+	manager       *Manager
+	token         string
+	session       *discordgo.Session
+	slashMu       sync.RWMutex
+	slash         map[string]*slashBuilderState
+	filterMu      sync.Mutex
+	filterActions map[string]*slashFilterActionState
+	filterSeq     int64
+	mapMu         sync.Mutex
+	mapCache      map[string]slashMapCacheEntry
+	mapJobs       map[string]*slashMapJob
+	renderMu      sync.Mutex
+	renderState   map[string]*slashRenderState
+	renderSeq     int64
+	mapGenerator  slashMapGenerator
+
+	channelFetcher     func(*discordgo.Session, string) (*discordgo.Channel, error)
+	guildMemberFetcher func(*discordgo.Session, string, string) (*discordgo.Member, error)
+	guildMembersLoader func(*discordgo.Session, string) ([]*discordgo.Member, error)
+	commandFetcher     func(*discordgo.Session, string, string) ([]*discordgo.ApplicationCommand, error)
+	commandCreator     func(*discordgo.Session, string, string, *discordgo.ApplicationCommand) (*discordgo.ApplicationCommand, error)
+	commandEditor      func(*discordgo.Session, string, string, string, *discordgo.ApplicationCommand) (*discordgo.ApplicationCommand, error)
+	commandDeleter     func(*discordgo.Session, string, string, string) error
 
 	channelFetcher     func(*discordgo.Session, string) (*discordgo.Channel, error)
 	guildMemberFetcher func(*discordgo.Session, string, string) (*discordgo.Member, error)
@@ -35,9 +53,13 @@ type Discord struct {
 // NewDiscord constructs a Discord bot.
 func NewDiscord(manager *Manager, token string) *Discord {
 	return &Discord{
-		manager: manager,
-		token:   token,
-		slash:   map[string]*slashBuilderState{},
+		manager:       manager,
+		token:         token,
+		slash:         map[string]*slashBuilderState{},
+		filterActions: map[string]*slashFilterActionState{},
+		mapCache:      map[string]slashMapCacheEntry{},
+		mapJobs:       map[string]*slashMapJob{},
+		renderState:   map[string]*slashRenderState{},
 	}
 }
 

@@ -9,15 +9,16 @@ import (
 	"poraclego/internal/tracking"
 )
 
-func (d *Discord) autocompleteQuestTypeChoices(query string) []*discordgo.ApplicationCommandOptionChoice {
+func (d *Discord) autocompleteQuestTypeChoices(i *discordgo.InteractionCreate, query string) []*discordgo.ApplicationCommandOptionChoice {
 	if d.manager == nil || d.manager.data == nil {
 		return nil
 	}
 	query = strings.ToLower(strings.TrimSpace(query))
+	tr := d.slashInteractionTranslator(i)
 	choices := []*discordgo.ApplicationCommandOptionChoice{}
-	if query == "" || strings.Contains("everything", query) {
+	if query == "" || strings.Contains("everything", query) || strings.Contains(strings.ToLower(translateOrDefault(tr, "Everything")), query) {
 		choices = append(choices, &discordgo.ApplicationCommandOptionChoice{
-			Name:  "Everything",
+			Name:  translateOrDefault(tr, "Everything"),
 			Value: "everything",
 		})
 	}
@@ -36,11 +37,11 @@ func (d *Discord) autocompleteQuestTypeChoices(query string) []*discordgo.Applic
 	}
 
 	entries := []questChoice{}
-	addChoice(&entries, "Stardust", "stardust")
-	addChoice(&entries, "Rare Candy", "candy")
-	addChoice(&entries, "Rare Candy XL", "xl candy")
-	addChoice(&entries, "Mega Energy", "energy")
-	addChoice(&entries, "Experience", "experience")
+	addChoice(&entries, translateOrDefault(tr, "Stardust"), "stardust")
+	addChoice(&entries, translateOrDefault(tr, "Rare Candy"), "candy")
+	addChoice(&entries, translateOrDefault(tr, "Rare Candy XL"), "xl candy")
+	addChoice(&entries, translateOrDefault(tr, "Mega Energy"), "energy")
+	addChoice(&entries, translateOrDefault(tr, "Experience"), "experience")
 
 	itemEntries := d.questItemChoices()
 	sort.Slice(itemEntries, func(i, j int) bool { return itemEntries[i].label < itemEntries[j].label })
@@ -91,15 +92,130 @@ func (d *Discord) autocompleteQuestTypeChoices(query string) []*discordgo.Applic
 	return choices
 }
 
-func (d *Discord) autocompleteIncidentTypeChoices(query string) []*discordgo.ApplicationCommandOptionChoice {
+func questChoiceAutocomplete(entries []questChoice, query string) []*discordgo.ApplicationCommandOptionChoice {
+	query = strings.ToLower(strings.TrimSpace(query))
+	choices := []*discordgo.ApplicationCommandOptionChoice{}
+	for _, entry := range entries {
+		label := truncateChoiceLabel(entry.label)
+		value := strings.TrimSpace(entry.value)
+		if label == "" || value == "" {
+			continue
+		}
+		if query != "" && !strings.Contains(strings.ToLower(label), query) && !strings.Contains(strings.ToLower(value), query) {
+			continue
+		}
+		choices = append(choices, &discordgo.ApplicationCommandOptionChoice{
+			Name:  label,
+			Value: value,
+		})
+		if len(choices) >= 25 {
+			break
+		}
+	}
+	return choices
+}
+
+func (d *Discord) autocompleteQuestPokemonChoices(_ *discordgo.InteractionCreate, query string) []*discordgo.ApplicationCommandOptionChoice {
+	entries := d.questMonsterChoices()
+	sort.Slice(entries, func(i, j int) bool { return entries[i].label < entries[j].label })
+	return questChoiceAutocomplete(entries, query)
+}
+
+func (d *Discord) autocompleteQuestItemRewardChoices(_ *discordgo.InteractionCreate, query string) []*discordgo.ApplicationCommandOptionChoice {
+	entries := d.questItemChoices()
+	sort.Slice(entries, func(i, j int) bool { return entries[i].label < entries[j].label })
+	return questChoiceAutocomplete(entries, query)
+}
+
+func (d *Discord) autocompleteQuestCandyRewardChoices(_ *discordgo.InteractionCreate, query string) []*discordgo.ApplicationCommandOptionChoice {
+	entries := d.questCandyMonsterChoices()
+	sort.Slice(entries, func(i, j int) bool { return entries[i].label < entries[j].label })
+	return questChoiceAutocomplete(entries, query)
+}
+
+func (d *Discord) autocompleteQuestMegaEnergyRewardChoices(_ *discordgo.InteractionCreate, query string) []*discordgo.ApplicationCommandOptionChoice {
+	entries := d.questMegaEnergyChoices()
+	sort.Slice(entries, func(i, j int) bool { return entries[i].label < entries[j].label })
+	return questChoiceAutocomplete(entries, query)
+}
+
+func (d *Discord) isPokestopEventType(value string) bool {
+	if d == nil || d.manager == nil || d.manager.data == nil || d.manager.data.UtilData == nil {
+		return false
+	}
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" {
+		return false
+	}
+	raw, ok := d.manager.data.UtilData["pokestopEvent"].(map[string]any)
+	if !ok {
+		return false
+	}
+	for _, item := range raw {
+		entry, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		name := strings.ToLower(strings.TrimSpace(getStringValue(entry["name"])))
+		if name == value {
+			return true
+		}
+	}
+	return false
+}
+
+func (d *Discord) autocompleteRocketTypeChoices(i *discordgo.InteractionCreate, query string) []*discordgo.ApplicationCommandOptionChoice {
+	allChoices := d.autocompleteIncidentTypeChoices(i, query)
+	choices := []*discordgo.ApplicationCommandOptionChoice{}
+	for _, choice := range allChoices {
+		if choice == nil {
+			continue
+		}
+		value := strings.TrimSpace(fmt.Sprintf("%v", choice.Value))
+		if value == "" {
+			continue
+		}
+		if strings.EqualFold(value, "everything") || !d.isPokestopEventType(value) {
+			choices = append(choices, choice)
+		}
+		if len(choices) >= 25 {
+			break
+		}
+	}
+	return choices
+}
+
+func (d *Discord) autocompletePokestopEventChoices(i *discordgo.InteractionCreate, query string) []*discordgo.ApplicationCommandOptionChoice {
+	allChoices := d.autocompleteIncidentTypeChoices(i, query)
+	choices := []*discordgo.ApplicationCommandOptionChoice{}
+	for _, choice := range allChoices {
+		if choice == nil {
+			continue
+		}
+		value := strings.TrimSpace(fmt.Sprintf("%v", choice.Value))
+		if value == "" {
+			continue
+		}
+		if strings.EqualFold(value, "everything") || d.isPokestopEventType(value) {
+			choices = append(choices, choice)
+		}
+		if len(choices) >= 25 {
+			break
+		}
+	}
+	return choices
+}
+
+func (d *Discord) autocompleteIncidentTypeChoices(i *discordgo.InteractionCreate, query string) []*discordgo.ApplicationCommandOptionChoice {
 	if d.manager == nil || d.manager.data == nil {
 		return nil
 	}
 	query = strings.ToLower(strings.TrimSpace(query))
+	tr := d.slashInteractionTranslator(i)
 	choices := []*discordgo.ApplicationCommandOptionChoice{}
-	if query == "" || strings.Contains("everything", query) {
+	if query == "" || strings.Contains("everything", query) || strings.Contains(strings.ToLower(translateOrDefault(tr, "Everything")), query) {
 		choices = append(choices, &discordgo.ApplicationCommandOptionChoice{
-			Name:  "Everything",
+			Name:  translateOrDefault(tr, "Everything"),
 			Value: "everything",
 		})
 	}
@@ -283,6 +399,7 @@ func (d *Discord) autocompleteProfileChoices(i *discordgo.InteractionCreate, que
 	}
 	query = strings.ToLower(strings.TrimSpace(query))
 	effectiveNo := effectiveProfileNoFromHuman(human)
+	tr := d.slashTranslator(d.resolvedHumanLanguage(human))
 	choices := []*discordgo.ApplicationCommandOptionChoice{}
 	addChoice := func(label, value string, aliases ...string) {
 		if len(choices) >= 25 || label == "" || value == "" {
@@ -298,9 +415,9 @@ func (d *Discord) autocompleteProfileChoices(i *discordgo.InteractionCreate, que
 		})
 	}
 	if row := profileRowByNo(profiles, effectiveNo); row != nil {
-		addChoice("Current profile: "+profileDisplayName(row), "effective", "current", "effective", fmt.Sprintf("p%d", effectiveNo))
+		addChoice(tr.TranslateFormat("Current profile: {0}", localizedProfileDisplayName(tr, row)), "effective", "current", "effective", fmt.Sprintf("p%d", effectiveNo))
 	} else {
-		addChoice(fmt.Sprintf("Current profile: Profile %d", effectiveNo), "effective", "current", "effective", fmt.Sprintf("p%d", effectiveNo))
+		addChoice(tr.TranslateFormat("Current profile: {0}", localizedProfileLabel(tr, effectiveNo)), "effective", "current", "effective", fmt.Sprintf("p%d", effectiveNo))
 	}
 	for _, row := range profiles {
 		profileNo := toInt(row["profile_no"], 0)
@@ -310,7 +427,7 @@ func (d *Discord) autocompleteProfileChoices(i *discordgo.InteractionCreate, que
 		addChoice(profileDisplayName(row), fmt.Sprintf("%d", profileNo), fmt.Sprintf("profile %d", profileNo), fmt.Sprintf("p%d", profileNo), fmt.Sprintf("%v", row["name"]))
 	}
 	if includeAll {
-		addChoice("All profiles", "all", "all", "every", "summary")
+		addChoice(translateOrDefault(tr, "All profiles"), "all", "all", "every", "summary")
 	}
 	return choices
 }
@@ -319,6 +436,14 @@ func (d *Discord) autocompleteHelpCommandChoices(query string) []*discordgo.Appl
 	query = strings.ToLower(strings.TrimSpace(query))
 	ids := []string{}
 	seen := map[string]bool{}
+	addID := func(id string) {
+		id = strings.TrimSpace(id)
+		if id == "" || seen[id] {
+			return
+		}
+		seen[id] = true
+		ids = append(ids, id)
+	}
 	if d != nil && d.manager != nil {
 		for _, tpl := range d.manager.templates {
 			if tpl.Type != "help" {
@@ -328,15 +453,24 @@ func (d *Discord) autocompleteHelpCommandChoices(query string) []*discordgo.Appl
 				continue
 			}
 			id := strings.TrimSpace(fmt.Sprintf("%v", tpl.ID))
-			if id == "" || strings.EqualFold(id, "slash") || seen[id] {
+			if id == "" || strings.EqualFold(id, "slash") {
 				continue
 			}
-			seen[id] = true
-			ids = append(ids, id)
+			switch strings.ToLower(id) {
+			case "track":
+				addID("pokemon")
+			case "invasion":
+				addID("rocket")
+				addID("pokestop-event")
+			case "tracked", "remove":
+				addID("filters")
+			default:
+				addID(id)
+			}
 		}
 	}
 	if len(ids) == 0 {
-		ids = []string{"track", "raid", "quest", "invasion", "tracked", "remove", "profile", "info"}
+		ids = []string{"pokemon", "raid", "quest", "rocket", "pokestop-event", "filters", "profile", "info"}
 	}
 	sort.Strings(ids)
 	choices := []*discordgo.ApplicationCommandOptionChoice{}
@@ -380,22 +514,6 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType, profile
 		fetchLimit = 5000
 	}
 
-	truncateChoiceLabel := func(value string) string {
-		const max = 100 // Discord limit for choice name
-		value = strings.TrimSpace(value)
-		if value == "" {
-			return value
-		}
-		r := []rune(value)
-		if len(r) <= max {
-			return value
-		}
-		if max <= 3 {
-			return string(r[:max])
-		}
-		return string(r[:max-3]) + "..."
-	}
-
 	appendChoice := func(label, value string) {
 		if label == "" || value == "" {
 			return
@@ -431,15 +549,16 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType, profile
 
 	removeAllLabel := func(typeName string) string {
 		if selection.Mode == slashProfileScopeAll {
-			return fmt.Sprintf("Everything in all profiles (%s)", typeName)
+			return tr.TranslateFormat("Everything in all profiles ({0})", typeName)
 		}
-		return fmt.Sprintf("Everything in %s (%s)", selection.TargetLabel(), typeName)
+		return tr.TranslateFormat("Everything in {0} ({1})", selection.TargetLabelLocalized(tr), typeName)
 	}
+	removeAllType := translateOrDefault(tr, "remove all")
 
 	switch strings.ToLower(trackingType) {
 	case "pokemon":
 		if query == "" {
-			appendChoice(removeAllLabel("remove all"), "pokemon|all")
+			appendChoice(removeAllLabel(removeAllType), "pokemon|all")
 		}
 		rows, err := d.manager.query.SelectAllQueryLimit("monsters", whereByUser(), fetchLimit)
 		if err != nil {
@@ -458,7 +577,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType, profile
 		}
 	case "raid":
 		if query == "" {
-			appendChoice(removeAllLabel("remove all"), "raid|all")
+			appendChoice(removeAllLabel(removeAllType), "raid|all")
 		}
 		rows, err := d.manager.query.SelectAllQueryLimit("raid", whereByUser(), fetchLimit)
 		if err != nil {
@@ -477,7 +596,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType, profile
 		}
 	case "egg":
 		if query == "" {
-			appendChoice(removeAllLabel("remove all"), "egg|all")
+			appendChoice(removeAllLabel(removeAllType), "egg|all")
 		}
 		rows, err := d.manager.query.SelectAllQueryLimit("egg", whereByUser(), fetchLimit)
 		if err != nil {
@@ -496,7 +615,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType, profile
 		}
 	case "maxbattle":
 		if query == "" {
-			appendChoice(removeAllLabel("remove all"), "maxbattle|all")
+			appendChoice(removeAllLabel(removeAllType), "maxbattle|all")
 		}
 		rows, err := d.manager.query.SelectAllQueryLimit("maxbattle", whereByUser(), fetchLimit)
 		if err != nil {
@@ -515,7 +634,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType, profile
 		}
 	case "quest":
 		if query == "" {
-			appendChoice(removeAllLabel("remove all"), "quest|all")
+			appendChoice(removeAllLabel(removeAllType), "quest|all")
 		}
 		rows, err := d.manager.query.SelectAllQueryLimit("quest", whereByUser(), fetchLimit)
 		if err != nil {
@@ -532,28 +651,29 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType, profile
 				break
 			}
 		}
-	case "incident", "invasion":
+	case "incident", "invasion", "rocket", "pokestop-event":
 		if query == "" {
-			appendChoice(removeAllLabel("remove all"), "invasion|all")
+			appendChoice(removeAllLabel(removeAllType), strings.ToLower(trackingType)+"|all")
 		}
 		rows, err := d.manager.query.SelectAllQueryLimit("invasion", whereByUser(), fetchLimit)
 		if err != nil {
 			return nil
 		}
+		rows = d.filterRowsByTrackingType(rows, trackingType)
 		for _, row := range rows {
 			uid := strings.TrimSpace(fmt.Sprintf("%v", row["uid"]))
 			if uid == "" {
 				continue
 			}
 			label := labelWithProfile(row, tracking.InvasionRowText(d.manager.cfg, tr, d.manager.data, row))
-			appendChoice(label, "invasion|"+uid)
+			appendChoice(label, strings.ToLower(trackingType)+"|"+uid)
 			if len(choices) >= 25 {
 				break
 			}
 		}
 	case "lure":
 		if query == "" {
-			appendChoice(removeAllLabel("remove all"), "lure|all")
+			appendChoice(removeAllLabel(removeAllType), "lure|all")
 		}
 		rows, err := d.manager.query.SelectAllQueryLimit("lures", whereByUser(), fetchLimit)
 		if err != nil {
@@ -572,7 +692,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType, profile
 		}
 	case "weather":
 		if query == "" {
-			appendChoice(removeAllLabel("remove all"), "weather|all")
+			appendChoice(removeAllLabel(removeAllType), "weather|all")
 		}
 		rows, err := d.manager.query.SelectAllQueryLimit("weather", whereByUser(), fetchLimit)
 		if err != nil {
@@ -591,7 +711,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType, profile
 		}
 	case "gym":
 		if query == "" {
-			appendChoice(removeAllLabel("remove all"), "gym|all")
+			appendChoice(removeAllLabel(removeAllType), "gym|all")
 		}
 		rows, err := d.manager.query.SelectAllQueryLimit("gym", whereByUser(), fetchLimit)
 		if err != nil {
@@ -610,7 +730,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType, profile
 		}
 	case "nest":
 		if query == "" {
-			appendChoice(removeAllLabel("remove all"), "nest|all")
+			appendChoice(removeAllLabel(removeAllType), "nest|all")
 		}
 		rows, err := d.manager.query.SelectAllQueryLimit("nests", whereByUser(), fetchLimit)
 		if err != nil {
@@ -629,7 +749,7 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType, profile
 		}
 	case "fort":
 		if query == "" {
-			appendChoice(removeAllLabel("remove all"), "fort|all")
+			appendChoice(removeAllLabel(removeAllType), "fort|all")
 		}
 		rows, err := d.manager.query.SelectAllQueryLimit("forts", whereByUser(), fetchLimit)
 		if err != nil {

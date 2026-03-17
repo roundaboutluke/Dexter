@@ -3,8 +3,9 @@ package command
 import (
 	"fmt"
 	"regexp"
-	"strconv"
 	"strings"
+
+	"poraclego/internal/util"
 )
 
 type Target struct {
@@ -181,20 +182,4 @@ func boolToInt(value bool) int {
 	return 0
 }
 
-func toInt(value any, fallback int) int {
-	switch v := value.(type) {
-	case int:
-		return v
-	case int64:
-		return int(v)
-	case float64:
-		return int(v)
-	case float32:
-		return int(v)
-	case string:
-		if parsed, err := strconv.Atoi(v); err == nil {
-			return parsed
-		}
-	}
-	return fallback
-}
+var toInt = util.ToInt

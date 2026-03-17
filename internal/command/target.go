@@ -25,7 +25,7 @@ func loadTargetRow(ctx *Context, t Target) (map[string]any, int, string, error) 
 		return row, 1, t.ID, err
 	}
 	currentProfileNo := toInt(row["current_profile_no"], 1)
-	profileNo := resolveCommandProfileNo(row, currentProfileNo)
+	profileNo := resolveCommandProfileNo(ctx, row, currentProfileNo)
 	targetID := t.ID
 	if idVal, ok := row["id"]; ok {
 		targetID = fmt.Sprintf("%v", idVal)
@@ -38,7 +38,10 @@ func loadTargetRow(ctx *Context, t Target) (map[string]any, int, string, error) 
 	return row, profileNo, targetID, nil
 }
 
-func resolveCommandProfileNo(row map[string]any, currentProfileNo int) int {
+func resolveCommandProfileNo(ctx *Context, row map[string]any, currentProfileNo int) int {
+	if ctx != nil && ctx.ProfileOverride > 0 {
+		return ctx.ProfileOverride
+	}
 	if currentProfileNo > 0 {
 		return currentProfileNo
 	}
@@ -242,15 +245,7 @@ func buildTarget(ctx *Context, args []string) TargetResult {
 		}
 	}
 
-	return TargetResult{
-		CanContinue:  false,
-		Target:       tgt,
-		Language:     ctx.Language,
-		ProfileNo:    1,
-		IsRegistered: false,
-		TargetID:     targetID,
-		Message:      unregisteredMessage(ctx, tr),
-	}
+	return TargetResult{CanContinue: false, Message: unregisteredMessage(ctx, tr)}
 }
 
 func unregisteredMessage(ctx *Context, tr *i18n.Translator) string {
