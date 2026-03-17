@@ -402,7 +402,7 @@ func suffixFlag(enabled bool, suffix string) []string {
 
 var (
 	cachedClients   = map[string]*Client{}
-	cachedClientsMu sync.Mutex
+	cachedClientsMu sync.RWMutex
 )
 
 // CachedClient returns a shared Client for the given base URL and image type.
@@ -415,13 +415,24 @@ func CachedClient(baseURL, imageType string) *Client {
 		imageType = "png"
 	}
 	key := baseURL + "|" + imageType
-	cachedClientsMu.Lock()
+
+	// Fast path: read lock for cache hits.
+	cachedClientsMu.RLock()
 	client, ok := cachedClients[key]
-	if !ok {
-		client = NewClient(baseURL, imageType)
-		cachedClients[key] = client
+	cachedClientsMu.RUnlock()
+	if ok {
+		return client
 	}
-	cachedClientsMu.Unlock()
+
+	// Slow path: write lock for cache misses.
+	cachedClientsMu.Lock()
+	defer cachedClientsMu.Unlock()
+	// Double-check under write lock.
+	if client, ok := cachedClients[key]; ok {
+		return client
+	}
+	client = NewClient(baseURL, imageType)
+	cachedClients[key] = client
 	return client
 }
 

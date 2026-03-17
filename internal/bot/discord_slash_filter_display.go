@@ -115,7 +115,8 @@ func (d *Discord) slashFilterIconURL(trackingType string, rows []map[string]any)
 	case "lure":
 		lureID := toInt(row["lure_id"], 0)
 		if lureID > 0 {
-			url, _ := client.RewardItemIcon(lureID)
+			// Use PokestopIcon for lures, matching PoracleJS and plaudagei convention.
+			url, _ := client.PokestopIcon(lureID, false, 0, false)
 			return url
 		}
 		return ""
@@ -598,7 +599,8 @@ func (d *Discord) slashPreviewIconURL(commandLine string) string {
 			return url
 		}
 	case "weather":
-		// Weather command line: "weather <location> | <condition>"
+		// Weather command line format: "weather <location> | <condition>"
+		// This pipe-separated format is constructed in handleSlashWeather().
 		// Find the condition after the "|" separator.
 		pipeIdx := -1
 		for idx, p := range parts {

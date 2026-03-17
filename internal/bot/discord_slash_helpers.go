@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
+	"poraclego/internal/util"
 )
 
 func (d *Discord) titleCase(input string) string {
@@ -127,32 +128,12 @@ func truncateChoiceLabel(label string) string {
 	return string(runes[:maxRunes-3]) + "..."
 }
 
-func getStringValue(value any) string {
-	if value == nil {
-		return ""
-	}
-	switch v := value.(type) {
-	case string:
-		return v
-	default:
-		return fmt.Sprintf("%v", v)
-	}
-}
+// getStringValue delegates to util.GetString for converting arbitrary values to string.
+var getStringValue = util.GetString
 
+// toIntValue converts an arbitrary value to int (zero fallback).
 func toIntValue(value any) int {
-	switch v := value.(type) {
-	case int:
-		return v
-	case int64:
-		return int(v)
-	case float64:
-		return int(v)
-	case string:
-		if parsed, err := strconv.Atoi(v); err == nil {
-			return parsed
-		}
-	}
-	return 0
+	return util.ToInt(value, 0)
 }
 
 func (d *Discord) invasionEncounterNames(grunt map[string]any) []string {

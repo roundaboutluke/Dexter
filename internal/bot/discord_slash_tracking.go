@@ -143,7 +143,7 @@ func (d *Discord) handleSlashRaidEgg(s *discordgo.Session, i *discordgo.Interact
 	}
 	level, ok := optionString(options, "level")
 	if !ok || strings.TrimSpace(level) == "" {
-		d.respondEphemeral(s, i, d.slashText(i, "Please enter a raid boss name or level."))
+		d.respondEphemeral(s, i, d.slashText(i, "Please select an egg level."))
 		return
 	}
 	args := []string{normalizeRaidType(strings.TrimSpace(level))}

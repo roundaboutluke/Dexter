@@ -1810,3 +1810,69 @@ func writeTestLocale(t *testing.T, locale string, entries map[string]string) str
 	}
 	return root
 }
+
+func TestPrefixedQuestArg(t *testing.T) {
+	tests := []struct {
+		prefix, value, want string
+	}{
+		{"energy", "charizard", "energy:charizard"},
+		{"energy", "energy:charizard", "energy:charizard"},       // idempotent
+		{"energy", "Energy:Charizard", "Energy:Charizard"},       // case-insensitive prefix check
+		{"candy", "pikachu", "candy:pikachu"},
+		{"candy", "candy:pikachu", "candy:pikachu"},
+		{"xlcandy", "xlcandy:bulbasaur", "xlcandy:bulbasaur"},
+		{"energy", "", "energy"},
+		{"energy", "  ", "energy"},
+		{"candy", "mr mime", `candy:"mr mime"`}, // spaces get quoted
+	}
+	for _, tt := range tests {
+		got := prefixedQuestArg(tt.prefix, tt.value)
+		if got != tt.want {
+			t.Errorf("prefixedQuestArg(%q, %q) = %q, want %q", tt.prefix, tt.value, got, tt.want)
+		}
+	}
+}
+
+func TestSlashGymTeamID(t *testing.T) {
+	tests := []struct {
+		name string
+		want int
+	}{
+		{"mystic", 1},
+		{"blue", 1},
+		{"valor", 2},
+		{"valour", 2},
+		{"red", 2},
+		{"instinct", 3},
+		{"yellow", 3},
+		{"uncontested", 0},
+		{"harmony", 0},
+		{"everything", 4},
+		{"unknown", -1},
+	}
+	for _, tt := range tests {
+		got := slashGymTeamID(tt.name)
+		if got != tt.want {
+			t.Errorf("slashGymTeamID(%q) = %d, want %d", tt.name, got, tt.want)
+		}
+	}
+}
+
+func TestStripTrailingTrackArgs(t *testing.T) {
+	tests := []struct {
+		input, want string
+	}{
+		{"sunny", "sunny"},
+		{"sunny clean", "sunny"},
+		{"sunny template:weather1", "sunny"},
+		{"sunny clean template:foo", "sunny"},
+		{"partly cloudy", "partly cloudy"},
+		{"", ""},
+	}
+	for _, tt := range tests {
+		got := stripTrailingTrackArgs(tt.input)
+		if got != tt.want {
+			t.Errorf("stripTrailingTrackArgs(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}

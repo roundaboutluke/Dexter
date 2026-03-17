@@ -18,8 +18,8 @@ const (
 	slashFilterRemoveButtonPrefix  = "poracle:filter:remove:"
 	slashFilterRestoreButtonPrefix = "poracle:filter:restore:"
 
-	slashFilterCardColorConfirm  = 0x57F287
-	slashFilterCardColorAdded    = 0x57F287
+	slashFilterCardColorConfirm  = 0x57F287 // Green: pre-save confirmation prompt
+	slashFilterCardColorAdded    = 0x57F287 // Green: post-save success (intentionally same as confirm)
 	slashFilterCardColorRemoved  = 0xED4245
 	slashFilterCardColorRestored = 0x5865F2
 
@@ -502,7 +502,7 @@ func (d *Discord) slashFilterMutationEmbed(i *discordgo.InteractionCreate, actio
 		}
 	}
 	embed := &discordgo.MessageEmbed{
-		Title:       translateOrDefault(tr,slashFilterMutationTitleKey(action, len(rows))),
+		Title:       translateOrDefault(tr, slashFilterMutationTitleKey(action, len(rows))),
 		Description: slashCardDescription(headline, "", detailLines, ""),
 		Color:       slashFilterCardColor(action),
 	}
