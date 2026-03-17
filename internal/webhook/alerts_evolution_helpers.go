@@ -8,12 +8,13 @@ import (
 )
 
 func applyPokemonEvolutions(p *Processor, data map[string]any, pokemonID, formID int, platform string, tr *i18n.Translator) {
-	if p == nil || p.data == nil || data == nil || pokemonID <= 0 {
+	d := p.getData()
+	if d == nil || data == nil || pokemonID <= 0 {
 		return
 	}
-	monster := lookupMonster(p.data, fmt.Sprintf("%d_%d", pokemonID, formID))
+	monster := lookupMonster(d, fmt.Sprintf("%d_%d", pokemonID, formID))
 	if monster == nil && formID != 0 {
-		monster = lookupMonster(p.data, fmt.Sprintf("%d_0", pokemonID))
+		monster = lookupMonster(d, fmt.Sprintf("%d_0", pokemonID))
 	}
 	if monster == nil {
 		return
@@ -47,6 +48,7 @@ func collectPokemonEvolutions(p *Processor, monster map[string]any, totalCount *
 		return
 	}
 
+	d := p.getData()
 	switch raw := monster["evolutions"].(type) {
 	case []any:
 		for _, entry := range raw {
@@ -59,9 +61,9 @@ func collectPokemonEvolutions(p *Processor, monster map[string]any, totalCount *
 			if evoID <= 0 {
 				continue
 			}
-			next := lookupMonster(p.data, fmt.Sprintf("%d_%d", evoID, formID))
+			next := lookupMonster(d, fmt.Sprintf("%d_%d", evoID, formID))
 			if next == nil && formID != 0 {
-				next = lookupMonster(p.data, fmt.Sprintf("%d_0", evoID))
+				next = lookupMonster(d, fmt.Sprintf("%d_0", evoID))
 			}
 			if next == nil {
 				continue

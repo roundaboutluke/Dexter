@@ -7,13 +7,12 @@ import (
 )
 
 func TestInvasionTrackTypeKeepsMetalForMatching(t *testing.T) {
-	p := &Processor{
-		data: &data.GameData{
-			Grunts: map[string]any{
-				"1": map[string]any{"type": "Metal"},
-			},
+	p := &Processor{}
+	p.data.Store(&data.GameData{
+		Grunts: map[string]any{
+			"1": map[string]any{"type": "Metal"},
 		},
-	}
+	})
 
 	hook := &Hook{
 		Type: "invasion",

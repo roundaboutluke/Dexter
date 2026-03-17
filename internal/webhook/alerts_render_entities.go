@@ -77,12 +77,13 @@ func applyPokemonRenderData(ctx *renderDataContext) {
 		ctx.data["generationNameEng"] = name
 		ctx.data["generationRoman"] = roman
 	}
-	monster := lookupMonster(ctx.p.data, fmt.Sprintf("%d_%d", ctx.data["pokemonId"].(int), formID))
+	d := ctx.p.getData()
+	monster := lookupMonster(d, fmt.Sprintf("%d_%d", ctx.data["pokemonId"].(int), formID))
 	if monster == nil && formID != 0 {
-		monster = lookupMonster(ctx.p.data, fmt.Sprintf("%d_0", ctx.data["pokemonId"].(int)))
+		monster = lookupMonster(d, fmt.Sprintf("%d_0", ctx.data["pokemonId"].(int)))
 	}
 	if monster == nil {
-		monster = lookupMonster(ctx.p.data, fmt.Sprintf("%d", ctx.data["pokemonId"].(int)))
+		monster = lookupMonster(d, fmt.Sprintf("%d", ctx.data["pokemonId"].(int)))
 	}
 	if monster != nil {
 		if stats, ok := monster["stats"].(map[string]any); ok {
@@ -93,12 +94,12 @@ func applyPokemonRenderData(ctx *renderDataContext) {
 	displayID := getInt(ctx.hook.Message["display_pokemon_id"])
 	if displayID > 0 && displayID != ctx.data["pokemonId"].(int) {
 		displayForm := getInt(ctx.hook.Message["display_form"])
-		displayMonster := lookupMonster(ctx.p.data, fmt.Sprintf("%d_%d", displayID, displayForm))
+		displayMonster := lookupMonster(d, fmt.Sprintf("%d_%d", displayID, displayForm))
 		if displayMonster == nil && displayForm != 0 {
-			displayMonster = lookupMonster(ctx.p.data, fmt.Sprintf("%d_0", displayID))
+			displayMonster = lookupMonster(d, fmt.Sprintf("%d_0", displayID))
 		}
 		if displayMonster == nil {
-			displayMonster = lookupMonster(ctx.p.data, fmt.Sprintf("%d", displayID))
+			displayMonster = lookupMonster(d, fmt.Sprintf("%d", displayID))
 		}
 		if displayMonster != nil {
 			if name := getString(displayMonster["name"]); name != "" {
@@ -229,12 +230,13 @@ func applyRaidEggMaxBattleRenderData(ctx *renderDataContext) {
 		ctx.data["generationRoman"] = roman
 		ctx.data["generationName"] = translateMaybe(ctx.tr, name)
 	}
-	monster := lookupMonster(ctx.p.data, fmt.Sprintf("%d_%d", pokemonID, formID))
+	d2 := ctx.p.getData()
+	monster := lookupMonster(d2, fmt.Sprintf("%d_%d", pokemonID, formID))
 	if monster == nil && formID != 0 {
-		monster = lookupMonster(ctx.p.data, fmt.Sprintf("%d_0", pokemonID))
+		monster = lookupMonster(d2, fmt.Sprintf("%d_0", pokemonID))
 	}
 	if monster == nil {
-		monster = lookupMonster(ctx.p.data, fmt.Sprintf("%d", pokemonID))
+		monster = lookupMonster(d2, fmt.Sprintf("%d", pokemonID))
 	}
 	if monster != nil {
 		if stats, ok := monster["stats"].(map[string]any); ok {

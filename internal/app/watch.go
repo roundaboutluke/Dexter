@@ -80,6 +80,7 @@ func (a *App) watchGeofence(ctx context.Context, root string, interval time.Dura
 					a.fences.Replace(store.Fences)
 				}
 				if a.processor != nil {
+					a.processor.UpdateFences(store)
 					a.processor.RefreshAlertCacheAsync()
 				}
 				logf("Geofence reloaded")

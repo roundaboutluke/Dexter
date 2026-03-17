@@ -169,10 +169,14 @@ func isEventInvasion(hook *Hook, displayTypeID int) bool {
 }
 
 func pokestopEventInfo(p *Processor, displayTypeID int) (string, string, string) {
-	if p == nil || p.data == nil || p.data.UtilData == nil {
+	if p == nil {
 		return "", "", ""
 	}
-	raw, ok := p.data.UtilData["pokestopEvent"].(map[string]any)
+	d := p.getData()
+	if d == nil || d.UtilData == nil {
+		return "", "", ""
+	}
+	raw, ok := d.UtilData["pokestopEvent"].(map[string]any)
 	if !ok {
 		return "", "", ""
 	}
@@ -184,10 +188,14 @@ func pokestopEventInfo(p *Processor, displayTypeID int) (string, string, string)
 }
 
 func typeStyle(p *Processor, typeName string) (int, string) {
-	if p == nil || p.data == nil || p.data.UtilData == nil {
+	if p == nil {
 		return 0, ""
 	}
-	types, ok := p.data.UtilData["types"].(map[string]any)
+	d := p.getData()
+	if d == nil || d.UtilData == nil {
+		return 0, ""
+	}
+	types, ok := d.UtilData["types"].(map[string]any)
 	if !ok {
 		return 0, ""
 	}
@@ -210,7 +218,11 @@ func lookupEmoji(p *Processor, key string) string {
 }
 
 func lookupEmojiForPlatform(p *Processor, key string, platform string) string {
-	if p == nil || p.data == nil || p.data.UtilData == nil || key == "" {
+	if p == nil || key == "" {
+		return ""
+	}
+	d := p.getData()
+	if d == nil || d.UtilData == nil {
 		return ""
 	}
 	if platform == "" && p.customEmoji != nil && len(p.customEmoji) == 1 {
@@ -231,7 +243,7 @@ func lookupEmojiForPlatform(p *Processor, key string, platform string) string {
 			}
 		}
 	}
-	raw, ok := p.data.UtilData["emojis"].(map[string]any)
+	raw, ok := d.UtilData["emojis"].(map[string]any)
 	if !ok {
 		return ""
 	}
@@ -242,10 +254,14 @@ func lookupEmojiForPlatform(p *Processor, key string, platform string) string {
 }
 
 func genderDataEng(p *Processor, gender int) map[string]any {
-	if p == nil || p.data == nil || p.data.UtilData == nil {
+	if p == nil {
 		return nil
 	}
-	raw, ok := p.data.UtilData["genders"].(map[string]any)
+	d := p.getData()
+	if d == nil || d.UtilData == nil {
+		return nil
+	}
+	raw, ok := d.UtilData["genders"].(map[string]any)
 	if !ok {
 		return nil
 	}
@@ -273,7 +289,7 @@ func gruntTypeColor(gruntType any) int {
 
 func gruntRewardsList(p *Processor, gruntType any, tr *i18n.Translator) map[string]any {
 	out := map[string]any{}
-	if p == nil || p.data == nil {
+	if p == nil || p.getData() == nil {
 		return out
 	}
 	grunt := findGrunt(p, gruntType)
@@ -302,11 +318,15 @@ func gruntRewardsList(p *Processor, gruntType any, tr *i18n.Translator) map[stri
 }
 
 func findGrunt(p *Processor, gruntType any) map[string]any {
-	if p == nil || p.data == nil {
+	if p == nil {
+		return nil
+	}
+	d := p.getData()
+	if d == nil {
 		return nil
 	}
 	needle := strings.ToLower(fmt.Sprintf("%v", gruntType))
-	for _, raw := range p.data.Grunts {
+	for _, raw := range d.Grunts {
 		if m, ok := raw.(map[string]any); ok {
 			if typ, ok := m["type"].(string); ok && strings.ToLower(typ) == needle {
 				return m
@@ -317,10 +337,14 @@ func findGrunt(p *Processor, gruntType any) map[string]any {
 }
 
 func findGruntByID(p *Processor, gruntTypeID int) map[string]any {
-	if p == nil || p.data == nil || gruntTypeID <= 0 {
+	if p == nil || gruntTypeID <= 0 {
 		return nil
 	}
-	raw, ok := p.data.Grunts[strconv.Itoa(gruntTypeID)]
+	d := p.getData()
+	if d == nil {
+		return nil
+	}
+	raw, ok := d.Grunts[strconv.Itoa(gruntTypeID)]
 	if !ok {
 		return nil
 	}
@@ -333,7 +357,7 @@ func findGruntByID(p *Processor, gruntTypeID int) map[string]any {
 
 func gruntRewardsDetails(p *Processor, grunt map[string]any, tr *i18n.Translator) (string, map[string]any) {
 	out := map[string]any{}
-	if p == nil || p.data == nil || grunt == nil {
+	if p == nil || p.getData() == nil || grunt == nil {
 		return "", out
 	}
 	encounters, ok := grunt["encounters"].(map[string]any)
@@ -503,10 +527,14 @@ func lureTypeInfo(lureID int) (string, int) {
 }
 
 func lureTypeDetails(p *Processor, lureID int) (string, string, int) {
-	if p == nil || p.data == nil || p.data.UtilData == nil {
+	if p == nil {
 		return "", "", 0
 	}
-	raw, ok := p.data.UtilData["lures"].(map[string]any)
+	d := p.getData()
+	if d == nil || d.UtilData == nil {
+		return "", "", 0
+	}
+	raw, ok := d.UtilData["lures"].(map[string]any)
 	if !ok {
 		return "", "", 0
 	}
@@ -526,15 +554,19 @@ func lureTypeDetails(p *Processor, lureID int) (string, string, int) {
 }
 
 func monsterTypes(p *Processor, pokemonID, formID int) []int {
-	if p == nil || p.data == nil {
+	if p == nil {
 		return nil
 	}
-	monster := lookupMonster(p.data, fmt.Sprintf("%d_%d", pokemonID, formID))
+	d := p.getData()
+	if d == nil {
+		return nil
+	}
+	monster := lookupMonster(d, fmt.Sprintf("%d_%d", pokemonID, formID))
 	if monster == nil && formID != 0 {
-		monster = lookupMonster(p.data, fmt.Sprintf("%d_0", pokemonID))
+		monster = lookupMonster(d, fmt.Sprintf("%d_0", pokemonID))
 	}
 	if monster == nil {
-		monster = lookupMonster(p.data, fmt.Sprintf("%d", pokemonID))
+		monster = lookupMonster(d, fmt.Sprintf("%d", pokemonID))
 	}
 	if monster == nil {
 		return nil
@@ -553,15 +585,16 @@ func monsterTypes(p *Processor, pokemonID, formID int) []int {
 }
 
 func monsterTypeNames(p *Processor, pokemonID, formID int) []string {
-	if p == nil || p.data == nil {
+	d := p.getData()
+	if d == nil {
 		return nil
 	}
-	monster := lookupMonster(p.data, fmt.Sprintf("%d_%d", pokemonID, formID))
+	monster := lookupMonster(d, fmt.Sprintf("%d_%d", pokemonID, formID))
 	if monster == nil && formID != 0 {
-		monster = lookupMonster(p.data, fmt.Sprintf("%d_0", pokemonID))
+		monster = lookupMonster(d, fmt.Sprintf("%d_0", pokemonID))
 	}
 	if monster == nil {
-		monster = lookupMonster(p.data, fmt.Sprintf("%d", pokemonID))
+		monster = lookupMonster(d, fmt.Sprintf("%d", pokemonID))
 	}
 	if monster == nil {
 		return nil

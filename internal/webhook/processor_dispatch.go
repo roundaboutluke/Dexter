@@ -180,18 +180,7 @@ func buildCleanTTH(hook *Hook) dispatch.TimeToHide {
 	} else {
 		expire = hookExpiryUnix(hook)
 	}
-	if expire <= 0 {
-		return dispatch.TimeToHide{Hours: 1}
-	}
-	remaining := time.Until(time.Unix(expire, 0))
-	if remaining < 0 {
-		remaining = 0
-	}
-	total := int(remaining.Seconds())
-	h := total / 3600
-	m := (total % 3600) / 60
-	s := total % 60
-	return dispatch.TimeToHide{Hours: h, Minutes: m, Seconds: s}
+	return buildTTHFromUnix(expire)
 }
 
 func updateKeyForRaid(hook *Hook) string {

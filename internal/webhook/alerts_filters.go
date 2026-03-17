@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"poraclego/internal/alertstate"
 	"poraclego/internal/config"
 	"poraclego/internal/geofence"
 )
@@ -34,18 +35,17 @@ func (p *Processor) loadHumansForRows(rows []map[string]any) (map[string]map[str
 
 	profileRows, err := p.query.SelectWhereInQuery("profiles", ids, "id")
 	if err != nil {
+		if logger := p.webhooksLogger(); logger != nil {
+			logger.Warnf("failed to load profiles: %v", err)
+		}
 		return humans, nil, nil
 	}
 	profiles := map[string]map[string]any{}
 	for _, row := range profileRows {
-		key := profileKey(getString(row["id"]), numberFromAnyOrDefault(row["profile_no"], 1))
+		key := alertstate.ProfileKey(getString(row["id"]), numberFromAnyOrDefault(row["profile_no"], 1))
 		profiles[key] = row
 	}
 	return humans, profiles, nil
-}
-
-func profileKey(id string, profileNo int) string {
-	return fmt.Sprintf("%s:%d", id, profileNo)
 }
 
 func resolveLocation(human, profile map[string]any) locationInfo {
@@ -309,20 +309,20 @@ func bearingEmojiKey(brng float64) string {
 	switch {
 	case brng < 22.5:
 		return "north"
-	case brng < 45+22.5:
-		return "northwest"
-	case brng < 90+22.5:
-		return "west"
-	case brng < 135+22.5:
-		return "southwest"
-	case brng < 180+22.5:
-		return "south"
-	case brng < 225+22.5:
-		return "southeast"
-	case brng < 270+22.5:
-		return "east"
-	case brng < 315+22.5:
+	case brng < 67.5:
 		return "northeast"
+	case brng < 112.5:
+		return "east"
+	case brng < 157.5:
+		return "southeast"
+	case brng < 202.5:
+		return "south"
+	case brng < 247.5:
+		return "southwest"
+	case brng < 292.5:
+		return "west"
+	case brng < 337.5:
+		return "northwest"
 	default:
 		return "north"
 	}
@@ -420,9 +420,10 @@ func selectTemplatePayload(p *Processor, target alertTarget, hook *Hook) any {
 	if p == nil {
 		return nil
 	}
+	templates := p.getTemplates()
 	for _, templateType := range templateTypeCandidates(hook) {
 		// 1) Exact id match with language preference.
-		for _, tpl := range p.templates {
+		for _, tpl := range templates {
 			if tpl.Hidden || tpl.Platform != target.Platform || tpl.Type != templateType {
 				continue
 			}
@@ -437,7 +438,7 @@ func selectTemplatePayload(p *Processor, target alertTarget, hook *Hook) any {
 			}
 		}
 		// 2) Default template for this type/platform/language.
-		for _, tpl := range p.templates {
+		for _, tpl := range templates {
 			if tpl.Hidden || tpl.Platform != target.Platform || tpl.Type != templateType {
 				continue
 			}
@@ -449,7 +450,7 @@ func selectTemplatePayload(p *Processor, target alertTarget, hook *Hook) any {
 			}
 		}
 		// 3) Any default template for this type/platform.
-		for _, tpl := range p.templates {
+		for _, tpl := range templates {
 			if tpl.Hidden || tpl.Platform != target.Platform || tpl.Type != templateType {
 				continue
 			}
@@ -458,7 +459,7 @@ func selectTemplatePayload(p *Processor, target alertTarget, hook *Hook) any {
 			}
 		}
 		// 4) Last-resort first matching template for this type/platform.
-		for _, tpl := range p.templates {
+		for _, tpl := range templates {
 			if tpl.Hidden || tpl.Platform != target.Platform || tpl.Type != templateType {
 				continue
 			}
@@ -467,7 +468,7 @@ func selectTemplatePayload(p *Processor, target alertTarget, hook *Hook) any {
 			}
 			return tpl.Template
 		}
-		for _, tpl := range p.templates {
+		for _, tpl := range templates {
 			if tpl.Hidden || tpl.Platform != target.Platform || tpl.Type != templateType {
 				continue
 			}

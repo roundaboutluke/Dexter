@@ -64,7 +64,7 @@ func (p *Processor) matchTargets(hook *Hook) ([]alertMatch, error) {
 		profiles     map[string]map[string]any
 		hasSchedules map[string]bool
 	)
-	fenceStore := p.fences
+	fenceStore := p.getFences()
 	snapshot := p.currentAlertState()
 	if snapshot != nil {
 		rows = snapshot.Rows(table)
@@ -185,7 +185,7 @@ func (p *Processor) matchTargets(hook *Hook) ([]alertMatch, error) {
 		}
 		if hook.Type == "quest" && p.questDigests != nil && hasSchedule && !scheduleDisabled && rowProfileNo > 0 {
 			if currentProfile == 0 || rowProfileNo != currentProfile {
-				profile := profiles[profileKey(id, rowProfileNo)]
+				profile := profiles[alertstate.ProfileKey(id, rowProfileNo)]
 				location := resolveLocation(human, profile)
 				if passesLocationFilter(fenceStore, p.cfg, location, hook, matchRow) {
 					lang := getString(human["language"])
@@ -248,7 +248,7 @@ func (p *Processor) matchTargets(hook *Hook) ([]alertMatch, error) {
 		if profileNo != currentProfile {
 			continue
 		}
-		profile := profiles[profileKey(id, profileNo)]
+		profile := profiles[alertstate.ProfileKey(id, profileNo)]
 		location := resolveLocation(human, profile)
 		if !passesLocationFilter(fenceStore, p.cfg, location, hook, matchRow) {
 			continue

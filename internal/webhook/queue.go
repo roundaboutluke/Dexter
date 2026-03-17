@@ -31,6 +31,9 @@ func (q *Queue) Len() int {
 func (q *Queue) Drain() []any {
 	q.mu.Lock()
 	defer q.mu.Unlock()
+	if len(q.items) == 0 {
+		return nil
+	}
 	out := make([]any, len(q.items))
 	copy(out, q.items)
 	q.items = q.items[:0]

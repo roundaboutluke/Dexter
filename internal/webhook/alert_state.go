@@ -61,7 +61,7 @@ func (p *Processor) reloadAlertState() error {
 	p.alertStateRefreshMu.Unlock()
 	if loader == nil {
 		loader = func() (*alertstate.Snapshot, error) {
-			return alertstate.Load(p.query, p.fences)
+			return alertstate.Load(p.query, p.getFences())
 		}
 	}
 	snapshot, err := loader()

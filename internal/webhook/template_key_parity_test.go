@@ -94,18 +94,18 @@ func TestFormatPayloadFortUpdateUsesTemplateWhenTemplateIDMismatched(t *testing.
 		t.Fatalf("unable to decode template fixture: %v", err)
 	}
 
-	p := &Processor{
-		templates: []dts.Template{
-			{
-				ID:       "standard",
-				Type:     "fort-update",
-				Language: ptrString("en"),
-				Default:  true,
-				Platform: "discord",
-				Template: template,
-			},
+	p := &Processor{}
+	tpls := []dts.Template{
+		{
+			ID:       "standard",
+			Type:     "fort-update",
+			Language: ptrString("en"),
+			Default:  true,
+			Platform: "discord",
+			Template: template,
 		},
 	}
+	p.templates.Store(&tpls)
 	hook := &Hook{
 		Type: "fort_update",
 		Message: map[string]any{
@@ -143,18 +143,18 @@ func TestFormatPayloadFortUpdateUsesTemplateWhenTemplateIDMismatched(t *testing.
 }
 
 func TestSelectTemplatePayloadFallsBackToFirstMatchingTemplate(t *testing.T) {
-	p := &Processor{
-		templates: []dts.Template{
-			{
-				ID:       "standard",
-				Type:     "fort-update",
-				Language: ptrString("en"),
-				Default:  false,
-				Platform: "discord",
-				Template: map[string]any{"content": "fort template"},
-			},
+	p := &Processor{}
+	tpls := []dts.Template{
+		{
+			ID:       "standard",
+			Type:     "fort-update",
+			Language: ptrString("en"),
+			Default:  false,
+			Platform: "discord",
+			Template: map[string]any{"content": "fort template"},
 		},
 	}
+	p.templates.Store(&tpls)
 	hook := &Hook{Type: "fort_update", Message: map[string]any{}}
 	target := alertTarget{Platform: "discord", Language: "en", Template: "1"}
 
@@ -165,18 +165,18 @@ func TestSelectTemplatePayloadFallsBackToFirstMatchingTemplate(t *testing.T) {
 }
 
 func TestSelectTemplatePayloadFortUpdateSupportsLegacyFortType(t *testing.T) {
-	p := &Processor{
-		templates: []dts.Template{
-			{
-				ID:       "legacy",
-				Type:     "fort",
-				Language: ptrString("en"),
-				Default:  true,
-				Platform: "discord",
-				Template: map[string]any{"content": "legacy fort template"},
-			},
+	p := &Processor{}
+	tpls := []dts.Template{
+		{
+			ID:       "legacy",
+			Type:     "fort",
+			Language: ptrString("en"),
+			Default:  true,
+			Platform: "discord",
+			Template: map[string]any{"content": "legacy fort template"},
 		},
 	}
+	p.templates.Store(&tpls)
 	hook := &Hook{Type: "fort_update", Message: map[string]any{}}
 	target := alertTarget{Platform: "discord", Language: "en", Template: "1"}
 
@@ -187,18 +187,18 @@ func TestSelectTemplatePayloadFortUpdateSupportsLegacyFortType(t *testing.T) {
 }
 
 func TestSelectTemplatePayloadTemplateIDCaseInsensitive(t *testing.T) {
-	p := &Processor{
-		templates: []dts.Template{
-			{
-				ID:       "standard",
-				Type:     "fort-update",
-				Language: ptrString("en"),
-				Default:  false,
-				Platform: "discord",
-				Template: map[string]any{"content": "case-insensitive id"},
-			},
+	p := &Processor{}
+	tpls := []dts.Template{
+		{
+			ID:       "standard",
+			Type:     "fort-update",
+			Language: ptrString("en"),
+			Default:  false,
+			Platform: "discord",
+			Template: map[string]any{"content": "case-insensitive id"},
 		},
 	}
+	p.templates.Store(&tpls)
 	hook := &Hook{Type: "fort_update", Message: map[string]any{}}
 	target := alertTarget{Platform: "discord", Language: "en", Template: "STANDARD"}
 
@@ -246,15 +246,14 @@ func TestWeatherOmitsActivePokemonsWhenAlteredPokemonDisabled(t *testing.T) {
 }
 
 func TestRaidAddsGymNameTeamIDAndEvolutionName(t *testing.T) {
-	p := &Processor{
-		data: &data.GameData{
-			UtilData: map[string]any{
-				"evolution": map[string]any{
-					"1": map[string]any{"name": "Mega"},
-				},
+	p := &Processor{}
+	p.data.Store(&data.GameData{
+		UtilData: map[string]any{
+			"evolution": map[string]any{
+				"1": map[string]any{"name": "Mega"},
 			},
 		},
-	}
+	})
 	hook := &Hook{
 		Type: "raid",
 		Message: map[string]any{

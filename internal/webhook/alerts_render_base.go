@@ -44,8 +44,8 @@ func applyBaseRenderData(p *Processor, hook *Hook, match alertMatch, data map[st
 	matchedAreas := []map[string]any{}
 	matched := []string{}
 	areasDisplay := []string{}
-	if p != nil && p.fences != nil {
-		for _, fence := range p.fences.MatchedAreas([]float64{lat, lon}) {
+	if fences := p.getFences(); fences != nil {
+		for _, fence := range fences.MatchedAreas([]float64{lat, lon}) {
 			display := true
 			if fence.DisplayInMatch != nil {
 				display = *fence.DisplayInMatch

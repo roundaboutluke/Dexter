@@ -61,10 +61,14 @@ func ivColor(value any) int {
 }
 
 func moveName(p *Processor, moveID int) string {
-	if moveID == 0 || p == nil || p.data == nil {
+	if moveID == 0 || p == nil {
 		return ""
 	}
-	raw, ok := p.data.Moves[fmt.Sprintf("%d", moveID)]
+	d := p.getData()
+	if d == nil {
+		return ""
+	}
+	raw, ok := d.Moves[fmt.Sprintf("%d", moveID)]
 	if !ok {
 		return ""
 	}
@@ -77,10 +81,14 @@ func moveName(p *Processor, moveID int) string {
 }
 
 func moveEmoji(p *Processor, moveID int, platform string, tr *i18n.Translator) string {
-	if moveID == 0 || p == nil || p.data == nil {
+	if moveID == 0 || p == nil {
 		return ""
 	}
-	raw, ok := p.data.Moves[fmt.Sprintf("%d", moveID)]
+	d := p.getData()
+	if d == nil {
+		return ""
+	}
+	raw, ok := d.Moves[fmt.Sprintf("%d", moveID)]
 	if !ok {
 		return ""
 	}
@@ -208,10 +216,14 @@ func normalizeCampfireMarker(marker string) string {
 }
 
 func weatherInfo(p *Processor, weatherID int, platform string, tr *i18n.Translator) (string, string) {
-	if p == nil || p.data == nil || p.data.UtilData == nil {
+	if p == nil {
 		return "", ""
 	}
-	weatherRaw, ok := p.data.UtilData["weather"].(map[string]any)
+	d := p.getData()
+	if d == nil || d.UtilData == nil {
+		return "", ""
+	}
+	weatherRaw, ok := d.UtilData["weather"].(map[string]any)
 	if !ok {
 		return "", ""
 	}
@@ -232,10 +244,14 @@ func weatherInfo(p *Processor, weatherID int, platform string, tr *i18n.Translat
 }
 
 func weatherEntry(p *Processor, weatherID int) (string, string) {
-	if p == nil || p.data == nil || p.data.UtilData == nil {
+	if p == nil {
 		return "", ""
 	}
-	weatherRaw, ok := p.data.UtilData["weather"].(map[string]any)
+	d := p.getData()
+	if d == nil || d.UtilData == nil {
+		return "", ""
+	}
+	weatherRaw, ok := d.UtilData["weather"].(map[string]any)
 	if !ok {
 		return "", ""
 	}
@@ -249,18 +265,21 @@ func weatherEntry(p *Processor, weatherID int) (string, string) {
 func teamDetails(p *Processor, teamID int) (string, string, int) {
 	name, color := teamInfo(teamID)
 	emojiKey := ""
-	if p != nil && p.data != nil && p.data.UtilData != nil {
-		if teams, ok := p.data.UtilData["teams"].(map[string]any); ok {
-			if entry, ok := teams[strconv.Itoa(teamID)].(map[string]any); ok {
-				if entryName := getString(entry["name"]); entryName != "" {
-					name = entryName
-				}
-				if entryEmoji := getString(entry["emoji"]); entryEmoji != "" {
-					emojiKey = entryEmoji
-				}
-				if entryColor := getString(entry["color"]); entryColor != "" {
-					if parsed, err := strconv.ParseInt(strings.TrimPrefix(entryColor, "#"), 16, 32); err == nil {
-						color = int(parsed)
+	if p != nil {
+		d := p.getData()
+		if d != nil && d.UtilData != nil {
+			if teams, ok := d.UtilData["teams"].(map[string]any); ok {
+				if entry, ok := teams[strconv.Itoa(teamID)].(map[string]any); ok {
+					if entryName := getString(entry["name"]); entryName != "" {
+						name = entryName
+					}
+					if entryEmoji := getString(entry["emoji"]); entryEmoji != "" {
+						emojiKey = entryEmoji
+					}
+					if entryColor := getString(entry["color"]); entryColor != "" {
+						if parsed, err := strconv.ParseInt(strings.TrimPrefix(entryColor, "#"), 16, 32); err == nil {
+							color = int(parsed)
+						}
 					}
 				}
 			}
@@ -270,10 +289,14 @@ func teamDetails(p *Processor, teamID int) (string, string, int) {
 }
 
 func raidLevelName(p *Processor, level int) string {
-	if p == nil || p.data == nil || p.data.UtilData == nil {
+	if p == nil {
 		return fmt.Sprintf("Level %d", level)
 	}
-	raw, ok := p.data.UtilData["raidLevels"].(map[string]any)
+	d := p.getData()
+	if d == nil || d.UtilData == nil {
+		return fmt.Sprintf("Level %d", level)
+	}
+	raw, ok := d.UtilData["raidLevels"].(map[string]any)
 	if !ok {
 		return fmt.Sprintf("Level %d", level)
 	}
@@ -286,10 +309,14 @@ func raidLevelName(p *Processor, level int) string {
 }
 
 func maxbattleLevelName(p *Processor, level int) string {
-	if p == nil || p.data == nil || p.data.UtilData == nil {
+	if p == nil {
 		return fmt.Sprintf("Level %d", level)
 	}
-	raw, ok := p.data.UtilData["maxbattleLevels"].(map[string]any)
+	d := p.getData()
+	if d == nil || d.UtilData == nil {
+		return fmt.Sprintf("Level %d", level)
+	}
+	raw, ok := d.UtilData["maxbattleLevels"].(map[string]any)
 	if !ok {
 		return fmt.Sprintf("Level %d", level)
 	}
@@ -302,10 +329,14 @@ func maxbattleLevelName(p *Processor, level int) string {
 }
 
 func evolutionName(p *Processor, evolutionID int) string {
-	if p == nil || p.data == nil || p.data.UtilData == nil || evolutionID == 0 {
+	if p == nil || evolutionID == 0 {
 		return ""
 	}
-	raw, ok := p.data.UtilData["evolution"].(map[string]any)
+	d := p.getData()
+	if d == nil || d.UtilData == nil {
+		return ""
+	}
+	raw, ok := d.UtilData["evolution"].(map[string]any)
 	if !ok {
 		return ""
 	}
@@ -317,10 +348,14 @@ func evolutionName(p *Processor, evolutionID int) string {
 }
 
 func megaNameFormat(p *Processor, evolutionID int) string {
-	if p == nil || p.data == nil || p.data.UtilData == nil || evolutionID == 0 {
+	if p == nil || evolutionID == 0 {
 		return ""
 	}
-	raw, ok := p.data.UtilData["megaName"].(map[string]any)
+	d := p.getData()
+	if d == nil || d.UtilData == nil {
+		return ""
+	}
+	raw, ok := d.UtilData["megaName"].(map[string]any)
 	if !ok {
 		return ""
 	}

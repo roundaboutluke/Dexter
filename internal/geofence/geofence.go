@@ -197,6 +197,7 @@ func fencesFromGeoJSON(cfg *config.Config, data map[string]any) ([]Fence, error)
 		}
 		geom, _ := feature["geometry"].(map[string]any)
 		if geom == nil {
+			fmt.Fprintf(os.Stderr, "geofence: skipping GeoJSON feature %d with nil geometry\n", i)
 			continue
 		}
 		geomType, _ := geom["type"].(string)
@@ -278,6 +279,9 @@ func parseGeoJSONMulti(raw any) [][][]float64 {
 }
 
 func pointInPolygon(point []float64, polygon [][]float64) bool {
+	if len(polygon) < 3 {
+		return false
+	}
 	inside := false
 	j := len(polygon) - 1
 	for i := 0; i < len(polygon); i++ {

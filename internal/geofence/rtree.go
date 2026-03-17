@@ -82,6 +82,9 @@ func (si *spatialIndex) matchedAreas(point []float64) []Fence {
 }
 
 func boundingBox(path [][]float64) (minLat, minLon, maxLat, maxLon float64) {
+	if len(path) == 0 {
+		return 0, 0, 0, 0
+	}
 	minLat = path[0][0]
 	minLon = path[0][1]
 	maxLat = path[0][0]

@@ -26,10 +26,11 @@ func rarityGroupForPokemon(tracker *stats.Tracker, pokemonID int) int {
 }
 
 func rarityNameEng(p *Processor, group int) string {
-	if p == nil || p.data == nil || p.data.UtilData == nil {
+	d := p.getData()
+	if d == nil || d.UtilData == nil {
 		return ""
 	}
-	raw, ok := p.data.UtilData["rarity"].(map[string]any)
+	raw, ok := d.UtilData["rarity"].(map[string]any)
 	if !ok {
 		return ""
 	}
@@ -38,10 +39,11 @@ func rarityNameEng(p *Processor, group int) string {
 }
 
 func sizeNameEng(p *Processor, size int) string {
-	if p == nil || p.data == nil || p.data.UtilData == nil {
+	d := p.getData()
+	if d == nil || d.UtilData == nil {
 		return ""
 	}
-	raw, ok := p.data.UtilData["size"].(map[string]any)
+	raw, ok := d.UtilData["size"].(map[string]any)
 	if !ok {
 		return ""
 	}

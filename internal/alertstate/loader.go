@@ -69,7 +69,7 @@ func Load(query *db.Query, fences *geofence.Store) (*Snapshot, error) {
 		if id == "" {
 			continue
 		}
-		profiles[profileKey(id, toInt(row["profile_no"], 1))] = row
+		profiles[ProfileKey(id, toInt(row["profile_no"], 1))] = row
 		if len(getString(row["active_hours"])) > 5 {
 			hasSchedules[id] = true
 		}
@@ -113,7 +113,8 @@ func buildMonsterIndex(rows []map[string]any) *MonsterIndex {
 	return idx
 }
 
-func profileKey(id string, profileNo int) string {
+// ProfileKey builds the lookup key for a human profile.
+func ProfileKey(id string, profileNo int) string {
 	return fmt.Sprintf("%s:%d", id, profileNo)
 }
 

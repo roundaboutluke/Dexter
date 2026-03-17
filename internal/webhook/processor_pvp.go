@@ -23,7 +23,8 @@ func (p *Processor) updateStats(hook *Hook) {
 }
 
 func (p *Processor) applyPvp(hook *Hook) {
-	if p == nil || hook == nil || p.cfg == nil || p.pvpCalc == nil {
+	calc := p.getPvpCalc()
+	if p == nil || hook == nil || p.cfg == nil || calc == nil {
 		return
 	}
 	start := time.Now()
@@ -53,13 +54,13 @@ func (p *Processor) applyPvp(hook *Hook) {
 	includeMega, _ := p.cfg.GetBool("pvp.includeMegaEvolution")
 	littleLeagueCanEvolve, _ := p.cfg.GetBool("pvp.littleLeagueCanEvolve")
 
-	ranks := p.pvpCalc.Rankings(pokemonID, formID, atk, def, sta, includeEvolution)
+	ranks := calc.Rankings(pokemonID, formID, atk, def, sta, includeEvolution)
 	filtered := map[int][]pvp.Entry{}
 	for league, entries := range ranks {
 		allowed := []pvp.Entry{}
 		for _, entry := range entries {
 			if !includeMega && entry.Evolution {
-				if isMegaForm(p.pvpCalc, entry.PokemonID, entry.FormID) {
+				if isMegaForm(calc, entry.PokemonID, entry.FormID) {
 					continue
 				}
 			}

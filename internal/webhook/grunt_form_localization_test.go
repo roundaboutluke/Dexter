@@ -27,16 +27,15 @@ func TestGruntRewardListsTreatNormalFormAsEmptyBeforeTranslation(t *testing.T) {
 		t.Fatalf("translator: %v", err)
 	}
 
-	p := &Processor{
-		data: &data.GameData{
-			Monsters: map[string]any{
-				"1_0": map[string]any{
-					"name": "Testmon",
-					"form": map[string]any{"name": "Normal"},
-				},
+	p := &Processor{}
+	p.data.Store(&data.GameData{
+		Monsters: map[string]any{
+			"1_0": map[string]any{
+				"name": "Testmon",
+				"form": map[string]any{"name": "Normal"},
 			},
 		},
-	}
+	})
 
 	rewards := rewardListFromEncountersDetailed(p, []any{map[string]any{"id": 1, "form": 0}}, tr)
 	if len(rewards) != 1 {
