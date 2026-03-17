@@ -77,10 +77,11 @@ func (d *Discord) profileCreateModalText(i *discordgo.InteractionCreate) (string
 func (d *Discord) buildLocationConfirmPayloadState(i *discordgo.InteractionCreate, lat, lon float64, placeConfirmation string) (*discordgo.MessageEmbed, []discordgo.MessageComponent, *slashMapRequest) {
 	tr := d.slashInteractionTranslator(i)
 	mapLink := fmt.Sprintf("https://maps.google.com/maps?q=%s,%s", formatFloat(lat), formatFloat(lon))
-	description := tr.TranslateFormat("I set your location to the following coordinates in{0}:\n{1}", placeConfirmation, mapLink)
+	description := tr.TranslateFormat("I set your location to the following coordinates in {0}:\n{1}", placeConfirmation, mapLink)
 	embed := &discordgo.MessageEmbed{
 		Title:       tr.Translate("Confirm location", false),
 		Description: description,
+		Color:       0x5865F2,
 	}
 	mapReq := d.locationMapRequest(lat, lon)
 	if !d.locationMapsEnabled() {

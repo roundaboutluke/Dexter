@@ -147,7 +147,7 @@ func handleTrackingPokemonUpsert(w http.ResponseWriter, s *Server, id string, r 
 			Inserts:   filteredInsert,
 		},
 		func(row map[string]any) string {
-			return tracking.MonsterRowText(s.cfg, translator, s.data, row)
+			return tracking.MonsterRowText(s.cfg, translator, s.getData(), row)
 		},
 	)
 

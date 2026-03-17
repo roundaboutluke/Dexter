@@ -583,7 +583,7 @@ func buildRenderData(p *Processor, hook *Hook, match alertMatch) map[string]any 
 			}
 			data["pokemonId"] = pokemonID
 			data["formId"] = formID
-			if monster := lookupMonster(p.data, fmt.Sprintf("%d_%d", pokemonID, formID)); monster != nil {
+			if monster := lookupMonster(p.getData(), fmt.Sprintf("%d_%d", pokemonID, formID)); monster != nil {
 				if name := getString(monster["name"]); name != "" {
 					data["nameEng"] = name
 				}

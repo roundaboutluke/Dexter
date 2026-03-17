@@ -52,7 +52,7 @@ func (d *Discord) buildProfileScheduleOverviewPayload(i *discordgo.InteractionCr
 	})
 	lines := []string{}
 	for _, entry := range entries {
-		lines = append(lines, fmt.Sprintf("%s — %s", scheduleEntryLabelLocalized(tr, entry.Entry), entry.ProfileName))
+		lines = append(lines, fmt.Sprintf("%s — %s", scheduleEntryLabel(tr, entry.Entry), entry.ProfileName))
 	}
 	content := tr.Translate("No schedules set.", false)
 	if len(lines) > 0 {
@@ -61,6 +61,7 @@ func (d *Discord) buildProfileScheduleOverviewPayload(i *discordgo.InteractionCr
 	embed := &discordgo.MessageEmbed{
 		Title:       tr.Translate("Scheduler", false),
 		Description: tr.Translate("Day | Start-End — Profile", false),
+		Color:       0x5865F2,
 		Fields: []*discordgo.MessageEmbedField{
 			{Name: tr.Translate("Schedules", false), Value: content, Inline: false},
 		},
@@ -76,7 +77,7 @@ func (d *Discord) buildProfileScheduleOverviewPayload(i *discordgo.InteractionCr
 		Inline: false,
 	})
 	components := []discordgo.MessageComponent{}
-	if options := scheduleEditOptionsGlobalLocalized(tr, profiles); len(options) > 0 {
+	if options := scheduleEditOptionsGlobal(tr, profiles); len(options) > 0 {
 		min := 1
 		editMenu := discordgo.SelectMenu{
 			CustomID:    slashProfileScheduleEditGlobal,
@@ -87,7 +88,7 @@ func (d *Discord) buildProfileScheduleOverviewPayload(i *discordgo.InteractionCr
 		}
 		components = append(components, discordgo.ActionsRow{Components: []discordgo.MessageComponent{editMenu}})
 	}
-	if options := scheduleRemoveOptionsGlobalLocalized(tr, profiles); len(options) > 0 {
+	if options := scheduleRemoveOptionsGlobal(tr, profiles); len(options) > 0 {
 		min := 1
 		removeMenu := discordgo.SelectMenu{
 			CustomID:    slashProfileScheduleRemoveGlobal,

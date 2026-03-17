@@ -50,7 +50,8 @@ func normalizeIV(hook *Hook, raw any) string {
 }
 
 func pokemonTypeColor(p *Processor, hook *Hook) string {
-	if p == nil || p.data == nil || p.data.Monsters == nil || p.data.UtilData == nil {
+	d := p.getData()
+	if d == nil || d.Monsters == nil || d.UtilData == nil {
 		return ""
 	}
 	pokemonID := getInt(hook.Message["pokemon_id"])
@@ -65,12 +66,12 @@ func pokemonTypeColor(p *Processor, hook *Hook) string {
 		form = getInt(hook.Message["pokemon_form"])
 	}
 	key := fmt.Sprintf("%d_%d", pokemonID, form)
-	monster := lookupMonster(p.data, key)
+	monster := lookupMonster(d, key)
 	if monster == nil && form != 0 {
-		monster = lookupMonster(p.data, fmt.Sprintf("%d_0", pokemonID))
+		monster = lookupMonster(d, fmt.Sprintf("%d_0", pokemonID))
 	}
 	if monster == nil {
-		monster = lookupMonster(p.data, fmt.Sprintf("%d", pokemonID))
+		monster = lookupMonster(d, fmt.Sprintf("%d", pokemonID))
 	}
 	if monster == nil {
 		return ""
@@ -91,7 +92,7 @@ func pokemonTypeColor(p *Processor, hook *Hook) string {
 	if typeName == "" {
 		return ""
 	}
-	utilTypes, ok := p.data.UtilData["types"].(map[string]any)
+	utilTypes, ok := d.UtilData["types"].(map[string]any)
 	if !ok {
 		return ""
 	}

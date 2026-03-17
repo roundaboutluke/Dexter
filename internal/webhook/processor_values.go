@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"poraclego/internal/logging"
 	"poraclego/internal/util"
 )
 
@@ -23,6 +24,9 @@ func normalizeHook(item any) (*Hook, bool) {
 	case map[string]any:
 		message = v
 	default:
+		if logger := logging.Get().Webhooks; logger != nil {
+			logger.Debugf("normalizeHook: message field is not map[string]any for type %s, using flat fallback", hookType)
+		}
 		for key, value := range raw {
 			if key == "type" {
 				continue

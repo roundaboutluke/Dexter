@@ -105,7 +105,7 @@ func (d *Discord) handleProfileScheduleTime(s *discordgo.Session, i *discordgo.I
 		d.respondEphemeral(s, i, tr.Translate("Profile not found.", false))
 		return
 	}
-	entries, errText := addScheduleEntryLocalized(tr, profiles, selected, day, startMin, endMin)
+	entries, errText := addScheduleEntry(tr, profiles, selected, day, startMin, endMin)
 	if errText != "" {
 		d.respondEphemeral(s, i, errText)
 		return
@@ -295,7 +295,7 @@ func (d *Discord) handleProfileScheduleAssign(s *discordgo.Session, i *discordgo
 		d.respondEphemeral(s, i, tr.Translate("Profile not found.", false))
 		return
 	}
-	entries, errText := addScheduleEntriesForDaysLocalized(tr, profiles, selected, days, startMin, endMin)
+	entries, errText := addScheduleEntriesForDays(tr, profiles, selected, days, startMin, endMin)
 	if errText != "" {
 		d.respondEphemeral(s, i, errText)
 		return
@@ -421,7 +421,7 @@ func (d *Discord) handleProfileScheduleEditAssign(s *discordgo.Session, i *disco
 		d.respondEphemeral(s, i, tr.Translate("Profile not found.", false))
 		return
 	}
-	updates, errText := buildScheduleEditAssignUpdatesLocalized(tr, profiles, selected, original, day, startMin, endMin)
+	updates, errText := buildScheduleEditAssignUpdates(tr, profiles, selected, original, day, startMin, endMin)
 	if errText != "" {
 		d.respondEphemeral(s, i, errText)
 		return

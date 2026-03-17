@@ -2,6 +2,7 @@ package bot
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 	"unicode"
@@ -399,4 +400,47 @@ func (d *Discord) applyOptionLocalizations(commandName string, options []*discor
 		}
 		d.applyOptionLocalizations(commandName, option.Options, targets)
 	}
+}
+
+// slashDayOptions builds the 7-day select menu options used by schedule day
+// pickers. If selectedDay is non-zero the matching option is marked as default.
+func slashDayOptions(tr *i18n.Translator, selectedDay int) []discordgo.SelectMenuOption {
+	type dayDef struct {
+		value string
+		day   int
+	}
+	days := []dayDef{
+		{"mon", 1}, {"tue", 2}, {"wed", 3}, {"thu", 4}, {"fri", 5}, {"sat", 6}, {"sun", 7},
+	}
+	opts := make([]discordgo.SelectMenuOption, len(days))
+	for i, d := range days {
+		opts[i] = discordgo.SelectMenuOption{
+			Label:   localizedDayLabel(tr, d.day),
+			Value:   d.value,
+			Default: d.day == selectedDay,
+		}
+	}
+	return opts
+}
+
+// slashProfileSelectOptions builds select menu options from a sorted slice of
+// profile rows. If selectedNo is non-zero the matching option is pre-selected.
+func slashProfileSelectOptions(tr *i18n.Translator, profiles []map[string]any, selectedNo int) []discordgo.SelectMenuOption {
+	sort.Slice(profiles, func(i, j int) bool {
+		return toInt(profiles[i]["profile_no"], 0) < toInt(profiles[j]["profile_no"], 0)
+	})
+	options := make([]discordgo.SelectMenuOption, 0, len(profiles))
+	for _, row := range profiles {
+		number := toInt(row["profile_no"], 0)
+		name := localizedProfileName(tr, row)
+		options = append(options, discordgo.SelectMenuOption{
+			Label:   fmt.Sprintf("%d. %s", number, name),
+			Value:   fmt.Sprintf("%d", number),
+			Default: number == selectedNo,
+		})
+		if len(options) >= 25 {
+			break
+		}
+	}
+	return options
 }

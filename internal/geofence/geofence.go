@@ -24,14 +24,24 @@ type Fence struct {
 
 type Store struct {
 	Fences []Fence
+	index  *spatialIndex
 }
 
-// Replace updates the fence list in-place.
+// Replace updates the fence list and rebuilds the spatial index.
 func (s *Store) Replace(fences []Fence) {
 	if s == nil {
 		return
 	}
 	s.Fences = fences
+	s.index = newSpatialIndex(s.Fences)
+}
+
+// BuildIndex builds (or rebuilds) the spatial index for fast point lookups.
+func (s *Store) BuildIndex() {
+	if s == nil || len(s.Fences) == 0 {
+		return
+	}
+	s.index = newSpatialIndex(s.Fences)
 }
 
 func Load(cfg *config.Config, root string) (*Store, error) {
@@ -49,12 +59,17 @@ func Load(cfg *config.Config, root string) (*Store, error) {
 		}
 		fences = append(fences, loaded...)
 	}
-	return &Store{Fences: fences}, nil
+	store := &Store{Fences: fences}
+	store.BuildIndex()
+	return store, nil
 }
 
 func (s *Store) PointInArea(point []float64) []string {
 	if len(point) != 2 {
 		return []string{}
+	}
+	if s.index != nil {
+		return s.index.pointInAreas(point)
 	}
 	areas := make([]string, 0)
 	for _, fence := range s.Fences {
@@ -76,6 +91,9 @@ func (s *Store) PointInArea(point []float64) []string {
 func (s *Store) MatchedAreas(point []float64) []Fence {
 	if s == nil || len(point) != 2 {
 		return []Fence{}
+	}
+	if s.index != nil {
+		return s.index.matchedAreas(point)
 	}
 	matches := make([]Fence, 0)
 	for _, fence := range s.Fences {
@@ -144,7 +162,7 @@ func readFenceFile(cfg *config.Config, path string) ([]Fence, error) {
 		}
 		return nil, fmt.Errorf("read geofence %s: %w", path, err)
 	}
-	clean := stripJSONComments(content)
+	clean := config.StripJSONComments(content)
 
 	var probe map[string]any
 	if err := json.Unmarshal(clean, &probe); err == nil {
@@ -179,6 +197,7 @@ func fencesFromGeoJSON(cfg *config.Config, data map[string]any) ([]Fence, error)
 		}
 		geom, _ := feature["geometry"].(map[string]any)
 		if geom == nil {
+			fmt.Fprintf(os.Stderr, "geofence: skipping GeoJSON feature %d with nil geometry\n", i)
 			continue
 		}
 		geomType, _ := geom["type"].(string)
@@ -260,6 +279,9 @@ func parseGeoJSONMulti(raw any) [][][]float64 {
 }
 
 func pointInPolygon(point []float64, polygon [][]float64) bool {
+	if len(polygon) < 3 {
+		return false
+	}
 	inside := false
 	j := len(polygon) - 1
 	for i := 0; i < len(polygon); i++ {
@@ -275,70 +297,3 @@ func pointInPolygon(point []float64, polygon [][]float64) bool {
 	return inside
 }
 
-func stripJSONComments(input []byte) []byte {
-	out := make([]byte, 0, len(input))
-	inString := false
-	inSingleLine := false
-	inMultiLine := false
-	escaped := false
-
-	for i := 0; i < len(input); i++ {
-		c := input[i]
-
-		if inSingleLine {
-			if c == '\n' {
-				inSingleLine = false
-				out = append(out, c)
-			}
-			continue
-		}
-
-		if inMultiLine {
-			if c == '*' && i+1 < len(input) && input[i+1] == '/' {
-				inMultiLine = false
-				i++
-			}
-			continue
-		}
-
-		if inString {
-			out = append(out, c)
-			if escaped {
-				escaped = false
-				continue
-			}
-			if c == '\\' {
-				escaped = true
-				continue
-			}
-			if c == '"' {
-				inString = false
-			}
-			continue
-		}
-
-		if c == '"' {
-			inString = true
-			out = append(out, c)
-			continue
-		}
-
-		if c == '/' && i+1 < len(input) {
-			next := input[i+1]
-			if next == '/' {
-				inSingleLine = true
-				i++
-				continue
-			}
-			if next == '*' {
-				inMultiLine = true
-				i++
-				continue
-			}
-		}
-
-		out = append(out, c)
-	}
-
-	return out
-}

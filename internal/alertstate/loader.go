@@ -69,7 +69,7 @@ func Load(query *db.Query, fences *geofence.Store) (*Snapshot, error) {
 		if id == "" {
 			continue
 		}
-		profiles[profileKey(id, toInt(row["profile_no"], 1))] = row
+		profiles[ProfileKey(id, toInt(row["profile_no"], 1))] = row
 		if len(getString(row["active_hours"])) > 5 {
 			hasSchedules[id] = true
 		}
@@ -81,11 +81,40 @@ func Load(query *db.Query, fences *geofence.Store) (*Snapshot, error) {
 		Profiles:     profiles,
 		HasSchedules: hasSchedules,
 		Fences:       cloneFenceStore(fences),
+		Monsters:     buildMonsterIndex(tables["monsters"]),
 		LoadedAt:     time.Now(),
 	}, nil
 }
 
-func profileKey(id string, profileNo int) string {
+// buildMonsterIndex groups monster tracking rows by pokemon_id and PVP league.
+func buildMonsterIndex(rows []map[string]any) *MonsterIndex {
+	if len(rows) == 0 {
+		return nil
+	}
+	idx := &MonsterIndex{
+		ByPokemonID:   make(map[int][]map[string]any),
+		PVPSpecific:   make(map[int][]map[string]any),
+		PVPEverything: make(map[int][]map[string]any),
+	}
+	for _, row := range rows {
+		pokemonID := toInt(row["pokemon_id"], 0)
+		league := toInt(row["pvp_ranking_league"], 0)
+
+		if league != 0 {
+			if pokemonID != 0 {
+				idx.PVPSpecific[league] = append(idx.PVPSpecific[league], row)
+			} else {
+				idx.PVPEverything[league] = append(idx.PVPEverything[league], row)
+			}
+		} else {
+			idx.ByPokemonID[pokemonID] = append(idx.ByPokemonID[pokemonID], row)
+		}
+	}
+	return idx
+}
+
+// ProfileKey builds the lookup key for a human profile.
+func ProfileKey(id string, profileNo int) string {
 	return fmt.Sprintf("%s:%d", id, profileNo)
 }
 
@@ -121,7 +150,9 @@ func cloneFenceStore(store *geofence.Store) *geofence.Store {
 		}
 		cloned = append(cloned, next)
 	}
-	return &geofence.Store{Fences: cloned}
+	result := &geofence.Store{Fences: cloned}
+	result.BuildIndex()
+	return result
 }
 
 func clone2DFloats(in [][]float64) [][]float64 {

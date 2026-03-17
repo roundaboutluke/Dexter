@@ -7,6 +7,7 @@ import (
 	"runtime/debug"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"poraclego/internal/alertstate"
@@ -45,10 +46,10 @@ type Processor struct {
 	raidSeen      map[string]raidSeenEntry
 	raidSeenMu    sync.Mutex
 	query         *db.Query
-	fences        *geofence.Store
-	data          *data.GameData
+	fences        atomic.Pointer[geofence.Store]
+	data          atomic.Pointer[data.GameData]
 	i18n          *i18n.Factory
-	templates     []dts.Template
+	templates     atomic.Pointer[[]dts.Template]
 	geocoder      *Geocoder
 	weather       *WeatherClient
 	weatherData   *WeatherTracker
@@ -57,7 +58,7 @@ type Processor struct {
 	shinyPossible *shiny.Possible
 	tzLocator     *tz.Locator
 	eventParser   *PogoEventParser
-	pvpCalc       *pvp.Calculator
+	pvpCalc       atomic.Pointer[pvp.Calculator]
 	discordQueue  *dispatch.Queue
 	telegramQueue *dispatch.Queue
 	scanner       *scanner.Client
@@ -72,8 +73,8 @@ type Processor struct {
 	alertStatePending    bool
 	alertStateLoader     func() (*alertstate.Snapshot, error)
 
-	processing bool
-	workCh     chan any
+	startOnce sync.Once
+	workCh    chan any
 }
 
 // NewProcessor returns a processor that drains the queue on the given interval.
@@ -91,10 +92,7 @@ func NewProcessor(queue *Queue, cfg *config.Config, query *db.Query, fences *geo
 		monsterChange: NewMonsterChangeTracker(cfg, root),
 		raidSeen:      map[string]raidSeenEntry{},
 		query:         query,
-		fences:        fences,
-		data:          gameData,
 		i18n:          i18nFactory,
-		templates:     templates,
 		geocoder:      NewGeocoder(cfg),
 		weather:       NewWeatherClient(cfg),
 		weatherData:   weatherData,
@@ -103,7 +101,6 @@ func NewProcessor(queue *Queue, cfg *config.Config, query *db.Query, fences *geo
 		shinyPossible: shinyPossible,
 		tzLocator:     tzLocator,
 		eventParser:   eventParser,
-		pvpCalc:       pvp.NewCalculator(cfg, gameData),
 		discordQueue:  discordQueue,
 		telegramQueue: telegramQueue,
 		scanner:       scannerClient,
@@ -113,6 +110,10 @@ func NewProcessor(queue *Queue, cfg *config.Config, query *db.Query, fences *geo
 		customEmoji:   loadCustomEmoji(root),
 		alertState:    alertstate.NewManager(),
 	}
+	p.fences.Store(fences)
+	p.data.Store(gameData)
+	p.templates.Store(&templates)
+	p.pvpCalc.Store(pvp.NewCalculator(cfg, gameData))
 	p.loadCaches()
 	return p
 }
@@ -175,47 +176,84 @@ func hookLogReference(hook *Hook) string {
 
 // Start runs the processor loop in a goroutine.
 func (p *Processor) Start() {
-	if p == nil || p.processing {
+	if p == nil {
 		return
 	}
-	p.processing = true
-	go p.startCachePruner()
-	workerCount := 1
-	workerConcurrency := 1
-	if p.cfg != nil {
-		if value, ok := p.cfg.GetInt("tuning.webhookProcessingWorkers"); ok && value > 0 {
-			workerCount = value
-		}
-		if value, ok := p.cfg.GetInt("tuning.concurrentWebhookProcessorsPerWorker"); ok && value > 0 {
-			workerConcurrency = value
-		}
-	}
-	if p.workCh == nil {
-		buffer := workerCount * workerConcurrency * 4
-		if buffer < 64 {
-			buffer = 64
-		}
-		p.workCh = make(chan any, buffer)
-	}
-	for i := 0; i < workerCount; i++ {
-		go p.workerLoop(workerConcurrency)
-	}
-	if p.monsterCache != nil {
-		p.monsterCache.RefreshAsync(p.cfg, p.query)
-	}
-	go func() {
-		ticker := time.NewTicker(p.interval)
-		defer ticker.Stop()
-		for range ticker.C {
-			items := p.queue.Drain()
-			if len(items) == 0 {
-				continue
+	p.startOnce.Do(func() {
+		go p.startCachePruner()
+		workerCount := 1
+		workerConcurrency := 1
+		if p.cfg != nil {
+			if value, ok := p.cfg.GetInt("tuning.webhookProcessingWorkers"); ok && value > 0 {
+				workerCount = value
 			}
-			for _, item := range items {
-				p.workCh <- item
+			if value, ok := p.cfg.GetInt("tuning.concurrentWebhookProcessorsPerWorker"); ok && value > 0 {
+				workerConcurrency = value
 			}
 		}
-	}()
+		if p.workCh == nil {
+			buffer := workerCount * workerConcurrency * 4
+			if buffer < 64 {
+				buffer = 64
+			}
+			p.workCh = make(chan any, buffer)
+		}
+		for i := 0; i < workerCount; i++ {
+			go p.workerLoop(workerConcurrency)
+		}
+		if p.monsterCache != nil {
+			p.monsterCache.RefreshAsync(p.cfg, p.query)
+		}
+		go func() {
+			ticker := time.NewTicker(p.interval)
+			defer ticker.Stop()
+			for range ticker.C {
+				items := p.queue.Drain()
+				if len(items) == 0 {
+					continue
+				}
+				for _, item := range items {
+					p.workCh <- item
+				}
+			}
+		}()
+	})
+}
+
+// getFences returns the current geofence store. Safe for nil receiver.
+func (p *Processor) getFences() *geofence.Store {
+	if p == nil {
+		return nil
+	}
+	return p.fences.Load()
+}
+
+// getData returns the current game data. Safe for nil receiver.
+func (p *Processor) getData() *data.GameData {
+	if p == nil {
+		return nil
+	}
+	return p.data.Load()
+}
+
+// getTemplates returns the current DTS templates. Safe for nil receiver.
+func (p *Processor) getTemplates() []dts.Template {
+	if p == nil {
+		return nil
+	}
+	ptr := p.templates.Load()
+	if ptr == nil {
+		return nil
+	}
+	return *ptr
+}
+
+// getPvpCalc returns the current PVP calculator. Safe for nil receiver.
+func (p *Processor) getPvpCalc() *pvp.Calculator {
+	if p == nil {
+		return nil
+	}
+	return p.pvpCalc.Load()
 }
 
 func (p *Processor) workerLoop(concurrency int) {

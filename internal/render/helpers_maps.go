@@ -11,6 +11,8 @@ import (
 
 	"github.com/aymerick/raymond"
 	"github.com/aymerick/raymond/ast"
+
+	"poraclego/internal/config"
 )
 
 // isCurrentBlockHelper returns true when the helper currently executing is the helper that owns the
@@ -148,7 +150,7 @@ func loadCustomEmoji(root string) map[string]map[string]string {
 	if err != nil {
 		return nil
 	}
-	clean := stripJSONComments(raw)
+	clean := config.StripJSONComments(raw)
 	var payload map[string]map[string]string
 	if err := json.Unmarshal(clean, &payload); err != nil {
 		return nil

@@ -26,7 +26,7 @@ func registerGeofenceRoutes(s *Server, mux *http.ServeMux) {
 		}
 
 		areas := map[string]string{}
-		for _, fence := range s.fences.Fences {
+		for _, fence := range s.getFences().Fences {
 			hash := md5.Sum(mustJSONMarshal(fence.Path))
 			areas[fence.Name] = hex.EncodeToString(hash[:])
 		}
@@ -49,7 +49,7 @@ func registerGeofenceRoutes(s *Server, mux *http.ServeMux) {
 		}
 		writeJSON(w, http.StatusOK, map[string]any{
 			"status":   "ok",
-			"geofence": s.fences.Fences,
+			"geofence": s.getFences().Fences,
 		})
 	})
 
@@ -64,7 +64,7 @@ func registerGeofenceRoutes(s *Server, mux *http.ServeMux) {
 		if rejectNotAuthorized(s.cfg, r, w) {
 			return
 		}
-		outGeo := geofenceToGeoJSON(s.fences.Fences)
+		outGeo := geofenceToGeoJSON(s.getFences().Fences)
 		writeJSON(w, http.StatusOK, map[string]any{
 			"status":  "ok",
 			"geoJSON": outGeo,
@@ -92,11 +92,7 @@ func registerGeofenceRoutes(s *Server, mux *http.ServeMux) {
 			})
 			return
 		}
-		if s.fences == nil {
-			s.fences = reloaded
-		} else {
-			s.fences.Replace(reloaded.Fences)
-		}
+		s.UpdateFences(reloaded)
 		refreshAlertState(s)
 		writeJSON(w, http.StatusOK, map[string]any{
 			"status": "ok",
@@ -182,7 +178,7 @@ func registerGeofenceRoutes(s *Server, mux *http.ServeMux) {
 				return
 			}
 			client := tileserver.NewClient(s.cfg)
-			url, err := tileserver.GenerateGeofenceTile(s.fences.Fences, client, s.cfg, parts[0])
+			url, err := tileserver.GenerateGeofenceTile(s.getFences().Fences, client, s.cfg, parts[0])
 			if err != nil || url == "" {
 				writeJSON(w, http.StatusOK, map[string]any{
 					"status":  "error",

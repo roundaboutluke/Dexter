@@ -151,7 +151,8 @@ func handleCheckLocation(w http.ResponseWriter, s *Server, id string, lat float6
 	}
 
 	restriction := parseCommunityMembership(human["area_restriction"])
-	areas := s.fences.PointInArea([]float64{lat, lon})
+	fences := s.getFences()
+	areas := fences.PointInArea([]float64{lat, lon})
 	locationOk := false
 	for _, fence := range restriction {
 		if containsString(areas, strings.ToLower(fence)) {
@@ -183,8 +184,9 @@ func handleHumansGet(w http.ResponseWriter, s *Server, id string) {
 		return
 	}
 
-	allowedAreas := make([]string, 0, len(s.fences.Fences))
-	for _, fence := range s.fences.Fences {
+	fences := s.getFences()
+	allowedAreas := make([]string, 0, len(fences.Fences))
+	for _, fence := range fences.Fences {
 		allowedAreas = append(allowedAreas, strings.ToLower(fence.Name))
 	}
 
@@ -194,8 +196,8 @@ func handleHumansGet(w http.ResponseWriter, s *Server, id string) {
 		allowedAreas = filterAreas(s.cfg, communityMembership, allowedAreas)
 	}
 
-	areas := make([]map[string]any, 0, len(s.fences.Fences))
-	for _, fence := range s.fences.Fences {
+	areas := make([]map[string]any, 0, len(fences.Fences))
+	for _, fence := range fences.Fences {
 		if !containsString(allowedAreas, strings.ToLower(fence.Name)) {
 			continue
 		}
@@ -237,7 +239,7 @@ func handleSetLocation(w http.ResponseWriter, s *Server, id string, lat float64,
 	areaSecurityEnabled, _ := s.cfg.GetBool("areaSecurity.enabled")
 	if areaSecurityEnabled && human["area_restriction"] != nil {
 		allowed := parseCommunityMembership(human["area_restriction"])
-		areas := s.fences.PointInArea([]float64{lat, lon})
+		areas := s.getFences().PointInArea([]float64{lat, lon})
 		allowedOk := false
 		for _, fence := range allowed {
 			if containsString(areas, strings.ToLower(fence)) {
@@ -351,8 +353,9 @@ func handleSetAreas(w http.ResponseWriter, s *Server, id string, r *http.Request
 	currentProfile := numberFromAnyOrDefault(human["current_profile_no"], 1)
 	adminTarget := !(containsString(getAdminIDs(s.cfg, "discord.admins"), id) && containsString(getAdminIDs(s.cfg, "telegram.admins"), id))
 
-	allowedAreas := make([]string, 0, len(s.fences.Fences))
-	for _, fence := range s.fences.Fences {
+	fences := s.getFences()
+	allowedAreas := make([]string, 0, len(fences.Fences))
+	for _, fence := range fences.Fences {
 		if !adminTarget || fence.UserSelectable == nil || *fence.UserSelectable {
 			allowedAreas = append(allowedAreas, strings.ToLower(fence.Name))
 		}
@@ -426,7 +429,14 @@ func handleStartStop(w http.ResponseWriter, s *Server, id string, start bool) {
 
 func handleHumanOne(w http.ResponseWriter, s *Server, id string) {
 	human, err := s.query.SelectOneQuery("humans", map[string]any{"id": id})
-	if err != nil || human == nil {
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{
+			"status":  "error",
+			"message": "Exception raised during execution",
+		})
+		return
+	}
+	if human == nil {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"status":  "error",
 			"message": "User not found",

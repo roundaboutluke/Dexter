@@ -7,6 +7,7 @@ import (
 
 	"poraclego/internal/config"
 	"poraclego/internal/data"
+	"poraclego/internal/util"
 )
 
 // CleanMonsterRow normalizes a pokemon tracking rule for persistence.
@@ -15,7 +16,7 @@ func CleanMonsterRow(cfg *config.Config, scope RuleScope, row map[string]any) (m
 		return nil, fmt.Errorf("Pokemon id must be specified")
 	}
 	template := defaultTemplate(templateName(cfg))
-	distance := floatFromAnyRule(row["distance"])
+	distance := util.ToFloat(row["distance"], 0)
 	if distance == 0 {
 		if def, ok := cfg.GetInt("tracking.defaultDistance"); ok {
 			distance = float64(def)
@@ -314,21 +315,6 @@ func numberFromAnyOrDefaultRule(value any, fallback int) int {
 	return fallback
 }
 
-func floatFromAnyRule(value any) float64 {
-	switch v := value.(type) {
-	case float64:
-		return v
-	case int:
-		return float64(v)
-	case int64:
-		return float64(v)
-	case string:
-		f, _ := strconv.ParseFloat(v, 64)
-		return f
-	default:
-		return 0
-	}
-}
 
 func getStringValueRule(value any, fallback string) string {
 	if value == nil {

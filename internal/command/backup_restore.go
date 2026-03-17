@@ -37,7 +37,7 @@ func (c *BackupCommand) Handle(ctx *Context, args []string) (string, error) {
 			return tr.Translate("Include the name of the backup you want to remove", false), nil
 		}
 		name := args[0]
-		return removeBackup(ctx.Root, name), nil
+		return removeBackup(ctx, ctx.Root, name), nil
 	}
 	if containsWord(args, "list") {
 		return tr.TranslateFormat("To list existing backups, run `{0}restore list`", ctx.Prefix), nil
@@ -134,10 +134,13 @@ func saveBackup(root, name string, payload backupPayload) error {
 	return os.WriteFile(path, raw, 0o644)
 }
 
-func removeBackup(root, name string) string {
+func removeBackup(ctx *Context, root, name string) string {
 	path := filepath.Join(root, "backups", fmt.Sprintf("%s.json", name))
 	if err := os.Remove(path); err != nil {
-		return "👌"
+		if logger := ctx.CommandLogger(); logger != nil {
+			logger.Warnf("backup remove %s: %v", name, err)
+		}
+		return "❌"
 	}
 	return "✅"
 }

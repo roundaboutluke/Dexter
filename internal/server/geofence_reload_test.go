@@ -56,7 +56,7 @@ func TestGeofenceReloadReplacesStoreInPlace(t *testing.T) {
 	if err != nil {
 		t.Fatalf("server.New: %v", err)
 	}
-	if s.fences != store {
+	if s.getFences() != store {
 		t.Fatalf("expected server to hold same fences pointer")
 	}
 
@@ -75,10 +75,8 @@ func TestGeofenceReloadReplacesStoreInPlace(t *testing.T) {
 	if payload["status"] != "ok" {
 		t.Fatalf("status=%v, want ok", payload["status"])
 	}
-	if s.fences != store {
-		t.Fatalf("expected fences pointer to remain unchanged after reload")
-	}
-	if len(store.Fences) != 1 || store.Fences[0].Name != "AreaA" {
-		t.Fatalf("fences=%v, want AreaA loaded", store.Fences)
+	reloaded := s.getFences()
+	if len(reloaded.Fences) != 1 || reloaded.Fences[0].Name != "AreaA" {
+		t.Fatalf("fences=%v, want AreaA loaded", reloaded.Fences)
 	}
 }

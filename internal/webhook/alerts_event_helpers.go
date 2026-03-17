@@ -338,11 +338,14 @@ func itemRewardString(p *Processor, itemID, amount int, tr *i18n.Translator) str
 		return ""
 	}
 	name := ""
-	if p != nil && p.data != nil {
-		if raw, ok := p.data.Items[fmt.Sprintf("%d", itemID)]; ok {
-			if m, ok := raw.(map[string]any); ok {
-				if text, ok := m["name"].(string); ok {
-					name = text
+	if p != nil {
+		d := p.getData()
+		if d != nil {
+			if raw, ok := d.Items[fmt.Sprintf("%d", itemID)]; ok {
+				if m, ok := raw.(map[string]any); ok {
+					if text, ok := m["name"].(string); ok {
+						name = text
+					}
 				}
 			}
 		}
@@ -357,24 +360,28 @@ func itemRewardString(p *Processor, itemID, amount int, tr *i18n.Translator) str
 }
 
 func monsterName(p *Processor, pokemonID int) string {
-	if pokemonID == 0 || p == nil || p.data == nil || p.data.Monsters == nil {
+	if pokemonID == 0 || p == nil {
 		return ""
 	}
-	if raw, ok := p.data.Monsters[fmt.Sprintf("%d_0", pokemonID)]; ok {
+	d := p.getData()
+	if d == nil || d.Monsters == nil {
+		return ""
+	}
+	if raw, ok := d.Monsters[fmt.Sprintf("%d_0", pokemonID)]; ok {
 		if m, ok := raw.(map[string]any); ok {
 			if name, ok := m["name"].(string); ok && name != "" {
 				return name
 			}
 		}
 	}
-	if raw, ok := p.data.Monsters[fmt.Sprintf("%d", pokemonID)]; ok {
+	if raw, ok := d.Monsters[fmt.Sprintf("%d", pokemonID)]; ok {
 		if m, ok := raw.(map[string]any); ok {
 			if name, ok := m["name"].(string); ok && name != "" {
 				return name
 			}
 		}
 	}
-	for _, raw := range p.data.Monsters {
+	for _, raw := range d.Monsters {
 		if m, ok := raw.(map[string]any); ok {
 			if getInt(m["id"]) == pokemonID {
 				if name, ok := m["name"].(string); ok && name != "" {
@@ -387,15 +394,19 @@ func monsterName(p *Processor, pokemonID int) string {
 }
 
 func monsterInfo(p *Processor, pokemonID, formID int) (string, string) {
-	if p == nil || p.data == nil {
+	if p == nil {
 		return "", ""
 	}
-	monster := lookupMonster(p.data, fmt.Sprintf("%d_%d", pokemonID, formID))
+	d := p.getData()
+	if d == nil {
+		return "", ""
+	}
+	monster := lookupMonster(d, fmt.Sprintf("%d_%d", pokemonID, formID))
 	if monster == nil && formID != 0 {
-		monster = lookupMonster(p.data, fmt.Sprintf("%d_0", pokemonID))
+		monster = lookupMonster(d, fmt.Sprintf("%d_0", pokemonID))
 	}
 	if monster == nil {
-		monster = lookupMonster(p.data, fmt.Sprintf("%d", pokemonID))
+		monster = lookupMonster(d, fmt.Sprintf("%d", pokemonID))
 	}
 	if monster == nil {
 		return "", ""
@@ -409,16 +420,20 @@ func monsterInfo(p *Processor, pokemonID, formID int) (string, string) {
 }
 
 func monsterFormName(p *Processor, pokemonID, formID int) string {
-	if p == nil || p.data == nil {
+	if p == nil {
+		return ""
+	}
+	d := p.getData()
+	if d == nil {
 		return ""
 	}
 	key := fmt.Sprintf("%d_%d", pokemonID, formID)
-	monster := lookupMonster(p.data, key)
+	monster := lookupMonster(d, key)
 	if monster == nil && formID != 0 {
-		monster = lookupMonster(p.data, fmt.Sprintf("%d_0", pokemonID))
+		monster = lookupMonster(d, fmt.Sprintf("%d_0", pokemonID))
 	}
 	if monster == nil {
-		monster = lookupMonster(p.data, fmt.Sprintf("%d", pokemonID))
+		monster = lookupMonster(d, fmt.Sprintf("%d", pokemonID))
 	}
 	if monster == nil {
 		return ""
@@ -432,10 +447,14 @@ func monsterFormName(p *Processor, pokemonID, formID int) string {
 }
 
 func monsterGeneration(p *Processor, pokemonID, formID int) (string, string, string) {
-	if p == nil || p.data == nil || p.data.UtilData == nil || pokemonID <= 0 {
+	if p == nil || pokemonID <= 0 {
 		return "", "", ""
 	}
-	if exceptions, ok := p.data.UtilData["genException"].(map[string]any); ok {
+	d := p.getData()
+	if d == nil || d.UtilData == nil {
+		return "", "", ""
+	}
+	if exceptions, ok := d.UtilData["genException"].(map[string]any); ok {
 		key := fmt.Sprintf("%d_%d", pokemonID, formID)
 		if value, ok := exceptions[key]; ok {
 			gen := fmt.Sprintf("%v", value)
@@ -445,7 +464,7 @@ func monsterGeneration(p *Processor, pokemonID, formID int) (string, string, str
 			return gen, "", ""
 		}
 	}
-	if genData, ok := p.data.UtilData["genData"].(map[string]any); ok {
+	if genData, ok := d.UtilData["genData"].(map[string]any); ok {
 		for genKey, raw := range genData {
 			entry, ok := raw.(map[string]any)
 			if !ok {
@@ -464,10 +483,14 @@ func monsterGeneration(p *Processor, pokemonID, formID int) (string, string, str
 }
 
 func genDetails(p *Processor, gen string) (string, string) {
-	if p == nil || p.data == nil || p.data.UtilData == nil {
+	if p == nil {
 		return "", ""
 	}
-	genData, ok := p.data.UtilData["genData"].(map[string]any)
+	d := p.getData()
+	if d == nil || d.UtilData == nil {
+		return "", ""
+	}
+	genData, ok := d.UtilData["genData"].(map[string]any)
 	if !ok {
 		return "", ""
 	}

@@ -97,10 +97,7 @@ func (c *TrackedCommand) Handle(ctx *Context, args []string) (string, error) {
 	if len(message) < 4000 {
 		return message, nil
 	}
-	if link, err := createHastebinLink(message); err == nil && link != "" {
-		return fmt.Sprintf("%s %s", tr.Translate("Tracking list is quite long. Have a look at", false), link), nil
-	}
-	reply := buildFileReply(fmt.Sprintf("%s.txt", result.Target.Name), tr.Translate("Tracking list is long, but Hastebin is also down. Tracking list made into a file:", false), message)
+	reply := buildFileReply(fmt.Sprintf("%s.txt", result.Target.Name), tr.Translate("Tracking list is long. Tracking list made into a file:", false), message)
 	if reply != "" {
 		return reply, nil
 	}

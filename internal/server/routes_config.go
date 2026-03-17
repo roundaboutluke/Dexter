@@ -99,7 +99,7 @@ func templateGroups(s *Server, platform string) map[string]any {
 func uniqueTemplateTypes(s *Server, platform string) []string {
 	seen := map[string]bool{}
 	out := []string{}
-	for _, tpl := range s.dts {
+	for _, tpl := range s.getTemplates() {
 		if tpl.Hidden || tpl.Platform != platform {
 			continue
 		}
@@ -115,7 +115,7 @@ func uniqueTemplateTypes(s *Server, platform string) []string {
 func uniqueTemplateLanguages(s *Server, platform, templateType string) []string {
 	seen := map[string]bool{}
 	out := []string{}
-	for _, tpl := range s.dts {
+	for _, tpl := range s.getTemplates() {
 		if tpl.Hidden || tpl.Platform != platform || tpl.Type != templateType {
 			continue
 		}
@@ -134,7 +134,7 @@ func uniqueTemplateLanguages(s *Server, platform, templateType string) []string 
 
 func templateIDs(s *Server, platform, templateType, language string) []any {
 	out := []any{}
-	for _, tpl := range s.dts {
+	for _, tpl := range s.getTemplates() {
 		if tpl.Hidden || tpl.Platform != platform || tpl.Type != templateType {
 			continue
 		}

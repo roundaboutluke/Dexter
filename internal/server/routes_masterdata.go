@@ -15,7 +15,7 @@ func registerMasterDataRoutes(s *Server, mux *http.ServeMux) {
 			return
 		}
 
-		writeJSON(w, http.StatusOK, s.data.Grunts)
+		writeJSON(w, http.StatusOK, s.getData().Grunts)
 	})
 
 	mux.HandleFunc("/api/masterdata/monsters", func(w http.ResponseWriter, r *http.Request) {
@@ -30,6 +30,6 @@ func registerMasterDataRoutes(s *Server, mux *http.ServeMux) {
 			return
 		}
 
-		writeJSON(w, http.StatusOK, s.data.Monsters)
+		writeJSON(w, http.StatusOK, s.getData().Monsters)
 	})
 }

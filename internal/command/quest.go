@@ -448,6 +448,9 @@ func removeQuestEntries(ctx *Context, tr *i18n.Translator, result TargetResult, 
 	)
 	affected, err := ctx.Query.ExecQuery(query, result.TargetID, result.ProfileNo)
 	if err != nil {
+		if logger := ctx.CommandLogger(); logger != nil {
+			logger.Warnf("quest remove: %v", err)
+		}
 		return tr.Translate("There was a problem removing entries", false)
 	}
 	if affected > 0 {

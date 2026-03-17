@@ -7,6 +7,8 @@ import (
 
 	"poraclego/internal/data"
 	"poraclego/internal/dts"
+	"poraclego/internal/geofence"
+	"poraclego/internal/logging"
 	"poraclego/internal/pvp"
 )
 
@@ -22,6 +24,15 @@ func (p *Processor) startCachePruner() {
 			p.cache.PruneExpired(now)
 		}
 		p.pruneRaidSeen(now)
+		if p.gymCache != nil {
+			p.gymCache.PruneStale(now.Add(-24 * time.Hour))
+		}
+		if p.geocoder != nil {
+			p.geocoder.PruneStale(now.Add(-24 * time.Hour))
+		}
+		if p.weatherData != nil {
+			p.weatherData.PruneStaleCares(now.Unix())
+		}
 	}
 }
 
@@ -41,12 +52,12 @@ func (p *Processor) pruneRaidSeen(now time.Time) {
 	}
 }
 
-// UpdateTemplates replaces the DTS template list.
+// UpdateTemplates replaces the DTS template list atomically.
 func (p *Processor) UpdateTemplates(templates []dts.Template) {
 	if p == nil {
 		return
 	}
-	p.templates = templates
+	p.templates.Store(&templates)
 }
 
 // SaveCaches persists cache data to disk for warm restarts.
@@ -54,15 +65,32 @@ func (p *Processor) SaveCaches() {
 	if p == nil || p.cacheDir == "" {
 		return
 	}
-	_ = os.MkdirAll(p.cacheDir, 0o755)
+	if err := os.MkdirAll(p.cacheDir, 0o755); err != nil {
+		if logger := logging.Get().Webhooks; logger != nil {
+			logger.Warnf("failed to create cache dir %s: %v", p.cacheDir, err)
+		}
+		return
+	}
 	if p.gymCache != nil {
-		_ = saveJSONFile(filepath.Join(p.cacheDir, "gymCache.json"), p.gymCache.Snapshot())
+		if err := saveJSONFile(filepath.Join(p.cacheDir, "gymCache.json"), p.gymCache.Snapshot()); err != nil {
+			if logger := logging.Get().Webhooks; logger != nil {
+				logger.Warnf("failed to save gym cache: %v", err)
+			}
+		}
 	}
 	if p.geocoder != nil {
-		_ = p.geocoder.SaveCache(filepath.Join(p.cacheDir, "geocoderCache.json"))
+		if err := p.geocoder.SaveCache(filepath.Join(p.cacheDir, "geocoderCache.json")); err != nil {
+			if logger := logging.Get().Webhooks; logger != nil {
+				logger.Warnf("failed to save geocoder cache: %v", err)
+			}
+		}
 	}
 	if p.weather != nil {
-		_ = p.weather.SaveCache(filepath.Join(p.cacheDir, "weatherCache.json"))
+		if err := p.weather.SaveCache(filepath.Join(p.cacheDir, "weatherCache.json")); err != nil {
+			if logger := logging.Get().Webhooks; logger != nil {
+				logger.Warnf("failed to save weather cache: %v", err)
+			}
+		}
 	}
 	if p.weatherData != nil {
 		p.weatherData.SaveCaches()
@@ -101,11 +129,19 @@ func cacheDir(root string) string {
 	return filepath.Join(root, ".cache")
 }
 
-// UpdateData replaces the game data set used for webhook processing.
+// UpdateData replaces the game data set used for webhook processing atomically.
 func (p *Processor) UpdateData(game *data.GameData) {
 	if p == nil || game == nil {
 		return
 	}
-	p.data = game
-	p.pvpCalc = pvp.NewCalculator(p.cfg, game)
+	p.data.Store(game)
+	p.pvpCalc.Store(pvp.NewCalculator(p.cfg, game))
+}
+
+// UpdateFences replaces the geofence store atomically.
+func (p *Processor) UpdateFences(store *geofence.Store) {
+	if p == nil || store == nil {
+		return
+	}
+	p.fences.Store(store)
 }

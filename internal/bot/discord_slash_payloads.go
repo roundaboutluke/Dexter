@@ -72,6 +72,7 @@ func (d *Discord) buildAreaShowPayloadState(i *discordgo.InteractionCreate, sele
 	}
 	embed := &discordgo.MessageEmbed{
 		Title: title,
+		Color: 0x5865F2,
 	}
 	mapReq := d.areaMapRequest(selected)
 	d.applySlashMapImage(embed, mapReq)
@@ -176,7 +177,7 @@ func (d *Discord) buildProfilePayloadState(i *discordgo.InteractionCreate, selec
 	if lat != 0 || lon != 0 {
 		locationText = fmt.Sprintf("%s, %s", formatFloat(lat), formatFloat(lon))
 	}
-	hoursText := profileScheduleTextLocalized(tr, selectedRow["active_hours"])
+	hoursText := profileScheduleText(tr, selectedRow["active_hours"])
 	if hoursText == "" {
 		hoursText = translateOrDefault(tr, "No schedules")
 	}
@@ -191,6 +192,7 @@ func (d *Discord) buildProfilePayloadState(i *discordgo.InteractionCreate, selec
 	embed := &discordgo.MessageEmbed{
 		Title:       title,
 		Description: description,
+		Color:       0x5865F2,
 		Fields: []*discordgo.MessageEmbedField{
 			{Name: translateOrDefault(tr, "Location"), Value: locationText, Inline: false},
 			{Name: translateOrDefault(tr, "Areas"), Value: areaText, Inline: false},
@@ -276,6 +278,7 @@ func (d *Discord) buildProfileEmptyPayloadState(human map[string]any) (*discordg
 	embed := &discordgo.MessageEmbed{
 		Title:       translateOrDefault(tr, "No profiles yet"),
 		Description: translateOrDefault(tr, "Create your first profile to manage alerts. You can still set location and areas now."),
+		Color:       0x5865F2,
 		Fields: []*discordgo.MessageEmbedField{
 			{Name: translateOrDefault(tr, "Location"), Value: locationText, Inline: false},
 			{Name: translateOrDefault(tr, "Areas"), Value: areaText, Inline: false},
@@ -323,6 +326,7 @@ func (d *Discord) buildProfileDeletePayload(i *discordgo.InteractionCreate, sele
 	embed := &discordgo.MessageEmbed{
 		Title:       translateOrDefault(tr, "Delete Profile"),
 		Description: translateFormatOrDefault(tr, "Delete **{0}**? This cannot be undone.", name),
+		Color:       0xED4245,
 	}
 	components := []discordgo.MessageComponent{
 		discordgo.ActionsRow{Components: []discordgo.MessageComponent{

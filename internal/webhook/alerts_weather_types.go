@@ -60,10 +60,11 @@ func caredPokemonFromHook(p *Processor, hook *Hook) *caredPokemon {
 }
 
 func alteringWeathers(p *Processor, types []int, weather int) []int {
-	if p == nil || p.data == nil || p.data.UtilData == nil {
+	d := p.getData()
+	if d == nil || d.UtilData == nil {
 		return nil
 	}
-	raw, ok := p.data.UtilData["weatherTypeBoost"].(map[string]any)
+	raw, ok := d.UtilData["weatherTypeBoost"].(map[string]any)
 	if !ok || len(types) == 0 {
 		return nil
 	}
@@ -98,10 +99,11 @@ func alteringWeathers(p *Processor, types []int, weather int) []int {
 }
 
 func weatherBoostsTypes(p *Processor, weatherID int, types []int) bool {
-	if p == nil || p.data == nil || p.data.UtilData == nil || weatherID == 0 || len(types) == 0 {
+	d := p.getData()
+	if d == nil || d.UtilData == nil || weatherID == 0 || len(types) == 0 {
 		return false
 	}
-	raw, ok := p.data.UtilData["weatherTypeBoost"].(map[string]any)
+	raw, ok := d.UtilData["weatherTypeBoost"].(map[string]any)
 	if !ok {
 		return false
 	}
@@ -118,10 +120,11 @@ func weatherBoostsTypes(p *Processor, weatherID int, types []int) bool {
 }
 
 func boostingWeathersForTypes(p *Processor, types []int) []int {
-	if p == nil || p.data == nil || p.data.UtilData == nil || len(types) == 0 {
+	d := p.getData()
+	if d == nil || d.UtilData == nil || len(types) == 0 {
 		return nil
 	}
-	raw, ok := p.data.UtilData["weatherTypeBoost"].(map[string]any)
+	raw, ok := d.UtilData["weatherTypeBoost"].(map[string]any)
 	if !ok {
 		return nil
 	}
@@ -153,14 +156,15 @@ func boostingWeathersForTypes(p *Processor, types []int) []int {
 }
 
 func weaknessListForTypes(p *Processor, typeNames []string, platform string, tr *i18n.Translator) ([]map[string]any, string) {
-	if p == nil || p.data == nil || len(typeNames) == 0 {
+	d := p.getData()
+	if d == nil || len(typeNames) == 0 {
 		return nil, ""
 	}
-	rawTypes := p.data.Types
+	rawTypes := d.Types
 	if rawTypes == nil {
 		return nil, ""
 	}
-	utilTypes, ok := p.data.UtilData["types"].(map[string]any)
+	utilTypes, ok := d.UtilData["types"].(map[string]any)
 	if !ok {
 		return nil, ""
 	}

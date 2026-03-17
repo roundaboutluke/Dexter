@@ -77,10 +77,11 @@ func (c *TTLCache) Len() int {
 
 // GymState stores last seen gym details for dedupe.
 type GymState struct {
-	TeamID         int
-	SlotsAvailable int
-	LastOwnerID    int
-	InBattle       bool
+	TeamID         int       `json:"team_id"`
+	SlotsAvailable int       `json:"slots_available"`
+	LastOwnerID    int       `json:"last_owner_id"`
+	InBattle       bool      `json:"in_battle"`
+	LastSeen       time.Time `json:"last_seen"`
 }
 
 // GymCache stores gym states by id.
@@ -106,9 +107,10 @@ func (c *GymCache) Get(id string) *GymState {
 	return &copy
 }
 
-// Set stores the gym state.
+// Set stores the gym state with a last-seen timestamp.
 func (c *GymCache) Set(id string, state GymState) {
 	c.mu.Lock()
+	state.LastSeen = time.Now()
 	c.items[id] = state
 	c.mu.Unlock()
 }
@@ -135,4 +137,21 @@ func (c *GymCache) Snapshot() map[string]GymState {
 		out[key] = value
 	}
 	return out
+}
+
+// PruneStale removes gym entries not seen since the cutoff time.
+func (c *GymCache) PruneStale(cutoff time.Time) int {
+	if c == nil {
+		return 0
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	removed := 0
+	for key, state := range c.items {
+		if state.LastSeen.Before(cutoff) {
+			delete(c.items, key)
+			removed++
+		}
+	}
+	return removed
 }

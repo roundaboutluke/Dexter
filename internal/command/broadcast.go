@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"poraclego/internal/config"
 	"poraclego/internal/dispatch"
 	"poraclego/internal/i18n"
 )
@@ -78,6 +79,9 @@ func (c *BroadcastCommand) Handle(ctx *Context, args []string) (string, error) {
 	templateID := strings.Join(args, " ")
 	messages, err := loadBroadcastMessages(ctx.Root)
 	if err != nil {
+		if logger := ctx.CommandLogger(); logger != nil {
+			logger.Warnf("broadcast: %v", err)
+		}
 		return tr.Translate("Cannot read broadcast.json - see log file for details", false), nil
 	}
 	discordMessage := ""
@@ -101,8 +105,8 @@ func (c *BroadcastCommand) Handle(ctx *Context, args []string) (string, error) {
 		return sendBroadcastJob(ctx, tr, result.TargetID, result.Target.Name, result.Target.Type, discordMessage, telegramMessage), nil
 	}
 
-	query := buildBroadcastQuery(latitude, longitude, distance, matchedAreas)
-	rows, err := ctx.Query.MysteryQuery(query)
+	query, queryArgs := buildBroadcastQuery(latitude, longitude, distance, matchedAreas)
+	rows, err := ctx.Query.MysteryQuery(query, queryArgs...)
 	if err != nil {
 		return "", err
 	}
@@ -162,7 +166,7 @@ func loadBroadcastMessages(root string) ([]broadcastEntry, error) {
 	if err != nil {
 		return nil, fmt.Errorf("broadcast.json not found")
 	}
-	payload = stripJSONComments(payload)
+	payload = config.StripJSONComments(payload)
 	var entries []broadcastEntry
 	if err := json.Unmarshal(payload, &entries); err != nil {
 		return nil, err
@@ -170,11 +174,12 @@ func loadBroadcastMessages(root string) ([]broadcastEntry, error) {
 	return entries, nil
 }
 
-func buildBroadcastQuery(lat, lon float64, distance int, areas []string) string {
+func buildBroadcastQuery(lat, lon float64, distance int, areas []string) (string, []any) {
+	var args []any
 	areaFilter := "1 = 0"
 	for _, area := range areas {
-		safe := strings.ReplaceAll(area, "'", "\\'")
-		areaFilter += fmt.Sprintf(" OR humans.area like '%%\"%s\"%%'", safe)
+		areaFilter += " OR humans.area LIKE ?"
+		args = append(args, fmt.Sprintf("%%\"%s\"%%", area))
 	}
 	locationFilter := ""
 	if lat != 0 && lon != 0 && distance > 0 {
@@ -201,7 +206,7 @@ func buildBroadcastQuery(lat, lon float64, distance int, areas []string) string 
 			(%s)
 		)
 	`, locationFilter, areaFilter)
-	return query
+	return query, args
 }
 
 func sendBroadcastJob(ctx *Context, tr *i18n.Translator, targetID, targetName, targetType, discordMessage, telegramMessage string) string {
@@ -231,41 +236,4 @@ func sendBroadcastJob(ctx *Context, tr *i18n.Translator, targetID, targetName, t
 		}
 	}
 	return "✅"
-}
-
-func stripJSONComments(input []byte) []byte {
-	out := make([]byte, 0, len(input))
-	inString := false
-	for i := 0; i < len(input); i++ {
-		ch := input[i]
-		if ch == '"' {
-			if i == 0 || input[i-1] != '\\' {
-				inString = !inString
-			}
-			out = append(out, ch)
-			continue
-		}
-		if !inString && ch == '/' && i+1 < len(input) {
-			next := input[i+1]
-			if next == '/' {
-				for i < len(input) && input[i] != '\n' {
-					i++
-				}
-				if i < len(input) {
-					out = append(out, '\n')
-				}
-				continue
-			}
-			if next == '*' {
-				i += 2
-				for i+1 < len(input) && !(input[i] == '*' && input[i+1] == '/') {
-					i++
-				}
-				i++
-				continue
-			}
-		}
-		out = append(out, ch)
-	}
-	return out
 }

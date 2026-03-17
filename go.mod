@@ -16,6 +16,8 @@ require (
 	github.com/goccy/go-json v0.7.10 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/klauspost/compress v1.13.6 // indirect
+	github.com/tidwall/geoindex v1.7.0 // indirect
+	github.com/tidwall/rtree v1.10.0 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.3.4 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	go.etcd.io/bbolt v1.3.6 // indirect

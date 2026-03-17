@@ -228,6 +228,36 @@ func (q *Query) CountQuery(table string, conditions map[string]any) (int64, erro
 	return count, nil
 }
 
+// CountGroupedQuery returns row counts grouped by a column.
+// The result maps group key values to their counts.
+func (q *Query) CountGroupedQuery(table string, conditions map[string]any, groupBy string) (map[int]int64, error) {
+	runner := q.runner()
+	if runner == nil {
+		return nil, fmt.Errorf("countGroupedQuery: database not initialized")
+	}
+	whereSQL, args := buildWhere(conditions)
+	col := quoteIdent(groupBy)
+	query := fmt.Sprintf("SELECT %s, COUNT(*) FROM %s%s GROUP BY %s", col, table, whereSQL, col)
+	rows, err := runner.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("countGroupedQuery: %w", err)
+	}
+	defer rows.Close()
+	result := map[int]int64{}
+	for rows.Next() {
+		var key int
+		var count int64
+		if err := rows.Scan(&key, &count); err != nil {
+			return nil, fmt.Errorf("countGroupedQuery scan: %w", err)
+		}
+		result[key] = count
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("countGroupedQuery rows: %w", err)
+	}
+	return result, nil
+}
+
 // InsertQuery inserts one or more rows.
 func (q *Query) InsertQuery(table string, values any) (int64, error) {
 	table = strings.TrimSpace(table)
@@ -286,12 +316,13 @@ func (q *Query) ExecQuery(sqlQuery string, args ...any) (int64, error) {
 }
 
 // MysteryQuery runs a raw SQL query and returns rows.
-func (q *Query) MysteryQuery(sqlQuery string) ([]map[string]any, error) {
+// Pass args to use parameterized placeholders and avoid SQL injection.
+func (q *Query) MysteryQuery(sqlQuery string, args ...any) ([]map[string]any, error) {
 	runner := q.runner()
 	if runner == nil {
 		return nil, fmt.Errorf("mysteryQuery: database not initialized")
 	}
-	rows, err := runner.Query(sqlQuery)
+	rows, err := runner.Query(sqlQuery, args...)
 	if err != nil {
 		return nil, fmt.Errorf("mysteryQuery: %w", err)
 	}
@@ -403,12 +434,9 @@ func quoteIdent(key string) string {
 	if key == "" {
 		return key
 	}
-	for _, r := range key {
-		if !(r == '_' || (r >= '0' && r <= '9') || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')) {
-			return key
-		}
-	}
-	return fmt.Sprintf("`%s`", key)
+	// Escape embedded backticks by doubling them, then wrap in backticks.
+	escaped := strings.ReplaceAll(key, "`", "``")
+	return "`" + escaped + "`"
 }
 
 func sortedKeys(values map[string]any) []string {

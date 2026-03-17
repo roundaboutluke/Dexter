@@ -99,15 +99,3 @@ func extractMentionID(value string) string {
 	return ""
 }
 
-func uniqueStrings(values []string) []string {
-	seen := map[string]bool{}
-	out := []string{}
-	for _, value := range values {
-		if value == "" || seen[value] {
-			continue
-		}
-		seen[value] = true
-		out = append(out, value)
-	}
-	return out
-}

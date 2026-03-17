@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"encoding/json"
+	"poraclego/internal/data"
 	"poraclego/internal/i18n"
 )
 
@@ -26,8 +27,12 @@ func questString(p *Processor, hook *Hook, language string, tr *i18n.Translator)
 	if lang == "" {
 		lang = "en"
 	}
-	if p != nil && p.data != nil && p.data.Translations != nil {
-		if raw, ok := p.data.Translations[lang]; ok {
+	var d *data.GameData
+	if p != nil {
+		d = p.getData()
+	}
+	if d != nil && d.Translations != nil {
+		if raw, ok := d.Translations[lang]; ok {
 			if langMap, ok := raw.(map[string]any); ok {
 				if title := getString(hook.Message["title"]); title != "" {
 					key := fmt.Sprintf("quest_title_%s", strings.ToLower(title))
@@ -60,8 +65,8 @@ func questString(p *Processor, hook *Hook, language string, tr *i18n.Translator)
 	if title := getString(hook.Message["quest_title"]); title != "" {
 		return translateMaybe(tr, title)
 	}
-	if questType := getInt(hook.Message["quest_type"]); questType > 0 && p != nil && p.data != nil {
-		if raw, ok := p.data.QuestTypes[fmt.Sprintf("%d", questType)]; ok {
+	if questType := getInt(hook.Message["quest_type"]); questType > 0 && p != nil && d != nil {
+		if raw, ok := d.QuestTypes[fmt.Sprintf("%d", questType)]; ok {
 			if m, ok := raw.(map[string]any); ok {
 				if text, ok := m["text"].(string); ok {
 					return translateMaybe(tr, text)

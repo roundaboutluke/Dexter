@@ -124,7 +124,8 @@ func renderMeta(target alertTarget) map[string]any {
 }
 
 func nameOrID(p *Processor, hook *Hook, key string) string {
-	if p.data == nil {
+	d := p.getData()
+	if d == nil {
 		return getString(hook.Message[key])
 	}
 	id := getString(hook.Message[key])
@@ -139,13 +140,13 @@ func nameOrID(p *Processor, hook *Hook, key string) string {
 		form = getInt(hook.Message["pokemon_form"])
 	}
 	keyWithForm := fmt.Sprintf("%s_%d", id, form)
-	if name := lookupMonsterName(p.data, keyWithForm); name != "" {
+	if name := lookupMonsterName(d, keyWithForm); name != "" {
 		return name
 	}
-	if name := lookupMonsterName(p.data, fmt.Sprintf("%s_0", id)); name != "" {
+	if name := lookupMonsterName(d, fmt.Sprintf("%s_0", id)); name != "" {
 		return name
 	}
-	if name := lookupMonsterName(p.data, id); name != "" {
+	if name := lookupMonsterName(d, id); name != "" {
 		return name
 	}
 	return id

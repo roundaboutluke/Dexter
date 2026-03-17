@@ -336,15 +336,19 @@ func boolToInt(value bool) int {
 }
 
 func lookupMonsterStats(p *Processor, pokemonID, formID int) (map[string]any, bool) {
-	if p == nil || p.data == nil {
+	if p == nil {
 		return nil, false
 	}
-	monster := lookupMonster(p.data, fmt.Sprintf("%d_%d", pokemonID, formID))
+	d := p.getData()
+	if d == nil {
+		return nil, false
+	}
+	monster := lookupMonster(d, fmt.Sprintf("%d_%d", pokemonID, formID))
 	if monster == nil && formID != 0 {
-		monster = lookupMonster(p.data, fmt.Sprintf("%d_0", pokemonID))
+		monster = lookupMonster(d, fmt.Sprintf("%d_0", pokemonID))
 	}
 	if monster == nil {
-		monster = lookupMonster(p.data, fmt.Sprintf("%d", pokemonID))
+		monster = lookupMonster(d, fmt.Sprintf("%d", pokemonID))
 	}
 	if monster == nil {
 		return nil, false
@@ -354,10 +358,14 @@ func lookupMonsterStats(p *Processor, pokemonID, formID int) (map[string]any, bo
 }
 
 func itemName(p *Processor, itemID int) string {
-	if itemID == 0 || p == nil || p.data == nil {
+	if itemID == 0 || p == nil {
 		return ""
 	}
-	raw, ok := p.data.Items[fmt.Sprintf("%d", itemID)]
+	d := p.getData()
+	if d == nil {
+		return ""
+	}
+	raw, ok := d.Items[fmt.Sprintf("%d", itemID)]
 	if !ok {
 		return ""
 	}
