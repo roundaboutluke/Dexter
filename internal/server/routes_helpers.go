@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -10,6 +11,9 @@ import (
 	"poraclego/internal/config"
 	"poraclego/internal/util"
 )
+
+// maxAPIBodySize limits API request bodies to 50 MB (same as the webhook handler).
+const maxAPIBodySize = 50 << 20
 
 func isAdmin(cfg *config.Config, id string) bool {
 	discordAdmins, _ := cfg.GetStringSlice("discord.admins")
@@ -122,7 +126,7 @@ func toStringSlice(raw any) []string {
 
 func decodeJSONRows(r *http.Request) ([]map[string]any, error) {
 	var payload any
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, maxAPIBodySize)).Decode(&payload); err != nil {
 		return nil, err
 	}
 	switch v := payload.(type) {
@@ -143,7 +147,7 @@ func decodeJSONRows(r *http.Request) ([]map[string]any, error) {
 
 func decodeStringArray(r *http.Request) ([]string, error) {
 	var payload any
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, maxAPIBodySize)).Decode(&payload); err != nil {
 		return nil, err
 	}
 	switch v := payload.(type) {
@@ -162,7 +166,7 @@ func decodeStringArray(r *http.Request) ([]string, error) {
 
 func decodeAnyArray(r *http.Request) ([]any, error) {
 	var payload any
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, maxAPIBodySize)).Decode(&payload); err != nil {
 		return nil, err
 	}
 	switch v := payload.(type) {
@@ -227,21 +231,6 @@ func intFromAny(value any) int {
 	return 0
 }
 
-func floatFromAny(value any) float64 {
-	switch v := value.(type) {
-	case float64:
-		return v
-	case int:
-		return float64(v)
-	case int64:
-		return float64(v)
-	case string:
-		f, _ := strconv.ParseFloat(v, 64)
-		return f
-	default:
-		return 0
-	}
-}
 
 func getStringValue(value any, cfg *config.Config, path string) string {
 	if value == nil {

@@ -69,7 +69,7 @@ func (c *InvasionCommand) Handle(ctx *Context, args []string) (string, error) {
 		removed, err := ctx.Query.DeleteWhereInQuery("invasion", map[string]any{
 			"id":         result.TargetID,
 			"profile_no": result.ProfileNo,
-		}, toAnySlice(types), "grunt_type")
+		}, toAnySliceStr(types), "grunt_type")
 		if err != nil {
 			return "", err
 		}
@@ -179,13 +179,6 @@ func parseGruntTypes(ctx *Context, args []string) []string {
 	return uniqueStrings(types)
 }
 
-func toAnySlice(values []string) []any {
-	out := make([]any, 0, len(values))
-	for _, value := range values {
-		out = append(out, value)
-	}
-	return out
-}
 
 func extractUids(rows []map[string]any) []any {
 	out := make([]any, 0, len(rows))

@@ -151,10 +151,3 @@ func parseLureIDs(ctx *Context, args []string) []int {
 	return uniqueInts(lureIDs)
 }
 
-func toAnySliceInt(values []int) []any {
-	out := make([]any, 0, len(values))
-	for _, value := range values {
-		out = append(out, value)
-	}
-	return out
-}

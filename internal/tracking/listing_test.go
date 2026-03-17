@@ -29,6 +29,29 @@ func (s stubRowSource) SelectAllQuery(table string, where map[string]any) ([]map
 	return filtered, nil
 }
 
+func (s stubRowSource) CountGroupedQuery(table string, conditions map[string]any, groupBy string) (map[int]int64, error) {
+	rows, err := s.SelectAllQuery(table, conditions)
+	if err != nil {
+		return nil, err
+	}
+	result := map[int]int64{}
+	for _, row := range rows {
+		key := 0
+		if v, ok := row[groupBy]; ok {
+			switch n := v.(type) {
+			case int:
+				key = n
+			case int64:
+				key = int(n)
+			case float64:
+				key = int(n)
+			}
+		}
+		result[key]++
+	}
+	return result, nil
+}
+
 func matchesWhere(row, where map[string]any) bool {
 	for key, want := range where {
 		if fmt.Sprintf("%v", row[key]) != fmt.Sprintf("%v", want) {

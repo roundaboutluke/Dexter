@@ -15,6 +15,7 @@ import (
 // RowSource is the minimal query surface needed to build tracked summaries.
 type RowSource interface {
 	SelectAllQuery(table string, where map[string]any) ([]map[string]any, error)
+	CountGroupedQuery(table string, conditions map[string]any, groupBy string) (map[int]int64, error)
 }
 
 // ListingContext carries the shared dependencies needed to render tracked
@@ -147,19 +148,18 @@ func ProfileCounts(ctx ListingContext, userID string, blocked []string) map[int]
 		if trackingDisabled(ctx.Config, spec.DisabledKey) || containsFold(blocked, spec.BlockedKeys...) {
 			continue
 		}
-		rows, err := ctx.Query.SelectAllQuery(spec.Table, map[string]any{"id": userID})
+		grouped, err := ctx.Query.CountGroupedQuery(spec.Table, map[string]any{"id": userID}, "profile_no")
 		if err != nil {
 			continue
 		}
-		for _, row := range rows {
-			profileNo := intFromAny(row["profile_no"])
+		for profileNo, count := range grouped {
 			if profileNo <= 0 {
 				profileNo = 1
 			}
 			if counts[profileNo] == nil {
 				counts[profileNo] = map[string]int{}
 			}
-			counts[profileNo][spec.Key]++
+			counts[profileNo][spec.Key] += int(count)
 		}
 	}
 	return counts

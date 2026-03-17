@@ -34,35 +34,15 @@ func isKnownForm(ctx *Context, formName string) bool {
 	return false
 }
 
-func containsStringInt(values []int, target int) bool {
-	for _, value := range values {
-		if value == target {
-			return true
-		}
-	}
-	return false
-}
-
-func uniqueInts(values []int) []int {
-	seen := map[int]bool{}
-	out := []int{}
-	for _, value := range values {
-		if !seen[value] {
-			seen[value] = true
-			out = append(out, value)
-		}
-	}
-	return out
-}
 
 func buildTrackMonsters(ctx *Context, ids []int, formNames []string, includeAllForms bool) []trackMonster {
 	if len(ids) == 0 {
 		return nil
 	}
-	if containsStringInt(ids, 0) && len(formNames) == 0 && !includeAllForms {
+	if containsInt(ids, 0) && len(formNames) == 0 && !includeAllForms {
 		return []trackMonster{{ID: 0, FormID: 0}}
 	}
-	if includeAllForms && ctx != nil && ctx.Data != nil && !containsStringInt(ids, 0) {
+	if includeAllForms && ctx != nil && ctx.Data != nil && !containsInt(ids, 0) {
 		idSet := map[int]bool{}
 		for _, id := range ids {
 			idSet[id] = true

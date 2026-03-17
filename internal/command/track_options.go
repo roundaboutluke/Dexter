@@ -266,7 +266,7 @@ func parseTrackOptions(ctx *Context, tr *i18n.Translator, args []string, re *Reg
 
 	if opt.PvpCap != 0 {
 		caps := levelCaps(ctx)
-		if !containsStringInt(caps, opt.PvpCap) {
+		if !containsInt(caps, opt.PvpCap) {
 			choices := append([]int{0}, caps...)
 			opt.Error = tr.TranslateFormat("This level cap is not supported, valid choices are: {0}", joinIntsInt(choices))
 		}

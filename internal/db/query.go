@@ -228,6 +228,36 @@ func (q *Query) CountQuery(table string, conditions map[string]any) (int64, erro
 	return count, nil
 }
 
+// CountGroupedQuery returns row counts grouped by a column.
+// The result maps group key values to their counts.
+func (q *Query) CountGroupedQuery(table string, conditions map[string]any, groupBy string) (map[int]int64, error) {
+	runner := q.runner()
+	if runner == nil {
+		return nil, fmt.Errorf("countGroupedQuery: database not initialized")
+	}
+	whereSQL, args := buildWhere(conditions)
+	col := quoteIdent(groupBy)
+	query := fmt.Sprintf("SELECT %s, COUNT(*) FROM %s%s GROUP BY %s", col, table, whereSQL, col)
+	rows, err := runner.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("countGroupedQuery: %w", err)
+	}
+	defer rows.Close()
+	result := map[int]int64{}
+	for rows.Next() {
+		var key int
+		var count int64
+		if err := rows.Scan(&key, &count); err != nil {
+			return nil, fmt.Errorf("countGroupedQuery scan: %w", err)
+		}
+		result[key] = count
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("countGroupedQuery rows: %w", err)
+	}
+	return result, nil
+}
+
 // InsertQuery inserts one or more rows.
 func (q *Query) InsertQuery(table string, values any) (int64, error) {
 	table = strings.TrimSpace(table)

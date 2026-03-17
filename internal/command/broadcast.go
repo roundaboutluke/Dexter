@@ -79,6 +79,9 @@ func (c *BroadcastCommand) Handle(ctx *Context, args []string) (string, error) {
 	templateID := strings.Join(args, " ")
 	messages, err := loadBroadcastMessages(ctx.Root)
 	if err != nil {
+		if logger := ctx.CommandLogger(); logger != nil {
+			logger.Warnf("broadcast: %v", err)
+		}
 		return tr.Translate("Cannot read broadcast.json - see log file for details", false), nil
 	}
 	discordMessage := ""
@@ -102,8 +105,8 @@ func (c *BroadcastCommand) Handle(ctx *Context, args []string) (string, error) {
 		return sendBroadcastJob(ctx, tr, result.TargetID, result.Target.Name, result.Target.Type, discordMessage, telegramMessage), nil
 	}
 
-	query := buildBroadcastQuery(latitude, longitude, distance, matchedAreas)
-	rows, err := ctx.Query.MysteryQuery(query)
+	query, queryArgs := buildBroadcastQuery(latitude, longitude, distance, matchedAreas)
+	rows, err := ctx.Query.MysteryQuery(query, queryArgs...)
 	if err != nil {
 		return "", err
 	}
@@ -171,11 +174,12 @@ func loadBroadcastMessages(root string) ([]broadcastEntry, error) {
 	return entries, nil
 }
 
-func buildBroadcastQuery(lat, lon float64, distance int, areas []string) string {
+func buildBroadcastQuery(lat, lon float64, distance int, areas []string) (string, []any) {
+	var args []any
 	areaFilter := "1 = 0"
 	for _, area := range areas {
-		safe := strings.ReplaceAll(area, "'", "\\'")
-		areaFilter += fmt.Sprintf(" OR humans.area like '%%\"%s\"%%'", safe)
+		areaFilter += " OR humans.area LIKE ?"
+		args = append(args, fmt.Sprintf("%%\"%s\"%%", area))
 	}
 	locationFilter := ""
 	if lat != 0 && lon != 0 && distance > 0 {
@@ -202,7 +206,7 @@ func buildBroadcastQuery(lat, lon float64, distance int, areas []string) string 
 			(%s)
 		)
 	`, locationFilter, areaFilter)
-	return query
+	return query, args
 }
 
 func sendBroadcastJob(ctx *Context, tr *i18n.Translator, targetID, targetName, targetType, discordMessage, telegramMessage string) string {
