@@ -22,6 +22,15 @@ func (p *Processor) startCachePruner() {
 			p.cache.PruneExpired(now)
 		}
 		p.pruneRaidSeen(now)
+		if p.gymCache != nil {
+			p.gymCache.PruneStale(now.Add(-24 * time.Hour))
+		}
+		if p.geocoder != nil {
+			p.geocoder.PruneStale(now.Add(-24 * time.Hour))
+		}
+		if p.weatherData != nil {
+			p.weatherData.PruneStaleCares(now.Unix())
+		}
 	}
 }
 

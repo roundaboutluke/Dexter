@@ -21,6 +21,7 @@ type Geocoder struct {
 	client      *http.Client
 	cache       map[string]string
 	detailCache map[string]ReverseResult
+	lastUsed    map[string]time.Time
 	mu          sync.Mutex
 }
 
@@ -56,6 +57,7 @@ func NewGeocoder(cfg *config.Config) *Geocoder {
 		client:      &http.Client{Timeout: 8 * time.Second},
 		cache:       map[string]string{},
 		detailCache: map[string]ReverseResult{},
+		lastUsed:    map[string]time.Time{},
 	}
 }
 
@@ -165,6 +167,7 @@ func (g *Geocoder) Reverse(lat, lon float64) string {
 	if cacheKey != "" {
 		g.mu.Lock()
 		if cached, ok := g.cache[cacheKey]; ok {
+			g.lastUsed[cacheKey] = time.Now()
 			g.mu.Unlock()
 			return cached
 		}
@@ -186,6 +189,7 @@ func (g *Geocoder) Reverse(lat, lon float64) string {
 		if cacheKey != "" {
 			g.mu.Lock()
 			g.cache[cacheKey] = address
+			g.lastUsed[cacheKey] = time.Now()
 			g.mu.Unlock()
 		}
 	}
@@ -216,6 +220,7 @@ func (g *Geocoder) ReverseDetails(lat, lon float64) *ReverseResult {
 	if cacheKey != "" {
 		g.mu.Lock()
 		if cached, ok := g.detailCache[cacheKey]; ok {
+			g.lastUsed[cacheKey] = time.Now()
 			g.mu.Unlock()
 			result := cached
 			return &result
@@ -238,6 +243,7 @@ func (g *Geocoder) ReverseDetails(lat, lon float64) *ReverseResult {
 			g.mu.Lock()
 			g.detailCache[cacheKey] = *result
 			g.cache[cacheKey] = result.FormattedAddress
+			g.lastUsed[cacheKey] = time.Now()
 			g.mu.Unlock()
 		}
 	}
@@ -407,6 +413,33 @@ func intersectionUsersFromConfig(cfg *config.Config) []string {
 	default:
 		return nil
 	}
+}
+
+// PruneStale removes geocoder cache entries not used since the cutoff time.
+func (g *Geocoder) PruneStale(cutoff time.Time) int {
+	if g == nil {
+		return 0
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	removed := 0
+	for key, used := range g.lastUsed {
+		if used.Before(cutoff) {
+			delete(g.cache, key)
+			delete(g.detailCache, key)
+			delete(g.lastUsed, key)
+			removed++
+		}
+	}
+	// Also remove entries that have no lastUsed tracking (pre-existing from older cache files).
+	for key := range g.cache {
+		if _, tracked := g.lastUsed[key]; !tracked {
+			delete(g.cache, key)
+			delete(g.detailCache, key)
+			removed++
+		}
+	}
+	return removed
 }
 
 func splitDisplayName(value string) (string, string) {

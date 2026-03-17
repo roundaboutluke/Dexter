@@ -24,14 +24,24 @@ type Fence struct {
 
 type Store struct {
 	Fences []Fence
+	index  *spatialIndex
 }
 
-// Replace updates the fence list in-place.
+// Replace updates the fence list and rebuilds the spatial index.
 func (s *Store) Replace(fences []Fence) {
 	if s == nil {
 		return
 	}
 	s.Fences = fences
+	s.index = newSpatialIndex(s.Fences)
+}
+
+// BuildIndex builds (or rebuilds) the spatial index for fast point lookups.
+func (s *Store) BuildIndex() {
+	if s == nil || len(s.Fences) == 0 {
+		return
+	}
+	s.index = newSpatialIndex(s.Fences)
 }
 
 func Load(cfg *config.Config, root string) (*Store, error) {
@@ -49,12 +59,17 @@ func Load(cfg *config.Config, root string) (*Store, error) {
 		}
 		fences = append(fences, loaded...)
 	}
-	return &Store{Fences: fences}, nil
+	store := &Store{Fences: fences}
+	store.BuildIndex()
+	return store, nil
 }
 
 func (s *Store) PointInArea(point []float64) []string {
 	if len(point) != 2 {
 		return []string{}
+	}
+	if s.index != nil {
+		return s.index.pointInAreas(point)
 	}
 	areas := make([]string, 0)
 	for _, fence := range s.Fences {
@@ -76,6 +91,9 @@ func (s *Store) PointInArea(point []float64) []string {
 func (s *Store) MatchedAreas(point []float64) []Fence {
 	if s == nil || len(point) != 2 {
 		return []Fence{}
+	}
+	if s.index != nil {
+		return s.index.matchedAreas(point)
 	}
 	matches := make([]Fence, 0)
 	for _, fence := range s.Fences {

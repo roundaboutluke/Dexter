@@ -4,9 +4,35 @@ import (
 	"fmt"
 	"strings"
 
+	"poraclego/internal/alertstate"
 	"poraclego/internal/digest"
 	"poraclego/internal/logging"
 )
+
+// monsterCandidates returns only the tracking rows that could possibly match
+// the pokemon in the hook, using the pre-built index instead of scanning all rows.
+func monsterCandidates(idx *alertstate.MonsterIndex, hook *Hook) []map[string]any {
+	pokemonID := getInt(hook.Message["pokemon_id"])
+
+	// Collect non-PVP candidates: catch-all (id=0) + species-specific.
+	var candidates []map[string]any
+	candidates = append(candidates, idx.ByPokemonID[0]...)
+	if pokemonID != 0 {
+		candidates = append(candidates, idx.ByPokemonID[pokemonID]...)
+	}
+
+	// Collect PVP candidates for each league present in the hook.
+	for _, league := range []int{500, 1500, 2500} {
+		key := pvpLeagueKey(league)
+		if hook.Message[key] == nil {
+			continue
+		}
+		candidates = append(candidates, idx.PVPEverything[league]...)
+		candidates = append(candidates, idx.PVPSpecific[league]...)
+	}
+
+	return candidates
+}
 
 func (p *Processor) matchTargets(hook *Hook) ([]alertMatch, error) {
 	if testTarget, ok := hook.Message["poracleTest"].(map[string]any); ok {
@@ -81,6 +107,11 @@ func (p *Processor) matchTargets(hook *Hook) ([]alertMatch, error) {
 			}
 		}
 	}
+	// Use indexed lookup for pokemon matching when available.
+	if hook.Type == "pokemon" && table == "monsters" && snapshot != nil && snapshot.Monsters != nil {
+		rows = monsterCandidates(snapshot.Monsters, hook)
+	}
+
 	var questRewardsNoAR map[string]any
 	var questRewardsAR map[string]any
 	if hook != nil && hook.Type == "quest" {

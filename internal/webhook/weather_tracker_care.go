@@ -163,6 +163,32 @@ func filterActivePokemons(list []caredPokemon, now int64) []caredPokemon {
 	return out
 }
 
+// PruneStaleCares removes expired care entries and empty cells.
+func (w *WeatherTracker) PruneStaleCares(now int64) int {
+	if w == nil {
+		return 0
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	removed := 0
+	for cellID, cell := range w.cares {
+		for id, entry := range cell.Cares {
+			// Prune expired pokemon within the entry.
+			entry.CaredPokemons = filterActivePokemons(entry.CaredPokemons, now)
+			// Remove the entry entirely if it has expired.
+			if entry.CaresUntil < now {
+				delete(cell.Cares, id)
+				removed++
+			}
+		}
+		// Remove empty cells to prevent map key accumulation.
+		if len(cell.Cares) == 0 {
+			delete(w.cares, cellID)
+		}
+	}
+	return removed
+}
+
 func hasAlteredPokemon(list []caredPokemon, weatherID int) bool {
 	if weatherID == 0 {
 		return len(list) > 0

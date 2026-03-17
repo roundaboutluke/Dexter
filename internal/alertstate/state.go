@@ -14,7 +14,19 @@ type Snapshot struct {
 	Profiles     map[string]map[string]any
 	HasSchedules map[string]bool
 	Fences       *geofence.Store
+	Monsters     *MonsterIndex
 	LoadedAt     time.Time
+}
+
+// MonsterIndex groups monster tracking rows for fast lookup by pokemon_id
+// and PVP league, avoiding full linear scans during matching.
+type MonsterIndex struct {
+	// ByPokemonID maps pokemon_id to tracking rows. Key 0 holds catch-all entries.
+	ByPokemonID map[int][]map[string]any
+	// PVPSpecific maps pvp_ranking_league to tracking rows where pokemon_id != 0.
+	PVPSpecific map[int][]map[string]any
+	// PVPEverything maps pvp_ranking_league to tracking rows where pokemon_id == 0.
+	PVPEverything map[int][]map[string]any
 }
 
 // Rows returns the tracking rows for a table.
