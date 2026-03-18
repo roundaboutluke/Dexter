@@ -11,6 +11,10 @@ import (
 )
 
 func (d *Discord) autocompletePokemonChoicesCore(query string, includeEverything bool) []*discordgo.ApplicationCommandOptionChoice {
+	return d.autocompletePokemonChoicesWithActive(query, includeEverything, nil)
+}
+
+func (d *Discord) autocompletePokemonChoicesWithActive(query string, includeEverything bool, activeIDs []int) []*discordgo.ApplicationCommandOptionChoice {
 	if d.manager == nil || d.manager.data == nil {
 		return nil
 	}
@@ -43,23 +47,51 @@ func (d *Discord) autocompletePokemonChoicesCore(query string, includeEverything
 	}
 	sort.Slice(candidates, func(i, j int) bool { return candidates[i].Name < candidates[j].Name })
 	choices := make([]*discordgo.ApplicationCommandOptionChoice, 0, len(candidates)+1)
-	if includeEverything && query == "" {
+	seen := map[int]bool{}
+	if includeEverything && (query == "" || strings.Contains("everything", query)) {
 		choices = append(choices, &discordgo.ApplicationCommandOptionChoice{
 			Name:  "Everything",
 			Value: "everything",
 		})
-		if len(candidates) > 24 {
-			candidates = candidates[:24]
+	}
+	// Insert currently-active pokemon before the alphabetical list.
+	for _, id := range activeIDs {
+		if len(choices) >= 25 {
+			break
 		}
-	} else if len(candidates) > 25 {
-		candidates = candidates[:25]
+		name := d.monsterNameWithForm(id, 0)
+		if name == "" {
+			continue
+		}
+		label := fmt.Sprintf("%s (#%d)", d.titleCase(name), id)
+		if query != "" && !strings.Contains(strings.ToLower(label), query) && !strings.Contains(fmt.Sprintf("%d", id), query) {
+			continue
+		}
+		seen[id] = true
+		choices = append(choices, &discordgo.ApplicationCommandOptionChoice{
+			Name:  truncateChoiceLabel(label),
+			Value: fmt.Sprintf("%d", id),
+		})
+	}
+	limit := 25 - len(choices)
+	if limit <= 0 {
+		return choices[:25]
+	}
+	if len(candidates) > limit {
+		candidates = candidates[:limit]
 	}
 	for _, mon := range candidates {
+		if seen[mon.ID] {
+			continue
+		}
 		label := fmt.Sprintf("%s (#%d)", d.titleCase(mon.Name), mon.ID)
 		choices = append(choices, &discordgo.ApplicationCommandOptionChoice{
 			Name:  label,
 			Value: fmt.Sprintf("%d", mon.ID),
 		})
+	}
+	if len(choices) > 25 {
+		choices = choices[:25]
 	}
 	return choices
 }
@@ -70,6 +102,14 @@ func (d *Discord) autocompletePokemonChoices(query string) []*discordgo.Applicat
 
 func (d *Discord) autocompleteInfoPokemonChoices(query string) []*discordgo.ApplicationCommandOptionChoice {
 	return d.autocompletePokemonChoicesCore(query, false)
+}
+
+func (d *Discord) autocompleteRaidBossChoices(query string) []*discordgo.ApplicationCommandOptionChoice {
+	return d.autocompletePokemonChoicesWithActive(query, true, d.recentActivityIDs("raidLevels"))
+}
+
+func (d *Discord) autocompleteMaxbattleBossChoices(query string) []*discordgo.ApplicationCommandOptionChoice {
+	return d.autocompletePokemonChoicesWithActive(query, true, d.recentActivityIDs("maxbattleLevels"))
 }
 
 func (d *Discord) autocompletePokemonFormChoices(query, pokemon string) []*discordgo.ApplicationCommandOptionChoice {
@@ -225,7 +265,7 @@ func (d *Discord) autocompleteTypeChoices(i *discordgo.InteractionCreate, query 
 	tr := d.slashInteractionTranslator(i)
 	choices := []*discordgo.ApplicationCommandOptionChoice{}
 	seen := map[string]bool{}
-	if query == "" {
+	if query == "" || strings.Contains("everything", query) || strings.Contains(strings.ToLower(translateOrDefault(tr, "Everything")), query) {
 		choices = append(choices, &discordgo.ApplicationCommandOptionChoice{
 			Name:  translateOrDefault(tr, "Everything"),
 			Value: "everything",
@@ -348,7 +388,7 @@ func (d *Discord) autocompleteLevelChoices(i *discordgo.InteractionCreate, query
 	}
 	sort.Ints(levels)
 	choices := make([]*discordgo.ApplicationCommandOptionChoice, 0, len(levels)+1)
-	if query == "" {
+	if query == "" || strings.Contains("everything", query) || strings.Contains(strings.ToLower(translateOrDefault(tr, "Everything")), query) {
 		choices = append(choices, &discordgo.ApplicationCommandOptionChoice{
 			Name:  translateOrDefault(tr, "Everything"),
 			Value: "everything",
