@@ -477,6 +477,14 @@
     //   uses templates (examples provided in tileservercache_templates folder)
       "staticProvider": "none",
       "staticProviderURL": "",
+      // tileserverTemplatePrefix - prefix for tileservercache template names.
+      // Default is "dexter-" (e.g. dexter-monster, dexter-raid).
+      // Set to "poracle-" for backwards compatibility with existing tileservercache setups.
+      "tileserverTemplatePrefix": "dexter-",
+      // tileserverTemplates - per-type overrides for tileservercache template names.
+      // When set, the value is used as the full template name (no prefix applied).
+      // e.g. { "monster": "my-custom-monster", "raid": "my-custom-raid" }
+      "tileserverTemplates": {},
       "tileserverSettings": {
         "default": {
           "type": "staticMap",          // can be staticMap or multiStaticMap - default is unlike to be changed

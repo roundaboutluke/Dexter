@@ -44,6 +44,25 @@ func NewClient(cfg *config.Config) *Client {
 	}
 }
 
+// ResolveTemplateName returns the full tileservercache template name for a
+// given type. It checks geocoding.tileserverTemplates.<type> first (full
+// override), then falls back to geocoding.tileserverTemplatePrefix + type
+// (default prefix is "dexter-").
+func ResolveTemplateName(cfg *config.Config, templateType string) string {
+	if cfg != nil {
+		if name, ok := cfg.GetString(fmt.Sprintf("geocoding.tileserverTemplates.%s", templateType)); ok && name != "" {
+			return name
+		}
+	}
+	prefix := "dexter-"
+	if cfg != nil {
+		if p, ok := cfg.GetString("geocoding.tileserverTemplatePrefix"); ok && p != "" {
+			prefix = p
+		}
+	}
+	return prefix + templateType
+}
+
 // GetMapURL returns a tileserver URL (pregenerated or dynamic).
 func (c *Client) GetMapURL(templateType string, data map[string]any, options TileOptions) (string, error) {
 	if c == nil || c.cfg == nil {
@@ -53,10 +72,11 @@ func (c *Client) GetMapURL(templateType string, data map[string]any, options Til
 	if baseURL == "" {
 		return "", fmt.Errorf("staticProviderURL not set")
 	}
+	resolved := ResolveTemplateName(c.cfg, templateType)
 	if strings.ToLower(options.Type) == "multistaticmap" {
-		return c.getURL(baseURL, "multistaticmap", "multi-"+templateType, data, options.Pregenerate)
+		return c.getURL(baseURL, "multistaticmap", "multi-"+resolved, data, options.Pregenerate)
 	}
-	return c.getURL(baseURL, "staticmap", templateType, data, options.Pregenerate)
+	return c.getURL(baseURL, "staticmap", resolved, data, options.Pregenerate)
 }
 
 // GetOptions returns configured tileserver options for a map type.
@@ -101,7 +121,7 @@ func (c *Client) getURL(baseURL, mapType, template string, data map[string]any, 
 	baseURL = strings.TrimRight(baseURL, "/")
 	if pregenerate {
 		start := time.Now()
-		endpoint := fmt.Sprintf("%s/%s/poracle-%s?pregenerate=true&regeneratable=true", baseURL, strings.ToLower(mapType), template)
+		endpoint := fmt.Sprintf("%s/%s/%s?pregenerate=true&regeneratable=true", baseURL, strings.ToLower(mapType), template)
 		body, err := json.Marshal(data)
 		if err != nil {
 			return "", err
@@ -150,7 +170,7 @@ func (c *Client) getURL(baseURL, mapType, template string, data map[string]any, 
 		}
 		return fmt.Sprintf("%s/%s/pregenerated/%s", baseURL, strings.ToLower(mapType), response), nil
 	}
-	endpoint := fmt.Sprintf("%s/%s/poracle-%s", baseURL, strings.ToLower(mapType), template)
+	endpoint := fmt.Sprintf("%s/%s/%s", baseURL, strings.ToLower(mapType), template)
 	u, err := url.Parse(endpoint)
 	if err != nil {
 		return "", err

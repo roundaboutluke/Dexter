@@ -132,7 +132,20 @@ Run it under your process manager of choice (systemd, pm2, etc.).
 
 ## Tileservercache Templates
 
-If you use `tileservercache` for static maps, reference templates are included in `tileservercache_templates/` (mirrors the PoracleJS set, including `poracle-maxbattle.json`).
+If you use `tileservercache` for static maps, reference templates are included in `tileservercache_templates/` (e.g. `dexter-monster.json`, `dexter-raid.json`).
+
+Template names are configurable via two config keys under `geocoding`:
+
+- `tileserverTemplatePrefix` (default `"dexter-"`) — the prefix prepended to each template type (e.g. `dexter-monster`, `dexter-raid`). Users migrating from PoracleJS can set this to `"poracle-"` for backwards compatibility.
+- `tileserverTemplates` — per-type overrides using the full template name (no prefix applied). For example:
+  ```json
+  "tileserverTemplates": {
+    "monster": "my-custom-monster",
+    "raid": "my-custom-raid"
+  }
+  ```
+
+Available template types: `monster`, `raid`, `quest`, `pokestop`, `gym`, `nest`, `weather`, `maxbattle`, `fort-update`, `area`, `areaoverview`, `distance`, `location`.
 
 ## Optional: Timezone DB (Per-Location Timezones)
 
