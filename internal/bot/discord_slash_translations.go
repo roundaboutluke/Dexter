@@ -176,7 +176,11 @@ func translateSlashName(tr *i18n.Translator, kind, name string) string {
 			return translated
 		}
 	}
-	return tr.Translate(name, false)
+	// Do not fall back to bare-key translation: general translations
+	// (e.g. "distance" → "*Расстояние*") are not valid Discord slash
+	// command/option names. Only explicit slash.command.* / slash.option.*
+	// keys should be used.
+	return name
 }
 
 func (d *Discord) slashLocalizationTargets() []slashLocalizationTarget {
