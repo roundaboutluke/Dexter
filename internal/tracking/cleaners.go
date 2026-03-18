@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"strings"
 
-	"poraclego/internal/config"
-	"poraclego/internal/data"
-	"poraclego/internal/util"
+	"dexter/internal/config"
+	"dexter/internal/data"
+	"dexter/internal/util"
 )
 
 // CleanMonsterRow normalizes a pokemon tracking rule for persistence.

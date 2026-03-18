@@ -9,8 +9,8 @@ import (
 
 	"github.com/evanoberholster/timezoneLookup"
 
-	"poraclego/internal/config"
-	"poraclego/internal/logging"
+	"dexter/internal/config"
+	"dexter/internal/logging"
 )
 
 type Locator struct {

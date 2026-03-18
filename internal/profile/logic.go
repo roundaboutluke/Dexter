@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"sort"
 
-	"poraclego/internal/alertstate"
-	"poraclego/internal/db"
+	"dexter/internal/alertstate"
+	"dexter/internal/db"
 )
 
 // Logic manages profile operations for a user.

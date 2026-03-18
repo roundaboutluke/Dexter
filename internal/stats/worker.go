@@ -3,7 +3,7 @@ package stats
 import (
 	"time"
 
-	"poraclego/internal/config"
+	"dexter/internal/config"
 )
 
 // Worker periodically calculates rarity statistics.

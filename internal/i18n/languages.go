@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"poraclego/internal/config"
+	"dexter/internal/config"
 )
 
 // EffectiveLanguages returns the configured language allowlist, or auto-discovers

@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"poraclego/internal/data"
-	"poraclego/internal/i18n"
+	"dexter/internal/data"
+	"dexter/internal/i18n"
 )
 
 func TestGruntRewardListsTreatNormalFormAsEmptyBeforeTranslation(t *testing.T) {

@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"strings"
 
-	"poraclego/internal/config"
-	"poraclego/internal/data"
-	"poraclego/internal/i18n"
-	"poraclego/internal/util"
+	"dexter/internal/config"
+	"dexter/internal/data"
+	"dexter/internal/i18n"
+	"dexter/internal/util"
 )
 
 // MonsterRowText mirrors PoracleJS monster tracking formatting.

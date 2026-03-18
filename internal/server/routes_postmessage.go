@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"poraclego/internal/dispatch"
-	"poraclego/internal/logging"
+	"dexter/internal/dispatch"
+	"dexter/internal/logging"
 )
 
 func registerPostMessageRoutes(s *Server, mux *http.ServeMux) {

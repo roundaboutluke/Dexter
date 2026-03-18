@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"poraclego/internal/i18n"
+	"dexter/internal/i18n"
 )
 
 func applyFortUpdateFields(data map[string]any, hook *Hook) {

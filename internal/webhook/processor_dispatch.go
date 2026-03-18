@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"poraclego/internal/dispatch"
-	"poraclego/internal/geo"
-	"poraclego/internal/logging"
+	"dexter/internal/dispatch"
+	"dexter/internal/geo"
+	"dexter/internal/logging"
 )
 
 func (p *Processor) dispatch(hook *Hook) {

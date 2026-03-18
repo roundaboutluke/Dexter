@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"sync"
 
-	"poraclego/internal/config"
-	"poraclego/internal/data"
+	"dexter/internal/config"
+	"dexter/internal/data"
 )
 
 // Entry describes a PvP ranking entry.

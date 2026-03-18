@@ -5,9 +5,9 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 
-	"poraclego/internal/community"
-	"poraclego/internal/db"
-	"poraclego/internal/logging"
+	"dexter/internal/community"
+	"dexter/internal/db"
+	"dexter/internal/logging"
 )
 
 func (d *Discord) onChannelDelete(s *discordgo.Session, ev *discordgo.ChannelDelete) {

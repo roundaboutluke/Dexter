@@ -3,7 +3,7 @@ package command
 import (
 	"strings"
 
-	"poraclego/internal/tracking"
+	"dexter/internal/tracking"
 )
 
 // GymCommand handles gym tracking.

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"poraclego/internal/db"
-	"poraclego/internal/geofence"
-	"poraclego/internal/util"
+	"dexter/internal/db"
+	"dexter/internal/geofence"
+	"dexter/internal/util"
 )
 
 var trackedTables = []string{

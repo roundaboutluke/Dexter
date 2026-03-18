@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"poraclego/internal/config"
+	"dexter/internal/config"
 )
 
 func selectImageURL(p *Processor, hook *Hook) string {

@@ -8,7 +8,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 
-	"poraclego/internal/config"
+	"dexter/internal/config"
 )
 
 // Client queries scanner databases for gym/pokestop metadata.

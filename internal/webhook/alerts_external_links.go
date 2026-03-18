@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"poraclego/internal/config"
+	"dexter/internal/config"
 )
 
 func buildRdmURL(cfg *config.Config, hook *Hook, lat, lon float64) string {

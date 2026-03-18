@@ -11,17 +11,17 @@ import (
 	"sync/atomic"
 	"time"
 
-	"poraclego/internal/bot"
-	"poraclego/internal/config"
-	"poraclego/internal/data"
-	"poraclego/internal/db"
-	"poraclego/internal/dispatch"
-	"poraclego/internal/dts"
-	"poraclego/internal/geofence"
-	"poraclego/internal/i18n"
-	"poraclego/internal/logging"
-	"poraclego/internal/scanner"
-	"poraclego/internal/webhook"
+	"dexter/internal/bot"
+	"dexter/internal/config"
+	"dexter/internal/data"
+	"dexter/internal/db"
+	"dexter/internal/dispatch"
+	"dexter/internal/dts"
+	"dexter/internal/geofence"
+	"dexter/internal/i18n"
+	"dexter/internal/logging"
+	"dexter/internal/scanner"
+	"dexter/internal/webhook"
 )
 
 // Server wraps the HTTP server.

@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"strings"
 
-	"poraclego/internal/config"
-	"poraclego/internal/i18n"
+	"dexter/internal/config"
+	"dexter/internal/i18n"
 )
 
 func containsID(cfg *config.Config, path string, id string) bool {

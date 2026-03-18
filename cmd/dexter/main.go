@@ -8,8 +8,8 @@ import (
 	"syscall"
 	"time"
 
-	"poraclego/internal/app"
-	"poraclego/internal/logging"
+	"dexter/internal/app"
+	"dexter/internal/logging"
 )
 
 func main() {

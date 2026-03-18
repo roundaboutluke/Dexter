@@ -199,7 +199,7 @@ func writeJSON(path string, payload any) (bool, error) {
 		}
 	}
 	dir := filepath.Dir(path)
-	tmp, err := os.CreateTemp(dir, ".tmp-poraclego-*.json")
+	tmp, err := os.CreateTemp(dir, ".tmp-dexter-*.json")
 	if err != nil {
 		return false, err
 	}

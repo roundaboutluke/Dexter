@@ -10,11 +10,11 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
-	"poraclego/internal/alertstate"
-	"poraclego/internal/community"
-	"poraclego/internal/db"
-	"poraclego/internal/dts"
-	"poraclego/internal/render"
+	"dexter/internal/alertstate"
+	"dexter/internal/community"
+	"dexter/internal/db"
+	"dexter/internal/dts"
+	"dexter/internal/render"
 )
 
 func (t *Telegram) startReconciliation() {

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"poraclego/internal/dts"
-	"poraclego/internal/render"
+	"dexter/internal/dts"
+	"dexter/internal/render"
 )
 
 // HelpCommand renders help or greeting DTS templates.

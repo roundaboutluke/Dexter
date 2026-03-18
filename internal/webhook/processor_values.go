@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"poraclego/internal/logging"
-	"poraclego/internal/util"
+	"dexter/internal/logging"
+	"dexter/internal/util"
 )
 
 func normalizeHook(item any) (*Hook, bool) {

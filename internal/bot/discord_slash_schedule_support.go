@@ -9,8 +9,8 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 
-	"poraclego/internal/config"
-	"poraclego/internal/i18n"
+	"dexter/internal/config"
+	"dexter/internal/i18n"
 )
 
 func profileRowByToken(rows []map[string]any, token string) map[string]any {

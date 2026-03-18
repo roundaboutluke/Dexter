@@ -5,14 +5,14 @@ import (
 	"sync"
 	"time"
 
-	"poraclego/internal/config"
-	"poraclego/internal/db"
-	"poraclego/internal/digest"
-	"poraclego/internal/dispatch"
-	"poraclego/internal/dts"
-	"poraclego/internal/i18n"
-	"poraclego/internal/logging"
-	"poraclego/internal/tz"
+	"dexter/internal/config"
+	"dexter/internal/db"
+	"dexter/internal/digest"
+	"dexter/internal/dispatch"
+	"dexter/internal/dts"
+	"dexter/internal/i18n"
+	"dexter/internal/logging"
+	"dexter/internal/tz"
 )
 
 // Scheduler checks active hours and switches profiles as needed.

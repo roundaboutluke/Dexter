@@ -3,20 +3,20 @@ package command
 import (
 	"fmt"
 
-	"poraclego/internal/config"
-	"poraclego/internal/data"
-	"poraclego/internal/db"
-	"poraclego/internal/dispatch"
-	"poraclego/internal/dts"
-	"poraclego/internal/geofence"
-	"poraclego/internal/i18n"
-	"poraclego/internal/logging"
-	"poraclego/internal/render"
-	"poraclego/internal/scanner"
-	"poraclego/internal/stats"
-	"poraclego/internal/tz"
-	"poraclego/internal/version"
-	"poraclego/internal/webhook"
+	"dexter/internal/config"
+	"dexter/internal/data"
+	"dexter/internal/db"
+	"dexter/internal/dispatch"
+	"dexter/internal/dts"
+	"dexter/internal/geofence"
+	"dexter/internal/i18n"
+	"dexter/internal/logging"
+	"dexter/internal/render"
+	"dexter/internal/scanner"
+	"dexter/internal/stats"
+	"dexter/internal/tz"
+	"dexter/internal/version"
+	"dexter/internal/webhook"
 )
 
 // Context holds command execution dependencies.
@@ -88,7 +88,7 @@ func (c *Context) RenderTemplate(templateType, templateID string, payload any) (
 	return "", nil
 }
 
-// Version returns the current PoracleGo version.
+// Version returns the current Dexter version.
 func (c *Context) Version() string {
 	return version.Read(c.Root)
 }

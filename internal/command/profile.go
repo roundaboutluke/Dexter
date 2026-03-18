@@ -1,7 +1,7 @@
 package command
 
 import (
-	"poraclego/internal/profile"
+	"dexter/internal/profile"
 )
 
 // ProfileCommand manages user profiles.

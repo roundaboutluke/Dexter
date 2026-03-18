@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"poraclego/internal/i18n"
+	"dexter/internal/i18n"
 )
 
 // RuleScope identifies the tracked user/profile pair for a normalized rule.

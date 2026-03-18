@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"strings"
 
-	"poraclego/internal/config"
-	"poraclego/internal/data"
-	"poraclego/internal/geofence"
-	"poraclego/internal/i18n"
-	"poraclego/internal/scanner"
+	"dexter/internal/config"
+	"dexter/internal/data"
+	"dexter/internal/geofence"
+	"dexter/internal/i18n"
+	"dexter/internal/scanner"
 )
 
 // RowSource is the minimal query surface needed to build tracked summaries.

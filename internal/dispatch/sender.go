@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"poraclego/internal/config"
-	"poraclego/internal/logging"
+	"dexter/internal/config"
+	"dexter/internal/logging"
 )
 
 // Sender delivers MessageJob payloads to Discord/Telegram/webhook targets.

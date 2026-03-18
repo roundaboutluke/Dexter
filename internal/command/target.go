@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"poraclego/internal/config"
-	"poraclego/internal/i18n"
+	"dexter/internal/config"
+	"dexter/internal/i18n"
 )
 
 func loadTargetRow(ctx *Context, t Target) (map[string]any, int, string, error) {

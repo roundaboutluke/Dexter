@@ -11,12 +11,12 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 
-	"poraclego/internal/command"
-	"poraclego/internal/config"
-	"poraclego/internal/data"
-	"poraclego/internal/dts"
-	"poraclego/internal/geofence"
-	"poraclego/internal/i18n"
+	"dexter/internal/command"
+	"dexter/internal/config"
+	"dexter/internal/data"
+	"dexter/internal/dts"
+	"dexter/internal/geofence"
+	"dexter/internal/i18n"
 )
 
 func TestSlashCommandDefinitionsGuidedEntryOptionsAreOptional(t *testing.T) {

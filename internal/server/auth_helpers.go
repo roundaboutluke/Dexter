@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	"poraclego/internal/config"
-	"poraclego/internal/logging"
+	"dexter/internal/config"
+	"dexter/internal/logging"
 )
 
 // rejectNotAllowedByIP writes the PoracleJS-style unhappy payload for whitelist/blacklist failures.

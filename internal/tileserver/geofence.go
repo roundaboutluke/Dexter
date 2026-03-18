@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"poraclego/internal/config"
-	"poraclego/internal/geofence"
+	"dexter/internal/config"
+	"dexter/internal/geofence"
 )
 
 // GenerateGeofenceTile builds a map for a single fence.

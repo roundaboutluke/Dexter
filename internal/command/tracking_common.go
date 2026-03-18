@@ -3,7 +3,7 @@ package command
 import (
 	"fmt"
 
-	"poraclego/internal/i18n"
+	"dexter/internal/i18n"
 )
 
 func defaultTemplateName(ctx *Context) string {

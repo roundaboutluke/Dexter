@@ -1,4 +1,4 @@
-module poraclego
+module dexter
 
 go 1.25.5
 

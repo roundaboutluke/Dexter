@@ -7,7 +7,7 @@ import (
 
 	"github.com/aymerick/raymond"
 
-	"poraclego/internal/i18n"
+	"dexter/internal/i18n"
 )
 
 func pokemonHelper(id interface{}, form interface{}, options *raymond.Options) string {

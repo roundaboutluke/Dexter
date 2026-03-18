@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"poraclego/internal/config"
-	"poraclego/internal/dispatch"
-	"poraclego/internal/i18n"
+	"dexter/internal/config"
+	"dexter/internal/dispatch"
+	"dexter/internal/i18n"
 )
 
 // BroadcastCommand sends a broadcast message to users (admin only).

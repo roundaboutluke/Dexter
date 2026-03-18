@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"poraclego/internal/config"
-	"poraclego/internal/geofence"
-	"poraclego/internal/webhook"
+	"dexter/internal/config"
+	"dexter/internal/geofence"
+	"dexter/internal/webhook"
 )
 
 func TestHealthReturnsHappyWithQueryAndPort(t *testing.T) {

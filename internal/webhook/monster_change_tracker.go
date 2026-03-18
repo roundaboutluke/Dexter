@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"poraclego/internal/config"
+	"dexter/internal/config"
 )
 
 type MonsterChangeTracker struct {

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"poraclego/internal/i18n"
+	"dexter/internal/i18n"
 )
 
 type renderDataContext struct {

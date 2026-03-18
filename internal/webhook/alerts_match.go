@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"poraclego/internal/alertstate"
-	"poraclego/internal/digest"
-	"poraclego/internal/logging"
+	"dexter/internal/alertstate"
+	"dexter/internal/digest"
+	"dexter/internal/logging"
 )
 
 // monsterCandidates returns only the tracking rows that could possibly match

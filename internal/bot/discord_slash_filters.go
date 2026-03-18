@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
-	"poraclego/internal/db"
-	"poraclego/internal/i18n"
-	"poraclego/internal/logging"
-	"poraclego/internal/tracking"
+	"dexter/internal/db"
+	"dexter/internal/i18n"
+	"dexter/internal/logging"
+	"dexter/internal/tracking"
 )
 
 const (

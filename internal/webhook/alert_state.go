@@ -1,8 +1,8 @@
 package webhook
 
 import (
-	"poraclego/internal/alertstate"
-	"poraclego/internal/logging"
+	"dexter/internal/alertstate"
+	"dexter/internal/logging"
 )
 
 // SetAlertStateLoader overrides the snapshot loader. Intended for tests.

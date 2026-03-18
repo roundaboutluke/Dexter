@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
-	"poraclego/internal/tracking"
+	"dexter/internal/tracking"
 )
 
 func (d *Discord) autocompleteQuestTypeChoices(i *discordgo.InteractionCreate, query string) []*discordgo.ApplicationCommandOptionChoice {

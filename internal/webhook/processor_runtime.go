@@ -5,11 +5,11 @@ import (
 	"path/filepath"
 	"time"
 
-	"poraclego/internal/data"
-	"poraclego/internal/dts"
-	"poraclego/internal/geofence"
-	"poraclego/internal/logging"
-	"poraclego/internal/pvp"
+	"dexter/internal/data"
+	"dexter/internal/dts"
+	"dexter/internal/geofence"
+	"dexter/internal/logging"
+	"dexter/internal/pvp"
 )
 
 func (p *Processor) startCachePruner() {

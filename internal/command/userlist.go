@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	"poraclego/internal/community"
-	"poraclego/internal/config"
+	"dexter/internal/community"
+	"dexter/internal/config"
 )
 
 // UserListCommand lists registered humans (admin only).

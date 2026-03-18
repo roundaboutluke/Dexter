@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"poraclego/internal/db"
-	"poraclego/internal/i18n"
-	"poraclego/internal/profile"
+	"dexter/internal/db"
+	"dexter/internal/i18n"
+	"dexter/internal/profile"
 )
 
 func profileDefaultMessage(ctx *Context, tr *i18n.Translator, logic *profile.Logic, result TargetResult) string {

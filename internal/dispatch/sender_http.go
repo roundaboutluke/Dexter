@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"poraclego/internal/config"
-	"poraclego/internal/logging"
+	"dexter/internal/config"
+	"dexter/internal/logging"
 )
 
 func (s *Sender) postJSONRaw(endpoint string, payload any, headers map[string]string) (int, string, error) {

@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"poraclego/internal/geofence"
+	"dexter/internal/geofence"
 )
 
 // Snapshot holds an immutable in-memory copy of alert-relevant state.

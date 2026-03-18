@@ -3,7 +3,7 @@ package server
 import (
 	"context"
 
-	"poraclego/internal/db"
+	"dexter/internal/db"
 )
 
 func withAlertStateTx(s *Server, fn func(*db.Query) error) error {

@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
-	"poraclego/internal/i18n"
+	"dexter/internal/i18n"
 )
 
 func slashUser(i *discordgo.InteractionCreate) (string, string) {

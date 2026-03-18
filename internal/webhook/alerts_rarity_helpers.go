@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"poraclego/internal/stats"
+	"dexter/internal/stats"
 )
 
 func rarityGroupForPokemon(tracker *stats.Tracker, pokemonID int) int {

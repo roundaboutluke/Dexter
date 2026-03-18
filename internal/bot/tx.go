@@ -3,7 +3,7 @@ package bot
 import (
 	"context"
 
-	"poraclego/internal/db"
+	"dexter/internal/db"
 )
 
 func (m *Manager) withQueryTx(fn func(*db.Query) error) error {

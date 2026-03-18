@@ -32,7 +32,7 @@ config/dts/*
 logs/*
 !logs/.gitkeep
 
-# Generated masterdata (run poraclego-generate after clone)
+# Generated masterdata (run dexter-generate after clone)
 util/*.json
 !util/util.json
 util/locale/*
@@ -67,5 +67,5 @@ __pycache__/
 .env
 
 # Built binaries
-/poraclego
-/poraclego-*
+/dexter
+/dexter-*

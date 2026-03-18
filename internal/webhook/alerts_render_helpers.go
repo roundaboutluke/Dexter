@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"poraclego/internal/data"
-	"poraclego/internal/logging"
-	"poraclego/internal/render"
-	"poraclego/internal/tileserver"
-	"poraclego/internal/uicons"
+	"dexter/internal/data"
+	"dexter/internal/logging"
+	"dexter/internal/render"
+	"dexter/internal/tileserver"
+	"dexter/internal/uicons"
 )
 
 func normalizeIV(hook *Hook, raw any) string {

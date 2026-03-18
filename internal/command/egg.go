@@ -3,7 +3,7 @@ package command
 import (
 	"strings"
 
-	"poraclego/internal/tracking"
+	"dexter/internal/tracking"
 )
 
 // EggCommand handles egg tracking.

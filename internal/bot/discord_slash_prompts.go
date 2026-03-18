@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
-	"poraclego/internal/i18n"
-	"poraclego/internal/logging"
+	"dexter/internal/i18n"
+	"dexter/internal/logging"
 )
 
 func (d *Discord) respondWithTypeSelect(s *discordgo.Session, i *discordgo.InteractionCreate) {

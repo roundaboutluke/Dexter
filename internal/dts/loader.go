@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"poraclego/internal/config"
+	"dexter/internal/config"
 )
 
 // Template represents a Discord/Telegram template entry.

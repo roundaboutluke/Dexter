@@ -6,8 +6,8 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 
-	"poraclego/internal/config"
-	"poraclego/internal/i18n"
+	"dexter/internal/config"
+	"dexter/internal/i18n"
 )
 
 func TestShippedDeFrSlashNameKeysCoverCommandInventory(t *testing.T) {

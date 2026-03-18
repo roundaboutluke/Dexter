@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"poraclego/internal/i18n"
+	"dexter/internal/i18n"
 )
 
 func infoRarity(ctx *Context) string {

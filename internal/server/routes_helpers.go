@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	"poraclego/internal/config"
-	"poraclego/internal/util"
+	"dexter/internal/config"
+	"dexter/internal/util"
 )
 
 // maxAPIBodySize limits API request bodies to 50 MB (same as the webhook handler).

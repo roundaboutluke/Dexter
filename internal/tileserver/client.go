@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"poraclego/internal/config"
-	"poraclego/internal/logging"
+	"dexter/internal/config"
+	"dexter/internal/logging"
 )
 
 // TileOptions configures a tileservercache request.

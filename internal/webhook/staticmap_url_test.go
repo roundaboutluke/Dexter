@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"poraclego/internal/config"
+	"dexter/internal/config"
 )
 
 func loadTestConfigFromMap(tb testing.TB, cfg map[string]any) *config.Config {

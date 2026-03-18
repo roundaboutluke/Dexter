@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	"poraclego/internal/i18n"
-	"poraclego/internal/profile"
+	"dexter/internal/i18n"
+	"dexter/internal/profile"
 )
 
 func quietHoursActive(human map[string]any) bool {

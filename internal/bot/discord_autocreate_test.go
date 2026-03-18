@@ -3,7 +3,7 @@ package bot
 import (
 	"testing"
 
-	"poraclego/internal/command"
+	"dexter/internal/command"
 )
 
 func TestInsertAutocreateTargetFailureSkipsCommandsAndRefresh(t *testing.T) {

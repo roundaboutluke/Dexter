@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"poraclego/internal/i18n"
+	"dexter/internal/i18n"
 )
 
 func caredPokemonFromHook(p *Processor, hook *Hook) *caredPokemon {

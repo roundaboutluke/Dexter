@@ -3,7 +3,7 @@ package webhook
 import (
 	"testing"
 
-	"poraclego/internal/data"
+	"dexter/internal/data"
 )
 
 func TestWeatherInfoUsesPlatformEmojiOverrides(t *testing.T) {

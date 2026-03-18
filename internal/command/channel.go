@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"poraclego/internal/community"
+	"dexter/internal/community"
 )
 
 // ChannelCommand registers/removes channels/webhooks (admin only).

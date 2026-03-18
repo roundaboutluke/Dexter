@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"poraclego/internal/config"
+	"dexter/internal/config"
 )
 
 // FetchKojiFences pulls remote geofences into the local cache folder.

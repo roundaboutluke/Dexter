@@ -5,10 +5,10 @@ import (
 	"strconv"
 	"strings"
 
-	"poraclego/internal/config"
-	"poraclego/internal/data"
-	"poraclego/internal/i18n"
-	"poraclego/internal/scanner"
+	"dexter/internal/config"
+	"dexter/internal/data"
+	"dexter/internal/i18n"
+	"dexter/internal/scanner"
 )
 
 // RaidRowText mirrors PoracleJS raid tracking formatting, using scanner lookup when available.

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"poraclego/internal/config"
+	"dexter/internal/config"
 )
 
 type roundTripperFunc func(*http.Request) (*http.Response, error)

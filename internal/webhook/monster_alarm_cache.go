@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"sync"
 
-	"poraclego/internal/config"
-	"poraclego/internal/db"
-	"poraclego/internal/logging"
+	"dexter/internal/config"
+	"dexter/internal/db"
+	"dexter/internal/logging"
 )
 
 type monsterQuery interface {

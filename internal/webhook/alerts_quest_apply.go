@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"poraclego/internal/i18n"
+	"dexter/internal/i18n"
 )
 
 func matchQuestWithVariants(hook *Hook, row map[string]any, rewardDataNoAR, rewardDataAR map[string]any) (bool, bool, bool) {

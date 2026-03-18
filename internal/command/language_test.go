@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"poraclego/internal/config"
-	"poraclego/internal/data"
-	"poraclego/internal/db"
-	"poraclego/internal/i18n"
+	"dexter/internal/config"
+	"dexter/internal/data"
+	"dexter/internal/db"
+	"dexter/internal/i18n"
 )
 
 func TestLanguageCommandListsDiscoveredLanguagesWhenConfigEmpty(t *testing.T) {

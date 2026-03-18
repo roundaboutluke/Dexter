@@ -7,7 +7,7 @@ import (
 
 	"github.com/golang/geo/s2"
 
-	"poraclego/internal/geo"
+	"dexter/internal/geo"
 )
 
 func applyDynamicWeatherRenderData(ctx *renderDataContext) {

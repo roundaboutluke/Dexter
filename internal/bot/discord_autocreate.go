@@ -9,8 +9,8 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 
-	"poraclego/internal/command"
-	"poraclego/internal/config"
+	"dexter/internal/command"
+	"dexter/internal/config"
 )
 
 type channelTemplate struct {

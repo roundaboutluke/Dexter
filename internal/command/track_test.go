@@ -3,8 +3,8 @@ package command
 import (
 	"testing"
 
-	"poraclego/internal/config"
-	"poraclego/internal/data"
+	"dexter/internal/config"
+	"dexter/internal/data"
 )
 
 func TestBuildTrackMonstersIncludeAllFormsKeepsDistinctForms(t *testing.T) {

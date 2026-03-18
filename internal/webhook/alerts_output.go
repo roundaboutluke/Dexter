@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"poraclego/internal/data"
-	"poraclego/internal/dispatch"
-	"poraclego/internal/render"
+	"dexter/internal/data"
+	"dexter/internal/dispatch"
+	"dexter/internal/render"
 )
 
 func (p *Processor) enqueue(job dispatch.MessageJob) {

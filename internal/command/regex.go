@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"poraclego/internal/i18n"
+	"dexter/internal/i18n"
 )
 
 // RegexSet mirrors PoracleJS regex helpers for commands.

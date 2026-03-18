@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"poraclego/internal/db"
-	"poraclego/internal/tileserver"
-	"poraclego/internal/webhook"
+	"dexter/internal/db"
+	"dexter/internal/tileserver"
+	"dexter/internal/webhook"
 )
 
 var postalCodeRe = regexp.MustCompile(`^\d{1,5}$`)

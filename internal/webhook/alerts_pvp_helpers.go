@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"poraclego/internal/config"
-	"poraclego/internal/i18n"
+	"dexter/internal/config"
+	"dexter/internal/i18n"
 )
 
 type pvpBestSummary struct {

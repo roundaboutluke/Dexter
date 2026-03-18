@@ -62,7 +62,7 @@
       "roleCheckMode": "ignore",
     // availableLanguages
     // - This is the explicit allowlist of languages that users can swap between using the !language command
-    // - When this object is left empty, PoracleGo auto-discovers full runtime locale packs from locale/*.json and config/custom.<locale>.json
+    // - When this object is left empty, Dexter auto-discovers full runtime locale packs from locale/*.json and config/custom.<locale>.json
     // - util/locale files are translation overlays/masterdata and do not make a language selectable for !language or Discord slash localizations on their own
     // - The configured general.locale still participates in text command parsing and Discord slash registration when a full runtime locale pack exists
     // - Each language can have it's own call word which pre-sets that language, and you also define the help text

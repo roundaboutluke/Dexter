@@ -7,8 +7,8 @@ import (
 
 	"encoding/json"
 	"github.com/bwmarrin/discordgo"
-	"poraclego/internal/command"
-	"poraclego/internal/logging"
+	"dexter/internal/command"
+	"dexter/internal/logging"
 )
 
 type slashExecutionStatus string

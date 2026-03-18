@@ -6,10 +6,10 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 
-	"poraclego/internal/config"
-	"poraclego/internal/dts"
-	"poraclego/internal/logging"
-	"poraclego/internal/render"
+	"dexter/internal/config"
+	"dexter/internal/dts"
+	"dexter/internal/logging"
+	"dexter/internal/render"
 )
 
 func (d *Discord) sendGreetingsDiscord(userID string) {

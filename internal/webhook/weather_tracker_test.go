@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"poraclego/internal/config"
+	"dexter/internal/config"
 )
 
 func loadTestConfig(t *testing.T, root string, showAltered bool) *config.Config {

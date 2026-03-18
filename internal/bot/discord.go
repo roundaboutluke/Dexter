@@ -10,9 +10,9 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 
-	"poraclego/internal/command"
-	"poraclego/internal/config"
-	"poraclego/internal/logging"
+	"dexter/internal/command"
+	"dexter/internal/config"
+	"dexter/internal/logging"
 )
 
 // Discord bot wrapper.

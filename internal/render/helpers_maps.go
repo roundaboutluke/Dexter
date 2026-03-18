@@ -12,7 +12,7 @@ import (
 	"github.com/aymerick/raymond"
 	"github.com/aymerick/raymond/ast"
 
-	"poraclego/internal/config"
+	"dexter/internal/config"
 )
 
 // isCurrentBlockHelper returns true when the helper currently executing is the helper that owns the

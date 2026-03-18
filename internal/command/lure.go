@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"poraclego/internal/tracking"
+	"dexter/internal/tracking"
 )
 
 // LureCommand handles lure tracking.

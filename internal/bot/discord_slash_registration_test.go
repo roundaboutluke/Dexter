@@ -9,9 +9,9 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 
-	"poraclego/internal/config"
-	"poraclego/internal/data"
-	"poraclego/internal/i18n"
+	"dexter/internal/config"
+	"dexter/internal/data"
+	"dexter/internal/i18n"
 )
 
 func TestSlashCommandDefinitionsDiscoverLocalizationsWhenConfigEmpty(t *testing.T) {

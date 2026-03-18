@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"poraclego/internal/i18n"
+	"dexter/internal/i18n"
 )
 
 // InfoCommand provides basic information queries.

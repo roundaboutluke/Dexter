@@ -10,9 +10,9 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 
-	"poraclego/internal/geofence"
-	"poraclego/internal/logging"
-	"poraclego/internal/tileserver"
+	"dexter/internal/geofence"
+	"dexter/internal/logging"
+	"dexter/internal/tileserver"
 )
 
 const (

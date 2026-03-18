@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"strings"
 
-	"poraclego/internal/alertstate"
-	"poraclego/internal/community"
-	"poraclego/internal/db"
-	"poraclego/internal/dispatch"
-	"poraclego/internal/dts"
-	"poraclego/internal/render"
+	"dexter/internal/alertstate"
+	"dexter/internal/community"
+	"dexter/internal/db"
+	"dexter/internal/dispatch"
+	"dexter/internal/dts"
+	"dexter/internal/render"
 )
 
 // StartCommand enables alerts.

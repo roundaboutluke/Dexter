@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
-	"poraclego/internal/logging"
-	"poraclego/internal/webhook"
+	"dexter/internal/logging"
+	"dexter/internal/webhook"
 )
 
 var postalCodeRe = regexp.MustCompile(`^\d{1,5}$`)

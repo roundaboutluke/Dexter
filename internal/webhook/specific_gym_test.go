@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"poraclego/internal/config"
-	"poraclego/internal/geofence"
+	"dexter/internal/config"
+	"dexter/internal/geofence"
 )
 
 func loadAreaSecurityConfig(t *testing.T, root string, enabled, strict bool) *config.Config {

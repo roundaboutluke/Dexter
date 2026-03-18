@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"poraclego/internal/config"
-	"poraclego/internal/dispatch"
-	"poraclego/internal/i18n"
+	"dexter/internal/config"
+	"dexter/internal/dispatch"
+	"dexter/internal/i18n"
 )
 
 func TestNotifySwitchLocalizesMessage(t *testing.T) {
