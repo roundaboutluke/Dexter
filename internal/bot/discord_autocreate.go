@@ -144,7 +144,7 @@ func (d *Discord) handleAutocreate(s *discordgo.Session, m *discordgo.MessageCre
 				Name: formatTemplate(channelDef.ChannelName, subArgs),
 			}
 		} else {
-			webhook, err := s.WebhookCreate(channel.ID, "Poracle", "")
+			webhook, err := s.WebhookCreate(channel.ID, "Dexter", "")
 			if err != nil || webhook == nil {
 				continue
 			}

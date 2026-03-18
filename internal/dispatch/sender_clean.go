@@ -76,7 +76,11 @@ func (s *Sender) scheduleTelegramDelete(token, chatID string, messageID int, del
 		delay = 0
 	}
 	time.AfterFunc(delay, func() {
-		_, _ = s.postTelegramWithResponse(endpoint, payload)
+		if _, err := s.postTelegramWithResponse(endpoint, payload); err != nil {
+			if logger := logging.Get().Telegram; logger != nil {
+				logger.Warnf("telegram clean delete failed for %s/%d: %v", chatID, messageID, err)
+			}
+		}
 		if s.cleanTelegram != nil {
 			s.cleanTelegram.Remove(entry)
 		}

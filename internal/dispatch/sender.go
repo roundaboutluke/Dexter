@@ -59,6 +59,9 @@ func NewSender(cfg *config.Config, root string) *Sender {
 	if root == "" {
 		root = "."
 	}
+	if abs, err := filepath.Abs(root); err == nil {
+		root = abs
+	}
 	cacheDir := filepath.Join(root, ".cache")
 	_ = os.MkdirAll(cacheDir, 0o755)
 	timeout := 10 * time.Second
