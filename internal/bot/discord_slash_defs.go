@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
-	"poraclego/internal/logging"
+	"dexter/internal/logging"
 )
 
 func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {

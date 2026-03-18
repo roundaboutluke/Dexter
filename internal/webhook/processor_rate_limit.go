@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"poraclego/internal/config"
-	"poraclego/internal/dispatch"
+	"dexter/internal/config"
+	"dexter/internal/dispatch"
 )
 
 func (p *Processor) applyRateLimit(job dispatch.MessageJob) ([]dispatch.MessageJob, bool) {

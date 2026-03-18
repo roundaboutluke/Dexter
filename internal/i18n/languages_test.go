@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"poraclego/internal/config"
+	"dexter/internal/config"
 )
 
 func TestEffectiveLanguagesDiscoversShippedLocalesWhenConfigEmpty(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"poraclego/internal/config"
+	"dexter/internal/config"
 )
 
 func loadCustomEmoji(root string) map[string]map[string]string {

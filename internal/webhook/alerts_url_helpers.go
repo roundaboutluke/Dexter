@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"poraclego/internal/config"
-	"poraclego/internal/logging"
+	"dexter/internal/config"
+	"dexter/internal/logging"
 )
 
 func googleMapURL(hook *Hook) string {

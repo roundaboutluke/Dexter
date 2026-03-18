@@ -9,10 +9,10 @@ import (
 
 	"github.com/golang/geo/s2"
 
-	"poraclego/internal/geo"
-	"poraclego/internal/i18n"
-	"poraclego/internal/tileserver"
-	"poraclego/internal/uicons"
+	"dexter/internal/geo"
+	"dexter/internal/i18n"
+	"dexter/internal/tileserver"
+	"dexter/internal/uicons"
 )
 
 func infoWeather(ctx *Context, targetID string, args []string, re *RegexSet) string {

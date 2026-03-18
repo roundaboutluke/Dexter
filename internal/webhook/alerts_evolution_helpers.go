@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"poraclego/internal/i18n"
+	"dexter/internal/i18n"
 )
 
 func applyPokemonEvolutions(p *Processor, data map[string]any, pokemonID, formID int, platform string, tr *i18n.Translator) {

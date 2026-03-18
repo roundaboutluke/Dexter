@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
-	"poraclego/internal/i18n"
-	"poraclego/internal/uicons"
+	"dexter/internal/i18n"
+	"dexter/internal/uicons"
 )
 
 func (d *Discord) slashUiconsClient() *uicons.Client {

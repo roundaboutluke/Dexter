@@ -6,19 +6,19 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 
-	"poraclego/internal/command"
-	"poraclego/internal/config"
-	"poraclego/internal/data"
-	"poraclego/internal/db"
-	"poraclego/internal/dispatch"
-	"poraclego/internal/dts"
-	"poraclego/internal/geofence"
-	"poraclego/internal/i18n"
-	"poraclego/internal/logging"
-	"poraclego/internal/scanner"
-	"poraclego/internal/stats"
-	"poraclego/internal/tz"
-	"poraclego/internal/webhook"
+	"dexter/internal/command"
+	"dexter/internal/config"
+	"dexter/internal/data"
+	"dexter/internal/db"
+	"dexter/internal/dispatch"
+	"dexter/internal/dts"
+	"dexter/internal/geofence"
+	"dexter/internal/i18n"
+	"dexter/internal/logging"
+	"dexter/internal/scanner"
+	"dexter/internal/stats"
+	"dexter/internal/tz"
+	"dexter/internal/webhook"
 )
 
 // Manager coordinates Discord and Telegram bots.

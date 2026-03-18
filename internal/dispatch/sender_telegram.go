@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"poraclego/internal/logging"
+	"dexter/internal/logging"
 )
 
 func (s *Sender) sendTelegram(chatID string, job MessageJob) error {

@@ -3,7 +3,7 @@ package server
 import (
 	"strings"
 
-	"poraclego/internal/dispatch"
+	"dexter/internal/dispatch"
 )
 
 func sendTrackingMessage(s *Server, human map[string]any, message, language string) {

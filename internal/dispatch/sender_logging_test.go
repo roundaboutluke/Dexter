@@ -10,8 +10,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"poraclego/internal/config"
-	"poraclego/internal/logging"
+	"dexter/internal/config"
+	"dexter/internal/logging"
 )
 
 func TestDiscordRequestWithRetriesLogsRateLimits(t *testing.T) {

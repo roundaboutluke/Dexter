@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"poraclego/internal/util"
+	"dexter/internal/util"
 )
 
 type Target struct {

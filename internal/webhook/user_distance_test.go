@@ -3,7 +3,7 @@ package webhook
 import (
 	"testing"
 
-	"poraclego/internal/config"
+	"dexter/internal/config"
 )
 
 func TestPokemonRenderAddsUserDistanceAndTrackingFlags(t *testing.T) {

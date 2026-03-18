@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"encoding/json"
-	"poraclego/internal/data"
-	"poraclego/internal/i18n"
+	"dexter/internal/data"
+	"dexter/internal/i18n"
 )
 
 func questString(p *Processor, hook *Hook, language string, tr *i18n.Translator) string {

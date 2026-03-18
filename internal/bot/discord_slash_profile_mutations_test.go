@@ -15,9 +15,9 @@ import (
 	"testing"
 	"time"
 
-	"poraclego/internal/alertstate"
-	"poraclego/internal/db"
-	"poraclego/internal/webhook"
+	"dexter/internal/alertstate"
+	"dexter/internal/db"
+	"dexter/internal/webhook"
 )
 
 func TestPersistSlashHumanUpdateRefreshesAlertState(t *testing.T) {

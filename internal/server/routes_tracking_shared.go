@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strings"
 
-	"poraclego/internal/i18n"
-	"poraclego/internal/tracking"
+	"dexter/internal/i18n"
+	"dexter/internal/tracking"
 )
 
 type trackingRouteConfig struct {

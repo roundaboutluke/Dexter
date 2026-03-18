@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"poraclego/internal/config"
+	"dexter/internal/config"
 )
 
 // Level describes log severity.

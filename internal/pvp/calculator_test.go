@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"poraclego/internal/config"
-	"poraclego/internal/data"
+	"dexter/internal/config"
+	"dexter/internal/data"
 )
 
 func TestRankingsBasic(t *testing.T) {

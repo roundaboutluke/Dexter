@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"poraclego/internal/i18n"
-	"poraclego/internal/profile"
+	"dexter/internal/i18n"
+	"dexter/internal/profile"
 )
 
 func resolveProfileNumber(logic *profile.Logic, token string) (int, string) {

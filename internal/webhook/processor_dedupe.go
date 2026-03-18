@@ -6,7 +6,7 @@ import (
 	"sort"
 	"time"
 
-	"poraclego/internal/logging"
+	"dexter/internal/logging"
 )
 
 func (p *Processor) dedupePokemon(hook *Hook) bool {

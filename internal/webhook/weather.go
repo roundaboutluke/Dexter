@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"poraclego/internal/config"
-	"poraclego/internal/logging"
+	"dexter/internal/config"
+	"dexter/internal/logging"
 )
 
 // WeatherClient fetches external weather data when configured.

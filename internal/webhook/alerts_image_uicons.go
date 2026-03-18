@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"poraclego/internal/uicons"
+	"dexter/internal/uicons"
 )
 
 func uiconsURL(baseURL, imageType string, hook *Hook, shinyPossible bool) string {

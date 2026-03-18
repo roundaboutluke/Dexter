@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"strings"
 
-	"poraclego/internal/geo"
-	"poraclego/internal/i18n"
-	"poraclego/internal/webhook"
+	"dexter/internal/geo"
+	"dexter/internal/i18n"
+	"dexter/internal/webhook"
 )
 
 // WeatherCommand adds weather tracking.

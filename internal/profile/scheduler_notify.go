@@ -6,12 +6,12 @@ import (
 	"strings"
 	"time"
 
-	"poraclego/internal/config"
-	"poraclego/internal/digest"
-	"poraclego/internal/dispatch"
-	"poraclego/internal/dts"
-	"poraclego/internal/i18n"
-	"poraclego/internal/render"
+	"dexter/internal/config"
+	"dexter/internal/digest"
+	"dexter/internal/dispatch"
+	"dexter/internal/dts"
+	"dexter/internal/i18n"
+	"dexter/internal/render"
 )
 
 func (s *Scheduler) notifySwitch(human map[string]any, profile map[string]any) {

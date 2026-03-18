@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"poraclego/internal/config"
-	"poraclego/internal/data"
-	"poraclego/internal/i18n"
+	"dexter/internal/config"
+	"dexter/internal/data"
+	"dexter/internal/i18n"
 )
 
 // NestRowText mirrors PoracleJS nest tracking formatting.

@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"strings"
 
-	"poraclego/internal/config"
-	"poraclego/internal/dts"
-	"poraclego/internal/version"
+	"dexter/internal/config"
+	"dexter/internal/dts"
+	"dexter/internal/version"
 )
 
 func registerConfigRoutes(s *Server, mux *http.ServeMux) {

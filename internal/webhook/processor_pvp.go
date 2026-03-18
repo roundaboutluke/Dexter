@@ -4,8 +4,8 @@ import (
 	"strings"
 	"time"
 
-	"poraclego/internal/logging"
-	"poraclego/internal/pvp"
+	"dexter/internal/logging"
+	"dexter/internal/pvp"
 )
 
 func (p *Processor) updateStats(hook *Hook) {

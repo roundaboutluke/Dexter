@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"poraclego/internal/logging"
-	"poraclego/internal/tz"
+	"dexter/internal/logging"
+	"dexter/internal/tz"
 )
 
 const defaultPogoEventsURL = "https://raw.githubusercontent.com/bigfoott/ScrapedDuck/data/events.json"

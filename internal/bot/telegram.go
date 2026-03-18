@@ -8,9 +8,9 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
-	"poraclego/internal/command"
-	"poraclego/internal/i18n"
-	"poraclego/internal/logging"
+	"dexter/internal/command"
+	"dexter/internal/i18n"
+	"dexter/internal/logging"
 )
 
 // Telegram bot wrapper.

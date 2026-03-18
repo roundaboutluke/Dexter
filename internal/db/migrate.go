@@ -56,7 +56,7 @@ func RunMigrations(ctx context.Context, conn *DB, dir string) error {
 			continue
 		}
 		if err := runMigrationFile(ctx, conn, path); err != nil {
-			// When pointing PoracleGo at an existing PoracleJS database, early migrations may have already
+			// When pointing Dexter at an existing PoracleJS database, early migrations may have already
 			// been applied. MySQL/MariaDB then error with duplicate column/table/index messages.
 			// Treat these as "already applied" and move on so later migrations can still run.
 			if !isMySQLAlreadyAppliedError(err) {

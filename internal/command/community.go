@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	"poraclego/internal/community"
-	"poraclego/internal/db"
+	"dexter/internal/community"
+	"dexter/internal/db"
 )
 
 // CommunityCommand manages community membership (admin only).

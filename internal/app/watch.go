@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"poraclego/internal/config"
-	"poraclego/internal/data"
-	"poraclego/internal/dts"
-	"poraclego/internal/geofence"
+	"dexter/internal/config"
+	"dexter/internal/data"
+	"dexter/internal/dts"
+	"dexter/internal/geofence"
 )
 
 func (a *App) startWatchers(ctx context.Context, root string) {

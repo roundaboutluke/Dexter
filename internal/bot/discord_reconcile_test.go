@@ -7,7 +7,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 
-	"poraclego/internal/config"
+	"dexter/internal/config"
 )
 
 func TestSyncDiscordChannelsSkipsTransientFetchErrors(t *testing.T) {

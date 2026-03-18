@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
-	"poraclego/internal/geofence"
-	"poraclego/internal/i18n"
-	"poraclego/internal/tracking"
+	"dexter/internal/geofence"
+	"dexter/internal/i18n"
+	"dexter/internal/tracking"
 )
 
 func normalizeRaidType(value string) string {

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"poraclego/internal/data"
-	"poraclego/internal/i18n"
+	"dexter/internal/data"
+	"dexter/internal/i18n"
 )
 
 // WeatherRowText formats weather tracking output.

@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"poraclego/internal/uicons"
+	"dexter/internal/uicons"
 )
 
 // stripTrailingTrackArgs removes common trailing tracking args (clean, template:X)

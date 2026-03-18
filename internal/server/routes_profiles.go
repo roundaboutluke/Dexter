@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"poraclego/internal/profile"
+	"dexter/internal/profile"
 )
 
 func registerProfileRoutes(s *Server, mux *http.ServeMux) {

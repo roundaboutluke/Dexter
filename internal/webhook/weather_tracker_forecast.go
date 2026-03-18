@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"poraclego/internal/logging"
+	"dexter/internal/logging"
 )
 
 func (w *WeatherTracker) fetchForecast(cellID string, lat, lon float64) {

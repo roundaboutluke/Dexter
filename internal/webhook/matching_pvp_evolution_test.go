@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"poraclego/internal/config"
+	"dexter/internal/config"
 )
 
 func writeJSON(t *testing.T, path string, data any) {

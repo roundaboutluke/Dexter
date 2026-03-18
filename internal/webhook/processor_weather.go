@@ -6,9 +6,9 @@ import (
 
 	"github.com/golang/geo/s2"
 
-	"poraclego/internal/dispatch"
-	"poraclego/internal/geo"
-	"poraclego/internal/logging"
+	"dexter/internal/dispatch"
+	"dexter/internal/geo"
+	"dexter/internal/logging"
 )
 
 func (p *Processor) dispatchWeatherChange(hook *Hook) bool {

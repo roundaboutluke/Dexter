@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"poraclego/internal/config"
+	"dexter/internal/config"
 )
 
 func TestInitCreatesCategoryFilesAndAliases(t *testing.T) {

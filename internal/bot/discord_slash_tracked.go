@@ -5,10 +5,10 @@ import (
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
-	"poraclego/internal/command"
-	"poraclego/internal/geofence"
-	"poraclego/internal/i18n"
-	"poraclego/internal/tracking"
+	"dexter/internal/command"
+	"dexter/internal/geofence"
+	"dexter/internal/i18n"
+	"dexter/internal/tracking"
 )
 
 func (d *Discord) handleSlashTracked(s *discordgo.Session, i *discordgo.InteractionCreate) {

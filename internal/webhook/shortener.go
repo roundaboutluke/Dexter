@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"poraclego/internal/config"
+	"dexter/internal/config"
 )
 
 type urlShortener interface {

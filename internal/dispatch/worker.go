@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"poraclego/internal/config"
-	"poraclego/internal/logging"
+	"dexter/internal/config"
+	"dexter/internal/logging"
 )
 
 // Worker drains a dispatch queue at a fixed interval.

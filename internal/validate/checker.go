@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"poraclego/internal/config"
-	"poraclego/internal/dts"
-	"poraclego/internal/geofence"
+	"dexter/internal/config"
+	"dexter/internal/dts"
+	"dexter/internal/geofence"
 )
 
 // CheckConfig logs warnings for common config issues.

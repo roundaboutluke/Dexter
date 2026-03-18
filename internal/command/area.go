@@ -6,11 +6,11 @@ import (
 	"sort"
 	"strings"
 
-	"poraclego/internal/db"
-	"poraclego/internal/geofence"
-	"poraclego/internal/i18n"
-	"poraclego/internal/tileserver"
-	"poraclego/internal/tracking"
+	"dexter/internal/db"
+	"dexter/internal/geofence"
+	"dexter/internal/i18n"
+	"dexter/internal/tileserver"
+	"dexter/internal/tracking"
 )
 
 // AreaCommand manages area selection.

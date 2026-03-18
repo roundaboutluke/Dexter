@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"poraclego/internal/config"
-	"poraclego/internal/logging"
+	"dexter/internal/config"
+	"dexter/internal/logging"
 )
 
 // Geocoder performs reverse geocoding with basic caching.

@@ -11,10 +11,10 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 
-	"poraclego/internal/command"
-	"poraclego/internal/i18n"
-	"poraclego/internal/uicons"
-	"poraclego/internal/util"
+	"dexter/internal/command"
+	"dexter/internal/i18n"
+	"dexter/internal/uicons"
+	"dexter/internal/util"
 )
 
 func (d *Discord) handlePoracleClean(s *discordgo.Session, m *discordgo.MessageCreate, ctx *command.Context) {

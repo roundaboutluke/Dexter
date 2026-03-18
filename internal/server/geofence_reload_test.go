@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"poraclego/internal/config"
-	"poraclego/internal/geofence"
-	"poraclego/internal/webhook"
+	"dexter/internal/config"
+	"dexter/internal/geofence"
+	"dexter/internal/webhook"
 )
 
 func writeTestConfig(t *testing.T, root string, cfg map[string]any) *config.Config {

@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
-	"poraclego/internal/i18n"
-	"poraclego/internal/scanner"
+	"dexter/internal/i18n"
+	"dexter/internal/scanner"
 )
 
 func (d *Discord) autocompletePokemonChoicesCore(query string, includeEverything bool) []*discordgo.ApplicationCommandOptionChoice {

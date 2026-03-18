@@ -18,7 +18,7 @@ func (c *VersionCommand) Name() string {
 func (c *VersionCommand) Handle(ctx *Context, _ []string) (string, error) {
 	output := []string{}
 	if ctx.IsDM {
-		output = append(output, fmt.Sprintf("PoracleGo version %s", ctx.Version()))
+		output = append(output, fmt.Sprintf("Dexter version %s", ctx.Version()))
 	}
 	if !ctx.IsAdmin {
 		return strings.TrimSpace(strings.Join(output, "\n")), nil

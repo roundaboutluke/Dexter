@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"poraclego/internal/config"
+	"dexter/internal/config"
 )
 
 // PokemonCount tracks scan counts for a pokemon.

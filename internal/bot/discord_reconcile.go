@@ -5,9 +5,9 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 
-	"poraclego/internal/alertstate"
-	"poraclego/internal/db"
-	"poraclego/internal/logging"
+	"dexter/internal/alertstate"
+	"dexter/internal/db"
+	"dexter/internal/logging"
 )
 
 func (d *Discord) onGuildMemberRemove(s *discordgo.Session, ev *discordgo.GuildMemberRemove) {

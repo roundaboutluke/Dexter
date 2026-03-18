@@ -7,7 +7,7 @@ import (
 
 	"github.com/aymerick/raymond"
 
-	"poraclego/internal/config"
+	"dexter/internal/config"
 )
 
 // RenderHandlebars renders a Handlebars template with the given data and meta.

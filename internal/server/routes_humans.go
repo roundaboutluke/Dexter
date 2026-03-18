@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"poraclego/internal/db"
+	"dexter/internal/db"
 )
 
 func registerHumanRoutes(s *Server, mux *http.ServeMux) {

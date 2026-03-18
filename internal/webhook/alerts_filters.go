@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"poraclego/internal/alertstate"
-	"poraclego/internal/config"
-	"poraclego/internal/geofence"
+	"dexter/internal/alertstate"
+	"dexter/internal/config"
+	"dexter/internal/geofence"
 )
 
 func (p *Processor) loadHumansForRows(rows []map[string]any) (map[string]map[string]any, map[string]map[string]any, error) {

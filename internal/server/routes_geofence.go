@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"poraclego/internal/config"
-	"poraclego/internal/geofence"
-	"poraclego/internal/tileserver"
+	"dexter/internal/config"
+	"dexter/internal/geofence"
+	"dexter/internal/tileserver"
 )
 
 func registerGeofenceRoutes(s *Server, mux *http.ServeMux) {

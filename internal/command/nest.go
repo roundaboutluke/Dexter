@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"poraclego/internal/db"
-	"poraclego/internal/tracking"
+	"dexter/internal/db"
+	"dexter/internal/tracking"
 )
 
 // NestCommand handles nest tracking.

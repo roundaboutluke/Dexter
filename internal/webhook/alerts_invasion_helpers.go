@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"poraclego/internal/i18n"
+	"dexter/internal/i18n"
 )
 
 func applyInvasionData(p *Processor, hook *Hook, data map[string]any, platform string, tr *i18n.Translator) {

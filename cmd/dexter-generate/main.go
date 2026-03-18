@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"poraclego/internal/data"
+	"dexter/internal/data"
 )
 
 func main() {

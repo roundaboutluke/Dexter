@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"poraclego/internal/config"
+	"dexter/internal/config"
 )
 
 // AddCommunity validates and adds a community.

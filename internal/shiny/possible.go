@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"poraclego/internal/logging"
+	"dexter/internal/logging"
 )
 
 const defaultURL = "https://raw.githubusercontent.com/jms412/PkmnShinyMap/main/shinyPossible.json"

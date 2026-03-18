@@ -9,10 +9,10 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 
-	"poraclego/internal/community"
-	"poraclego/internal/db"
-	"poraclego/internal/logging"
-	"poraclego/internal/util"
+	"dexter/internal/community"
+	"dexter/internal/db"
+	"dexter/internal/logging"
+	"dexter/internal/util"
 )
 
 type discordUserInfo struct {

@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"strings"
 
-	"poraclego/internal/config"
-	"poraclego/internal/data"
-	"poraclego/internal/i18n"
-	"poraclego/internal/scanner"
+	"dexter/internal/config"
+	"dexter/internal/data"
+	"dexter/internal/i18n"
+	"dexter/internal/scanner"
 )
 
 // EggRowText mirrors PoracleJS egg tracking formatting, using scanner lookup when available.

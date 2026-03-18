@@ -5,9 +5,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"poraclego/internal/alertstate"
-	"poraclego/internal/config"
-	"poraclego/internal/webhook"
+	"dexter/internal/alertstate"
+	"dexter/internal/config"
+	"dexter/internal/webhook"
 )
 
 func TestAlertStateRefreshRoutesUseFullSnapshotReload(t *testing.T) {

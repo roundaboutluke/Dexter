@@ -4,7 +4,7 @@ import (
 	"strings"
 	"sync"
 
-	"poraclego/internal/config"
+	"dexter/internal/config"
 )
 
 // Factory creates translators for configured locales.

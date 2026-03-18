@@ -4,8 +4,8 @@ import (
 	"slices"
 	"testing"
 
-	"poraclego/internal/config"
-	"poraclego/internal/i18n"
+	"dexter/internal/config"
+	"dexter/internal/i18n"
 )
 
 func TestParseProfileTimeTokensSupportsSwitchesAndRanges(t *testing.T) {

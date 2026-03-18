@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strings"
 
-	"poraclego/internal/db"
-	"poraclego/internal/tracking"
+	"dexter/internal/db"
+	"dexter/internal/tracking"
 )
 
 func registerTrackingPokemonRoutes(s *Server, mux *http.ServeMux) {

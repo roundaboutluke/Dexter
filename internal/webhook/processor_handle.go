@@ -5,8 +5,8 @@ import (
 	"os"
 	"time"
 
-	"poraclego/internal/geo"
-	"poraclego/internal/logging"
+	"dexter/internal/geo"
+	"dexter/internal/logging"
 )
 
 func (p *Processor) handle(item any) {

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"poraclego/internal/config"
-	"poraclego/internal/logging"
+	"dexter/internal/config"
+	"dexter/internal/logging"
 )
 
 func TestPreloadAlertStateSuccess(t *testing.T) {

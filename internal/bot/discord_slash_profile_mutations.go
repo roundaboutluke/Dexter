@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strings"
 
-	"poraclego/internal/db"
-	"poraclego/internal/i18n"
+	"dexter/internal/db"
+	"dexter/internal/i18n"
 )
 
 func (d *Discord) persistSlashHumanUpdate(userID string, update map[string]any) error {

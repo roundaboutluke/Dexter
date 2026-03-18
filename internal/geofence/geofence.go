@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"poraclego/internal/config"
+	"dexter/internal/config"
 )
 
 type Fence struct {

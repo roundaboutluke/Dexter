@@ -12,9 +12,9 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"poraclego/internal/config"
-	"poraclego/internal/db"
-	"poraclego/internal/i18n"
+	"dexter/internal/config"
+	"dexter/internal/db"
+	"dexter/internal/i18n"
 )
 
 func TestCommunityAddRefreshesOnceAndSkipsMissingTargets(t *testing.T) {

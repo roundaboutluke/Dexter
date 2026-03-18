@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"poraclego/internal/data"
-	"poraclego/internal/dts"
+	"dexter/internal/data"
+	"dexter/internal/dts"
 )
 
 func TestNestAddsResetTimeAndDisappearDate(t *testing.T) {

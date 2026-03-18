@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"poraclego/internal/logging"
+	"dexter/internal/logging"
 )
 
 func (s *Sender) sendDiscordWebhook(url string, job MessageJob) error {

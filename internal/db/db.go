@@ -6,7 +6,7 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
-	"poraclego/internal/config"
+	"dexter/internal/config"
 )
 
 // DB wraps the SQL connection pool.

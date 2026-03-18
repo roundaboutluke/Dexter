@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"poraclego/internal/config"
+	"dexter/internal/config"
 )
 
 // Result describes a rate limit check.

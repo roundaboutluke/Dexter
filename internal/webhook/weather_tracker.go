@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"poraclego/internal/config"
-	"poraclego/internal/geo"
+	"dexter/internal/config"
+	"dexter/internal/geo"
 )
 
 // WeatherCell stores cached weather data for a cell.

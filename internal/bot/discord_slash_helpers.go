@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
-	"poraclego/internal/util"
+	"dexter/internal/util"
 )
 
 func (d *Discord) titleCase(input string) string {

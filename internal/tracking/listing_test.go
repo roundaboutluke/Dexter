@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"poraclego/internal/config"
-	"poraclego/internal/data"
-	"poraclego/internal/geofence"
-	"poraclego/internal/i18n"
+	"dexter/internal/config"
+	"dexter/internal/data"
+	"dexter/internal/geofence"
+	"dexter/internal/i18n"
 )
 
 type stubRowSource struct {

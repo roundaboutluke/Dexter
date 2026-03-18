@@ -9,8 +9,8 @@ import (
 
 	"github.com/golang/geo/s2"
 
-	"poraclego/internal/geo"
-	"poraclego/internal/render"
+	"dexter/internal/geo"
+	"dexter/internal/render"
 )
 
 func buildRenderData(p *Processor, hook *Hook, match alertMatch) map[string]any {

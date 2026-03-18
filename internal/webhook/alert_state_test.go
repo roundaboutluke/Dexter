@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"poraclego/internal/alertstate"
-	"poraclego/internal/config"
+	"dexter/internal/alertstate"
+	"dexter/internal/config"
 )
 
 func testSnapshotConfig(tb testing.TB) *config.Config {

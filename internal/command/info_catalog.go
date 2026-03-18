@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"poraclego/internal/i18n"
+	"dexter/internal/i18n"
 )
 
 type catalogEntry struct {
