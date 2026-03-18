@@ -2,6 +2,7 @@ package bot
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -417,6 +418,37 @@ func (d *Discord) lookupMonster(key string) map[string]any {
 	return monster
 }
 
+// gruntIDFromTypeName finds the first grunt ID matching a "<type> [gender]" string.
+func (d *Discord) gruntIDFromTypeName(input string) int {
+	if d == nil || d.manager == nil || d.manager.data == nil || d.manager.data.Grunts == nil {
+		return 0
+	}
+	input = strings.ToLower(strings.TrimSpace(input))
+	if input == "" || input == "everything" {
+		return 0
+	}
+	for key, raw := range d.manager.data.Grunts {
+		entry, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		typeName := strings.ToLower(strings.TrimSpace(getStringValue(entry["type"])))
+		if typeName == "" {
+			continue
+		}
+		gender := toIntValue(entry["gender"])
+		genderWord := invasionGenderWord(gender)
+		candidate := typeName
+		if genderWord != "" {
+			candidate = typeName + " " + genderWord
+		}
+		if candidate == input || typeName == input {
+			return toInt(key, 0)
+		}
+	}
+	return 0
+}
+
 func slashUserID(member *discordgo.Member, user *discordgo.User) string {
 	if member != nil && member.User != nil {
 		return member.User.ID
@@ -425,4 +457,95 @@ func slashUserID(member *discordgo.Member, user *discordgo.User) string {
 		return user.ID
 	}
 	return ""
+}
+
+// sortQuestChoicesActiveFirst sorts quest choices with active items first, then alphabetical.
+func sortQuestChoicesActiveFirst(entries []questChoice, activeValues map[string]bool) {
+	sort.Slice(entries, func(i, j int) bool {
+		iActive := activeValues[strings.ToLower(entries[i].value)]
+		jActive := activeValues[strings.ToLower(entries[j].value)]
+		if iActive != jActive {
+			return iActive
+		}
+		return entries[i].label < entries[j].label
+	})
+}
+
+// activeQuestItemNames returns a set of lowercased item value strings for currently-active quest items.
+func (d *Discord) activeQuestItemNames() map[string]bool {
+	if d == nil || d.manager == nil || d.manager.processor == nil {
+		return nil
+	}
+	ra := d.manager.processor.RecentActivity()
+	if ra == nil {
+		return nil
+	}
+	ids := ra.ActiveQuestItems()
+	if len(ids) == 0 {
+		return nil
+	}
+	idSet := make(map[int]bool, len(ids))
+	for _, id := range ids {
+		idSet[id] = true
+	}
+	result := make(map[string]bool)
+	if d.manager.data != nil && d.manager.data.Items != nil {
+		for key, raw := range d.manager.data.Items {
+			itemID := toInt(key, 0)
+			if !idSet[itemID] {
+				continue
+			}
+			item, ok := raw.(map[string]any)
+			if !ok {
+				continue
+			}
+			name := strings.ToLower(strings.TrimSpace(getStringValue(item["name"])))
+			if name != "" {
+				result[name] = true
+			}
+		}
+	}
+	return result
+}
+
+// activeQuestMegaEnergyNames returns a set of lowercased value strings for currently-active mega energy quest rewards.
+func (d *Discord) activeQuestMegaEnergyNames() map[string]bool {
+	if d == nil || d.manager == nil || d.manager.processor == nil {
+		return nil
+	}
+	ra := d.manager.processor.RecentActivity()
+	if ra == nil {
+		return nil
+	}
+	ids := ra.ActiveQuestMegaEnergy()
+	if len(ids) == 0 {
+		return nil
+	}
+	idSet := make(map[int]bool, len(ids))
+	for _, id := range ids {
+		idSet[id] = true
+	}
+	result := make(map[string]bool)
+	if d.manager.data != nil && d.manager.data.Monsters != nil {
+		for _, raw := range d.manager.data.Monsters {
+			mon, ok := raw.(map[string]any)
+			if !ok {
+				continue
+			}
+			id := toInt(mon["id"], 0)
+			if !idSet[id] {
+				continue
+			}
+			form, _ := mon["form"].(map[string]any)
+			if toIntValue(form["id"]) != 0 {
+				continue
+			}
+			name := strings.ToLower(strings.TrimSpace(getStringValue(mon["name"])))
+			if name != "" {
+				// Match the value format from questRewardMonsterChoices: "energy:<name>"
+				result["energy:"+name] = true
+			}
+		}
+	}
+	return result
 }

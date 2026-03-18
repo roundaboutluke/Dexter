@@ -623,6 +623,13 @@ func (d *Discord) slashPreviewIconURL(commandLine string) string {
 			url, _ := client.PokemonIcon(id, 0, 0, 0, 0, 0, false, 0)
 			return url
 		}
+	case "rocket", "pokestop-event":
+		typeName := strings.Join(parts[1:], " ")
+		typeName = stripTrailingTrackArgs(typeName)
+		if id := d.gruntIDFromTypeName(typeName); id > 0 {
+			url, _ := client.InvasionIcon(id)
+			return url
+		}
 	}
 	return ""
 }

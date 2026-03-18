@@ -35,6 +35,9 @@ func (p *Processor) startCachePruner() {
 			if p.weatherData != nil {
 				p.weatherData.PruneStaleCares(now.Unix())
 			}
+			if p.recentActivity != nil {
+				p.recentActivity.Prune()
+			}
 		case <-p.stopCh:
 			return
 		}

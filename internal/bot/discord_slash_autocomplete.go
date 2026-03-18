@@ -258,6 +258,31 @@ func (d *Discord) autocompleteTypeChoices(i *discordgo.InteractionCreate, query 
 		}
 	}
 
+	// Insert currently-active bosses before the full alphabetical pokemon list.
+	activeIDs := d.recentActivityIDs(utilDataKey)
+	for _, id := range activeIDs {
+		if len(choices) >= 25 {
+			break
+		}
+		value := fmt.Sprintf("%d", id)
+		if seen[value] {
+			continue
+		}
+		name := d.monsterNameWithForm(id, 0)
+		if name == "" {
+			continue
+		}
+		label := fmt.Sprintf("%s (#%d)", d.titleCase(name), id)
+		if query != "" && !strings.Contains(strings.ToLower(label), query) && !strings.Contains(value, query) {
+			continue
+		}
+		seen[value] = true
+		choices = append(choices, &discordgo.ApplicationCommandOptionChoice{
+			Name:  truncateChoiceLabel(label),
+			Value: value,
+		})
+	}
+
 	for _, choice := range d.autocompletePokemonChoices(query) {
 		if len(choices) >= 25 {
 			break
@@ -273,6 +298,25 @@ func (d *Discord) autocompleteTypeChoices(i *discordgo.InteractionCreate, query 
 		choices = choices[:25]
 	}
 	return choices
+}
+
+// recentActivityIDs returns recently-seen pokemon IDs for the given util data key.
+func (d *Discord) recentActivityIDs(utilDataKey string) []int {
+	if d == nil || d.manager == nil || d.manager.processor == nil {
+		return nil
+	}
+	ra := d.manager.processor.RecentActivity()
+	if ra == nil {
+		return nil
+	}
+	switch utilDataKey {
+	case "raidLevels":
+		return ra.ActiveRaidBosses()
+	case "maxbattleLevels":
+		return ra.ActiveMaxBattleBosses()
+	default:
+		return nil
+	}
 }
 
 func (d *Discord) autocompleteRaidTypeChoices(i *discordgo.InteractionCreate, query string) []*discordgo.ApplicationCommandOptionChoice {
