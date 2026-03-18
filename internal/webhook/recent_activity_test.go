@@ -88,6 +88,26 @@ func TestRecordRecentActivityFromHook(t *testing.T) {
 	if len(megaIDs) != 1 || megaIDs[0] != 6 {
 		t.Fatalf("after quest mega energy hook, ActiveQuestMegaEnergy() = %v, want [6]", megaIDs)
 	}
+
+	// Quest pokemon encounter hook
+	p.recordRecentActivity(&Hook{
+		Type:    "quest",
+		Message: map[string]any{"reward_type": float64(7), "reward": float64(25)},
+	})
+	pokemonIDs := p.recentActivity.ActiveQuestPokemon()
+	if len(pokemonIDs) != 1 || pokemonIDs[0] != 25 {
+		t.Fatalf("after quest pokemon hook, ActiveQuestPokemon() = %v, want [25]", pokemonIDs)
+	}
+
+	// Quest candy hook
+	p.recordRecentActivity(&Hook{
+		Type:    "quest",
+		Message: map[string]any{"reward_type": float64(4), "reward": float64(143)},
+	})
+	candyIDs := p.recentActivity.ActiveQuestCandy()
+	if len(candyIDs) != 1 || candyIDs[0] != 143 {
+		t.Fatalf("after quest candy hook, ActiveQuestCandy() = %v, want [143]", candyIDs)
+	}
 }
 
 func TestRecentActivityCountsMatchExpected(t *testing.T) {

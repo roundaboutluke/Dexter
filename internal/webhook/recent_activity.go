@@ -11,20 +11,24 @@ const recentActivityTTL = 6 * time.Hour
 // RecentActivity tracks recently-seen game entities from incoming webhooks.
 // Autocomplete handlers use this to prioritise currently-active options.
 type RecentActivity struct {
-	mu            sync.RWMutex
-	raidBosses    map[int]time.Time
-	questItems    map[int]time.Time
-	questMegaMons map[int]time.Time
-	maxbattleMons map[int]time.Time
+	mu             sync.RWMutex
+	raidBosses     map[int]time.Time
+	questItems     map[int]time.Time
+	questMegaMons  map[int]time.Time
+	questPokemon   map[int]time.Time
+	questCandyMons map[int]time.Time
+	maxbattleMons  map[int]time.Time
 }
 
 // NewRecentActivity creates a new tracker.
 func NewRecentActivity() *RecentActivity {
 	return &RecentActivity{
-		raidBosses:    make(map[int]time.Time),
-		questItems:    make(map[int]time.Time),
-		questMegaMons: make(map[int]time.Time),
-		maxbattleMons: make(map[int]time.Time),
+		raidBosses:     make(map[int]time.Time),
+		questItems:     make(map[int]time.Time),
+		questMegaMons:  make(map[int]time.Time),
+		questPokemon:   make(map[int]time.Time),
+		questCandyMons: make(map[int]time.Time),
+		maxbattleMons:  make(map[int]time.Time),
 	}
 }
 
@@ -58,6 +62,26 @@ func (r *RecentActivity) RecordQuestMegaEnergy(pokemonID int) {
 	r.mu.Unlock()
 }
 
+// RecordQuestPokemon notes that a pokemon encounter quest reward was seen.
+func (r *RecentActivity) RecordQuestPokemon(pokemonID int) {
+	if r == nil || pokemonID <= 0 {
+		return
+	}
+	r.mu.Lock()
+	r.questPokemon[pokemonID] = time.Now()
+	r.mu.Unlock()
+}
+
+// RecordQuestCandy notes that a candy quest reward was seen for a pokemon.
+func (r *RecentActivity) RecordQuestCandy(pokemonID int) {
+	if r == nil || pokemonID <= 0 {
+		return
+	}
+	r.mu.Lock()
+	r.questCandyMons[pokemonID] = time.Now()
+	r.mu.Unlock()
+}
+
 // RecordMaxBattle notes that a max battle boss was seen.
 func (r *RecentActivity) RecordMaxBattle(pokemonID int) {
 	if r == nil || pokemonID <= 0 {
@@ -81,6 +105,16 @@ func (r *RecentActivity) ActiveQuestItems() []int {
 // ActiveQuestMegaEnergy returns pokemon IDs seen as mega energy quest rewards recently, sorted.
 func (r *RecentActivity) ActiveQuestMegaEnergy() []int {
 	return r.activeIDs(r.questMegaMons)
+}
+
+// ActiveQuestPokemon returns pokemon IDs seen as quest encounter rewards recently, sorted.
+func (r *RecentActivity) ActiveQuestPokemon() []int {
+	return r.activeIDs(r.questPokemon)
+}
+
+// ActiveQuestCandy returns pokemon IDs seen as quest candy rewards recently, sorted.
+func (r *RecentActivity) ActiveQuestCandy() []int {
+	return r.activeIDs(r.questCandyMons)
 }
 
 // ActiveMaxBattleBosses returns pokemon IDs seen as max battle bosses recently, sorted.
@@ -116,6 +150,8 @@ func (r *RecentActivity) Prune() {
 	pruneMap(r.raidBosses, cutoff)
 	pruneMap(r.questItems, cutoff)
 	pruneMap(r.questMegaMons, cutoff)
+	pruneMap(r.questPokemon, cutoff)
+	pruneMap(r.questCandyMons, cutoff)
 	pruneMap(r.maxbattleMons, cutoff)
 }
 
@@ -130,6 +166,8 @@ func pruneMap(m map[int]time.Time, cutoff time.Time) {
 // Quest reward type constants (matching PoracleJS/database values).
 const (
 	rewardTypeItem       = 2
+	rewardTypeCandy      = 4
+	rewardTypePokemon    = 7
 	rewardTypeMegaEnergy = 12
 )
 
@@ -158,11 +196,23 @@ func (p *Processor) recordRecentActivity(hook *Hook) {
 		}
 		reward := getInt(hook.Message["reward"])
 		if reward == 0 {
+			switch rewardType {
+			case rewardTypeItem:
+				reward = getInt(hook.Message["quest_item_id"])
+			case rewardTypePokemon:
+				reward = getInt(hook.Message["quest_pokemon_id"])
+			}
+		}
+		if reward == 0 {
 			reward = getInt(hook.Message["pokemon_id"])
 		}
 		switch rewardType {
 		case rewardTypeItem:
 			p.recentActivity.RecordQuestItem(reward)
+		case rewardTypeCandy:
+			p.recentActivity.RecordQuestCandy(reward)
+		case rewardTypePokemon:
+			p.recentActivity.RecordQuestPokemon(reward)
 		case rewardTypeMegaEnergy:
 			p.recentActivity.RecordQuestMegaEnergy(reward)
 		}

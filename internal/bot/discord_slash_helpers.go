@@ -508,6 +508,38 @@ func (d *Discord) activeQuestItemNames() map[string]bool {
 	return result
 }
 
+// activeQuestPokemonNames returns a set of lowercased pokemon name strings for currently-active quest encounter rewards.
+func (d *Discord) activeQuestPokemonNames() map[string]bool {
+	if d == nil || d.manager == nil || d.manager.processor == nil {
+		return nil
+	}
+	ra := d.manager.processor.RecentActivity()
+	if ra == nil {
+		return nil
+	}
+	ids := ra.ActiveQuestPokemon()
+	if len(ids) == 0 {
+		return nil
+	}
+	return d.monsterIDsToNameSet(ids, "")
+}
+
+// activeQuestCandyNames returns a set of lowercased value strings for currently-active quest candy rewards.
+func (d *Discord) activeQuestCandyNames() map[string]bool {
+	if d == nil || d.manager == nil || d.manager.processor == nil {
+		return nil
+	}
+	ra := d.manager.processor.RecentActivity()
+	if ra == nil {
+		return nil
+	}
+	ids := ra.ActiveQuestCandy()
+	if len(ids) == 0 {
+		return nil
+	}
+	return d.monsterIDsToNameSet(ids, "candy")
+}
+
 // activeQuestMegaEnergyNames returns a set of lowercased value strings for currently-active mega energy quest rewards.
 func (d *Discord) activeQuestMegaEnergyNames() map[string]bool {
 	if d == nil || d.manager == nil || d.manager.processor == nil {
@@ -521,29 +553,39 @@ func (d *Discord) activeQuestMegaEnergyNames() map[string]bool {
 	if len(ids) == 0 {
 		return nil
 	}
+	return d.monsterIDsToNameSet(ids, "energy")
+}
+
+// monsterIDsToNameSet converts a list of pokemon IDs to a set of lowercased value strings.
+// If prefix is non-empty, values are formatted as "prefix:name"; otherwise just "name".
+func (d *Discord) monsterIDsToNameSet(ids []int, prefix string) map[string]bool {
+	if d == nil || d.manager == nil || d.manager.data == nil || d.manager.data.Monsters == nil || len(ids) == 0 {
+		return nil
+	}
 	idSet := make(map[int]bool, len(ids))
 	for _, id := range ids {
 		idSet[id] = true
 	}
 	result := make(map[string]bool)
-	if d.manager.data != nil && d.manager.data.Monsters != nil {
-		for _, raw := range d.manager.data.Monsters {
-			mon, ok := raw.(map[string]any)
-			if !ok {
-				continue
-			}
-			id := toInt(mon["id"], 0)
-			if !idSet[id] {
-				continue
-			}
-			form, _ := mon["form"].(map[string]any)
-			if toIntValue(form["id"]) != 0 {
-				continue
-			}
-			name := strings.ToLower(strings.TrimSpace(getStringValue(mon["name"])))
-			if name != "" {
-				// Match the value format from questRewardMonsterChoices: "energy:<name>"
-				result["energy:"+name] = true
+	for _, raw := range d.manager.data.Monsters {
+		mon, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		id := toInt(mon["id"], 0)
+		if !idSet[id] {
+			continue
+		}
+		form, _ := mon["form"].(map[string]any)
+		if toIntValue(form["id"]) != 0 {
+			continue
+		}
+		name := strings.ToLower(strings.TrimSpace(getStringValue(mon["name"])))
+		if name != "" {
+			if prefix != "" {
+				result[prefix+":"+name] = true
+			} else {
+				result[name] = true
 			}
 		}
 	}
