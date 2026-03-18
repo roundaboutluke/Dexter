@@ -2,6 +2,7 @@ package data
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -21,19 +22,30 @@ type GameData struct {
 
 var requiredFiles = []string{"monsters", "moves", "items", "grunts", "questTypes", "types", "translations"}
 
+// HasData reports whether the required util JSON files exist on disk.
+func HasData(root string) bool {
+	for _, name := range append([]string{"util"}, requiredFiles...) {
+		path := filepath.Join(root, "util", name+".json")
+		if _, err := os.Stat(path); err != nil {
+			return false
+		}
+	}
+	return true
+}
+
 // Load reads util JSON data from disk.
 func Load(root string) (*GameData, error) {
 	data := &GameData{}
 	utilPath := filepath.Join(root, "util", "util.json")
 	if err := loadJSON(utilPath, &data.UtilData); err != nil {
-		return nil, fmt.Errorf("load util.json: %w", err)
+		return nil, loadError("util", err)
 	}
 
 	for _, name := range requiredFiles {
 		path := filepath.Join(root, "util", fmt.Sprintf("%s.json", name))
 		var payload map[string]any
 		if err := loadJSON(path, &payload); err != nil {
-			return nil, fmt.Errorf("load %s.json: %w", name, err)
+			return nil, loadError(name, err)
 		}
 		switch name {
 		case "monsters":
@@ -62,4 +74,11 @@ func loadJSON(path string, target any) error {
 		return err
 	}
 	return json.Unmarshal(payload, target)
+}
+
+func loadError(name string, err error) error {
+	if errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("%s.json not found — run 'dexter-generate' or ensure internet is available on first startup: %w", name, err)
+	}
+	return fmt.Errorf("load %s.json: %w", name, err)
 }

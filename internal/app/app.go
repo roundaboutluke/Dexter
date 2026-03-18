@@ -7,32 +7,32 @@ import (
 	"path/filepath"
 	"time"
 
-	"poraclego/internal/bot"
-	"poraclego/internal/config"
-	"poraclego/internal/data"
-	"poraclego/internal/db"
-	"poraclego/internal/digest"
-	"poraclego/internal/dispatch"
-	"poraclego/internal/dts"
-	"poraclego/internal/geofence"
-	"poraclego/internal/i18n"
-	"poraclego/internal/logging"
-	"poraclego/internal/profile"
-	"poraclego/internal/render"
-	"poraclego/internal/scanner"
-	"poraclego/internal/server"
-	"poraclego/internal/shiny"
-	"poraclego/internal/stats"
-	"poraclego/internal/tz"
-	"poraclego/internal/validate"
-	"poraclego/internal/webhook"
+	"dexter/internal/bot"
+	"dexter/internal/config"
+	"dexter/internal/data"
+	"dexter/internal/db"
+	"dexter/internal/digest"
+	"dexter/internal/dispatch"
+	"dexter/internal/dts"
+	"dexter/internal/geofence"
+	"dexter/internal/i18n"
+	"dexter/internal/logging"
+	"dexter/internal/profile"
+	"dexter/internal/render"
+	"dexter/internal/scanner"
+	"dexter/internal/server"
+	"dexter/internal/shiny"
+	"dexter/internal/stats"
+	"dexter/internal/tz"
+	"dexter/internal/validate"
+	"dexter/internal/webhook"
 )
 
 type alertStatePreloader interface {
 	RefreshAlertCacheSync() error
 }
 
-// App wires PoracleGo components together.
+// App wires Dexter components together.
 type App struct {
 	config          *config.Config
 	db              *db.DB
@@ -88,11 +88,21 @@ func (a *App) Run(ctx context.Context) error {
 	if err := logging.Init(cfg, root); err != nil {
 		return err
 	}
-	logf("PoracleGo startup - initialising from %s", root)
+	logf("Dexter startup - initialising from %s", root)
 	validate.CheckConfig(cfg, logf)
 
-	logf("Generating supporting data files")
-	data.GenerateBestEffort(root, true, logf)
+	if data.HasData(root) {
+		logf("Refreshing game data")
+		data.GenerateBestEffort(root, true, logf)
+	} else {
+		logf("First run detected: downloading game data (requires internet)...")
+		if err := data.Generate(root, true, logf); err != nil {
+			return fmt.Errorf("first-run data download failed: %w\n\n"+
+				"Dexter needs game data files in util/. "+
+				"Ensure you have internet access and try again, or run:\n"+
+				"  go run ./cmd/dexter-generate", err)
+		}
+	}
 	logf("Refreshing geofence cache")
 	geofence.FetchKojiFences(cfg, root, logf)
 
