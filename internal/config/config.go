@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-// Config holds Poracle configuration data.
+// Config holds Dexter configuration data.
 type Config struct {
 	data map[string]any
 }

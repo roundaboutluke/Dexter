@@ -251,7 +251,7 @@ func preloadAlertState(preloader alertStatePreloader, forcedMigrationFailure boo
 
 // Shutdown performs a graceful shutdown.
 func (a *App) Shutdown(ctx context.Context) error {
-	logf("Poracle shutdown - starting save of cache")
+	logf("Dexter shutdown - saving caches")
 	if a.processor != nil {
 		a.processor.Stop()
 		a.processor.SaveCaches()
@@ -280,6 +280,6 @@ func (a *App) Shutdown(ctx context.Context) error {
 	if a.scannerClient != nil {
 		_ = a.scannerClient.Close()
 	}
-	logf("Poracle shutdown - complete")
+	logf("Dexter shutdown - complete")
 	return logging.Close()
 }

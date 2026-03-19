@@ -507,7 +507,7 @@ func slashFilterNonDefaultDetailLines(tr *i18n.Translator, trackingType string, 
 	return lines
 }
 
-func (d *Discord) slashFilterPreviewEmbed(i *discordgo.InteractionCreate, title, commandLine, profileLabel string, fields []*discordgo.MessageEmbedField) *discordgo.MessageEmbed {
+func (d *Discord) slashFilterPreviewEmbed(i *discordgo.InteractionCreate, title, command string, args []string, profileLabel string, fields []*discordgo.MessageEmbedField) *discordgo.MessageEmbed {
 	tr := d.slashInteractionTranslator(i)
 	headline := slashCardHeading(title)
 	start := 0
@@ -533,85 +533,80 @@ func (d *Discord) slashFilterPreviewEmbed(i *discordgo.InteractionCreate, title,
 		Description: slashCardDescription(headline, "", detailLines, ""),
 		Color:       slashFilterCardColor("confirm"),
 	}
-	if iconURL := d.slashPreviewIconURL(commandLine); iconURL != "" {
+	if iconURL := d.slashPreviewIconURLFromArgs(command, args); iconURL != "" {
 		embed.Thumbnail = &discordgo.MessageEmbedThumbnail{URL: iconURL}
 	}
 	return embed
 }
 
-func (d *Discord) slashPreviewIconURL(commandLine string) string {
-	parts := strings.Fields(commandLine)
-	if len(parts) < 2 {
-		return ""
-	}
-	command := strings.ToLower(parts[0])
+// slashPreviewIconURLFromArgs resolves a preview icon from the already-split
+// command name and argument list, avoiding the whitespace-splitting issues
+// that plagued the old commandLine-based approach.
+func (d *Discord) slashPreviewIconURLFromArgs(command string, args []string) string {
 	trackingType := slashTrackingTypeFromCommand(command)
-	if trackingType == "" {
+	if trackingType == "" || len(args) == 0 {
 		return ""
 	}
 	client := d.slashUiconsClient()
 	if client == nil {
 		return ""
 	}
+	// The primary entity is always the first arg. Unlike the old approach,
+	// args are preserved whole (e.g. "poke ball" stays as one element).
+	primary := args[0]
 	switch trackingType {
 	case "pokemon":
-		if id := d.pokemonIDFromName(parts[1]); id > 0 {
+		if id := d.pokemonIDFromName(primary); id > 0 {
 			url, _ := client.PokemonIcon(id, 0, 0, 0, 0, 0, false, 0)
 			return url
 		}
 	case "raid", "maxbattle":
-		name := parts[1]
-		if strings.HasPrefix(strings.ToLower(name), "level") {
-			if len(parts) > 2 {
-				if level, err := strconv.Atoi(parts[2]); err == nil && level > 0 {
+		if strings.HasPrefix(strings.ToLower(primary), "level") {
+			if len(args) > 1 {
+				if level, err := strconv.Atoi(args[1]); err == nil && level > 0 {
 					url, _ := client.RaidEggIcon(level, false, false)
 					return url
 				}
 			}
-		} else if id := d.pokemonIDFromName(name); id > 0 {
+		} else if id := d.pokemonIDFromName(primary); id > 0 {
 			url, _ := client.PokemonIcon(id, 0, 0, 0, 0, 0, false, 0)
 			return url
 		}
 	case "egg":
-		name := parts[1]
-		if strings.HasPrefix(strings.ToLower(name), "level") && len(parts) > 2 {
-			if level, err := strconv.Atoi(parts[2]); err == nil && level > 0 {
+		if strings.HasPrefix(strings.ToLower(primary), "level") && len(args) > 1 {
+			if level, err := strconv.Atoi(args[1]); err == nil && level > 0 {
 				url, _ := client.RaidEggIcon(level, false, false)
 				return url
 			}
-		} else if level, err := strconv.Atoi(name); err == nil && level > 0 {
+		} else if level, err := strconv.Atoi(primary); err == nil && level > 0 {
 			url, _ := client.RaidEggIcon(level, false, false)
 			return url
 		}
 	case "quest":
-		return d.slashPreviewQuestIconURL(client, parts[1:])
+		return d.slashPreviewQuestIconURL(client, args)
 	case "gym":
-		teamName := strings.ToLower(parts[1])
-		teamID := slashGymTeamID(teamName)
+		teamID := slashGymTeamID(strings.ToLower(primary))
 		if teamID >= 0 {
 			url, _ := client.GymIcon(teamID, 0, false, false)
 			return url
 		}
 	case "lure":
-		lureName := strings.Join(parts[1:], " ")
+		lureName := strings.Join(args, " ")
 		if id := d.lureIDFromName(lureName); id > 0 {
 			url, _ := client.PokestopIcon(id, false, 0, false)
 			return url
 		}
 	case "weather":
-		// Weather command line format: "weather <location> | <condition>"
-		// This pipe-separated format is constructed in handleSlashWeather().
-		// Find the condition after the "|" separator.
+		// Weather args format: ["<location>", "|", "<condition>", ...]
 		pipeIdx := -1
-		for idx, p := range parts {
-			if p == "|" {
+		for idx, a := range args {
+			if a == "|" {
 				pipeIdx = idx
 				break
 			}
 		}
-		if pipeIdx >= 0 && pipeIdx+1 < len(parts) {
-			condition := strings.Join(parts[pipeIdx+1:], " ")
-			// Strip trailing args like "clean", "template:..."
+		if pipeIdx >= 0 && pipeIdx+1 < len(args) {
+			condition := strings.Join(args[pipeIdx+1:], " ")
 			condition = stripTrailingTrackArgs(condition)
 			if id := d.weatherIDFromName(condition); id > 0 {
 				url, _ := client.WeatherIcon(id)
@@ -619,8 +614,15 @@ func (d *Discord) slashPreviewIconURL(commandLine string) string {
 			}
 		}
 	case "nest":
-		if id := d.pokemonIDFromName(parts[1]); id > 0 {
+		if id := d.pokemonIDFromName(primary); id > 0 {
 			url, _ := client.PokemonIcon(id, 0, 0, 0, 0, 0, false, 0)
+			return url
+		}
+	case "rocket", "pokestop-event":
+		typeName := strings.Join(args, " ")
+		typeName = stripTrailingTrackArgs(typeName)
+		if id := d.gruntIDFromTypeName(typeName); id > 0 {
+			url, _ := client.InvasionIcon(id)
 			return url
 		}
 	}

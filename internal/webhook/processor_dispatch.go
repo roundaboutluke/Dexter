@@ -24,6 +24,7 @@ func (p *Processor) dispatch(hook *Hook) {
 	if hook != nil && hook.Type == "pokemon" {
 		normalizePvpRankings(hook)
 	}
+	p.recordRecentActivity(hook)
 	targets, err := p.matchTargets(hook)
 	if err != nil {
 		logger := logging.Get().Webhooks

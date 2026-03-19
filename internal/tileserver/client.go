@@ -72,10 +72,11 @@ func (c *Client) GetMapURL(templateType string, data map[string]any, options Til
 	if baseURL == "" {
 		return "", fmt.Errorf("staticProviderURL not set")
 	}
-	resolved := ResolveTemplateName(c.cfg, templateType)
 	if strings.ToLower(options.Type) == "multistaticmap" {
-		return c.getURL(baseURL, "multistaticmap", "multi-"+resolved, data, options.Pregenerate)
+		resolved := ResolveTemplateName(c.cfg, "multi-"+templateType)
+		return c.getURL(baseURL, "multistaticmap", resolved, data, options.Pregenerate)
 	}
+	resolved := ResolveTemplateName(c.cfg, templateType)
 	return c.getURL(baseURL, "staticmap", resolved, data, options.Pregenerate)
 }
 

@@ -79,7 +79,7 @@ func (p *Processor) applyRateLimit(job dispatch.MessageJob) ([]dispatch.MessageJ
 				logger.Infof("%s: Stopping alerts [until restart] (Rate limit) for %s %s %s", job.LogReference, job.Type, job.Target, job.Name)
 			}
 			if job.Type == "discord:user" {
-				shameMessage = tr.TranslateFormat("<@{0}> has had their Poracle tracking disabled for exceeding the rate limit too many times!", destinationID)
+				shameMessage = tr.TranslateFormat("<@{0}> has had their tracking disabled for exceeding the rate limit too many times!", destinationID)
 			}
 		}
 	}

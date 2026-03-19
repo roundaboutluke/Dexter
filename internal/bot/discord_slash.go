@@ -254,7 +254,7 @@ func (d *Discord) handleSlashAutocomplete(s *discordgo.Session, i *discordgo.Int
 		switch slashSubcommand(data) {
 		case "boss":
 			if focused.Name == "pokemon" {
-				choices = d.autocompletePokemonChoices(query)
+				choices = d.autocompleteRaidBossChoices(query)
 			} else if focused.Name == "gym" {
 				choices = d.autocompleteGymChoices(i, query)
 			} else if focused.Name == "template" {
@@ -292,7 +292,7 @@ func (d *Discord) handleSlashAutocomplete(s *discordgo.Session, i *discordgo.Int
 		switch slashSubcommand(data) {
 		case "boss":
 			if focused.Name == "pokemon" {
-				choices = d.autocompletePokemonChoices(query)
+				choices = d.autocompleteMaxbattleBossChoices(query)
 			} else if focused.Name == "station" {
 				choices = d.autocompleteStationChoices(i, query)
 			} else if focused.Name == "template" {

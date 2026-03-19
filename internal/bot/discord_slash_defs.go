@@ -126,7 +126,7 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 		{
 			Type:         discordgo.ApplicationCommandOptionString,
 			Name:         "pokemon",
-			Description:  "Choose a Pokemon, or leave blank for a guided flow",
+			Description:  "Start typing a Pokemon name or number",
 			Autocomplete: true,
 		},
 		{
@@ -248,7 +248,7 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 		{
 			Type:         discordgo.ApplicationCommandOptionString,
 			Name:         "pokemon",
-			Description:  "Choose a Pokemon, or leave blank for a guided flow",
+			Description:  "Start typing a Pokemon name or number",
 			Autocomplete: true,
 		},
 		{Type: discordgo.ApplicationCommandOptionInteger, Name: "min_spawn", Description: "Optional minimum average spawns", MinValue: floatPtr(0)},
@@ -261,7 +261,7 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 		{
 			Type:         discordgo.ApplicationCommandOptionString,
 			Name:         "condition",
-			Description:  "Choose weather, or leave blank for a guided flow",
+			Description:  "Start typing a weather condition",
 			Autocomplete: true,
 		},
 		{Type: discordgo.ApplicationCommandOptionString, Name: "location", Description: "Optional location. Leave blank to use your saved location."},
@@ -270,7 +270,7 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 	weatherOptions = appendCreationOptions(weatherOptions)
 
 	raidBossOptions := []*discordgo.ApplicationCommandOption{
-		{Type: discordgo.ApplicationCommandOptionString, Name: "pokemon", Description: "Choose a Pokemon, or leave blank for a guided flow", Autocomplete: true},
+		{Type: discordgo.ApplicationCommandOptionString, Name: "pokemon", Description: "Start typing a Pokemon name or number", Autocomplete: true},
 		{Type: discordgo.ApplicationCommandOptionString, Name: "gym", Description: "Optional gym", Autocomplete: true},
 		raidTeamOption(),
 		rsvpOption(),
@@ -280,7 +280,7 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 	raidBossOptions = appendCreationOptions(raidBossOptions)
 
 	raidLevelOptions := []*discordgo.ApplicationCommandOption{
-		{Type: discordgo.ApplicationCommandOptionString, Name: "level", Description: "Choose a raid level, or leave blank for a guided flow", Autocomplete: true},
+		{Type: discordgo.ApplicationCommandOptionString, Name: "level", Description: "Start typing a raid level or Pokemon name", Autocomplete: true},
 		{Type: discordgo.ApplicationCommandOptionString, Name: "gym", Description: "Optional gym", Autocomplete: true},
 		raidTeamOption(),
 		rsvpOption(),
@@ -290,7 +290,7 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 	raidLevelOptions = appendCreationOptions(raidLevelOptions)
 
 	eggOptions := []*discordgo.ApplicationCommandOption{
-		{Type: discordgo.ApplicationCommandOptionString, Name: "level", Description: "Choose an egg level, or leave blank for a guided flow", Autocomplete: true},
+		{Type: discordgo.ApplicationCommandOptionString, Name: "level", Description: "Start typing an egg level", Autocomplete: true},
 		{Type: discordgo.ApplicationCommandOptionString, Name: "gym", Description: "Optional gym", Autocomplete: true},
 		raidTeamOption(),
 		rsvpOption(),
@@ -300,7 +300,7 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 	eggOptions = appendCreationOptions(eggOptions)
 
 	maxbattleBossOptions := []*discordgo.ApplicationCommandOption{
-		{Type: discordgo.ApplicationCommandOptionString, Name: "pokemon", Description: "Choose a Pokemon, or leave blank for a guided flow", Autocomplete: true},
+		{Type: discordgo.ApplicationCommandOptionString, Name: "pokemon", Description: "Start typing a Pokemon name or number", Autocomplete: true},
 		{Type: discordgo.ApplicationCommandOptionString, Name: "station", Description: "Optional station", Autocomplete: true},
 		{Type: discordgo.ApplicationCommandOptionBoolean, Name: "gmax_only", Description: "Only Gigantamax battles"},
 		distanceOption(),
@@ -309,7 +309,7 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 	maxbattleBossOptions = appendCreationOptions(maxbattleBossOptions)
 
 	maxbattleLevelOptions := []*discordgo.ApplicationCommandOption{
-		{Type: discordgo.ApplicationCommandOptionString, Name: "level", Description: "Choose a max battle level, or leave blank for a guided flow", Autocomplete: true},
+		{Type: discordgo.ApplicationCommandOptionString, Name: "level", Description: "Start typing a max battle level or Pokemon name", Autocomplete: true},
 		{Type: discordgo.ApplicationCommandOptionString, Name: "station", Description: "Optional station", Autocomplete: true},
 		{Type: discordgo.ApplicationCommandOptionBoolean, Name: "gmax_only", Description: "Only Gigantamax battles"},
 		distanceOption(),
@@ -328,7 +328,7 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 		},
 	}
 	questPokemonOptions := []*discordgo.ApplicationCommandOption{
-		{Type: discordgo.ApplicationCommandOptionString, Name: "pokemon", Description: "Choose a Pokemon, or leave blank for a guided flow", Autocomplete: true},
+		{Type: discordgo.ApplicationCommandOptionString, Name: "pokemon", Description: "Start typing a Pokemon name or number", Autocomplete: true},
 		questAROption,
 		distanceOption(),
 		cleanFlagOption("Auto delete after expiration"),
@@ -336,7 +336,7 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 	questPokemonOptions = appendCreationOptions(questPokemonOptions)
 
 	questItemOptions := []*discordgo.ApplicationCommandOption{
-		{Type: discordgo.ApplicationCommandOptionString, Name: "item", Description: "Choose an item, or leave blank for a guided flow", Autocomplete: true},
+		{Type: discordgo.ApplicationCommandOptionString, Name: "item", Description: "Start typing an item name", Autocomplete: true},
 		{Type: discordgo.ApplicationCommandOptionInteger, Name: "min_amount", Description: "Optional minimum value for items only", MinValue: floatPtr(0)},
 		questAROption,
 		distanceOption(),
@@ -353,7 +353,7 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 	questStardustOptions = appendCreationOptions(questStardustOptions)
 
 	questCandyOptions := []*discordgo.ApplicationCommandOption{
-		{Type: discordgo.ApplicationCommandOptionString, Name: "pokemon", Description: "Choose a Pokemon, or leave blank for a guided flow", Autocomplete: true},
+		{Type: discordgo.ApplicationCommandOptionString, Name: "pokemon", Description: "Start typing a Pokemon name", Autocomplete: true},
 		{Type: discordgo.ApplicationCommandOptionInteger, Name: "min_amount", Description: "Optional minimum value for candy only", MinValue: floatPtr(0)},
 		questAROption,
 		distanceOption(),
@@ -362,7 +362,7 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 	questCandyOptions = appendCreationOptions(questCandyOptions)
 
 	questMegaEnergyOptions := []*discordgo.ApplicationCommandOption{
-		{Type: discordgo.ApplicationCommandOptionString, Name: "pokemon", Description: "Choose a Pokemon, or leave blank for a guided flow", Autocomplete: true},
+		{Type: discordgo.ApplicationCommandOptionString, Name: "pokemon", Description: "Start typing a Pokemon name", Autocomplete: true},
 		{Type: discordgo.ApplicationCommandOptionInteger, Name: "min_amount", Description: "Optional minimum value for mega energy only", MinValue: floatPtr(0)},
 		questAROption,
 		distanceOption(),
@@ -371,14 +371,14 @@ func (d *Discord) slashCommandDefinitions() []*discordgo.ApplicationCommand {
 	questMegaEnergyOptions = appendCreationOptions(questMegaEnergyOptions)
 
 	rocketOptions := []*discordgo.ApplicationCommandOption{
-		{Type: discordgo.ApplicationCommandOptionString, Name: "type", Description: "Choose a grunt or leader type, or leave blank for a guided flow", Autocomplete: true},
+		{Type: discordgo.ApplicationCommandOptionString, Name: "type", Description: "Start typing a grunt or leader type", Autocomplete: true},
 		distanceOption(),
 		cleanFlagOption("Auto delete after expiration"),
 	}
 	rocketOptions = appendCreationOptions(rocketOptions)
 
 	incidentOptions := []*discordgo.ApplicationCommandOption{
-		{Type: discordgo.ApplicationCommandOptionString, Name: "type", Description: "Choose a Pokestop event type, or leave blank for a guided flow", Autocomplete: true},
+		{Type: discordgo.ApplicationCommandOptionString, Name: "type", Description: "Start typing a Pokestop event type", Autocomplete: true},
 		distanceOption(),
 		cleanFlagOption("Auto delete after expiration"),
 	}

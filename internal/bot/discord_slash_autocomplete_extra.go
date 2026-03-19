@@ -117,25 +117,29 @@ func questChoiceAutocomplete(entries []questChoice, query string) []*discordgo.A
 
 func (d *Discord) autocompleteQuestPokemonChoices(_ *discordgo.InteractionCreate, query string) []*discordgo.ApplicationCommandOptionChoice {
 	entries := d.questMonsterChoices()
-	sort.Slice(entries, func(i, j int) bool { return entries[i].label < entries[j].label })
+	activeMons := d.activeQuestPokemonNames()
+	sortQuestChoicesActiveFirst(entries, activeMons)
 	return questChoiceAutocomplete(entries, query)
 }
 
 func (d *Discord) autocompleteQuestItemRewardChoices(_ *discordgo.InteractionCreate, query string) []*discordgo.ApplicationCommandOptionChoice {
 	entries := d.questItemChoices()
-	sort.Slice(entries, func(i, j int) bool { return entries[i].label < entries[j].label })
+	activeItems := d.activeQuestItemNames()
+	sortQuestChoicesActiveFirst(entries, activeItems)
 	return questChoiceAutocomplete(entries, query)
 }
 
 func (d *Discord) autocompleteQuestCandyRewardChoices(_ *discordgo.InteractionCreate, query string) []*discordgo.ApplicationCommandOptionChoice {
 	entries := d.questCandyMonsterChoices()
-	sort.Slice(entries, func(i, j int) bool { return entries[i].label < entries[j].label })
+	activeMons := d.activeQuestCandyNames()
+	sortQuestChoicesActiveFirst(entries, activeMons)
 	return questChoiceAutocomplete(entries, query)
 }
 
 func (d *Discord) autocompleteQuestMegaEnergyRewardChoices(_ *discordgo.InteractionCreate, query string) []*discordgo.ApplicationCommandOptionChoice {
 	entries := d.questMegaEnergyChoices()
-	sort.Slice(entries, func(i, j int) bool { return entries[i].label < entries[j].label })
+	activeMons := d.activeQuestMegaEnergyNames()
+	sortQuestChoicesActiveFirst(entries, activeMons)
 	return questChoiceAutocomplete(entries, query)
 }
 
@@ -770,3 +774,4 @@ func (d *Discord) autocompleteRemoveTrackingChoices(query, trackingType, profile
 
 	return choices
 }
+

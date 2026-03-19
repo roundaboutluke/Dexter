@@ -702,13 +702,12 @@ func (d *Discord) promptSlashConfirmationState(s *discordgo.Session, i *discordg
 	state.Step = "confirm"
 	state.ExpiresAt = time.Now().Add(5 * time.Minute)
 	d.setSlashState(i.Member, i.User, state)
-	commandLine := strings.TrimSpace(state.Command + " " + strings.Join(state.Args, " "))
 	tr := d.slashInteractionTranslator(i)
 	profileLabel := strings.TrimSpace(state.ProfileLabel)
 	if profileLabel == "" {
 		_, profileLabel = d.effectiveProfileInfo(i)
 	}
-	embed := d.slashFilterPreviewEmbed(i, title, commandLine, profileLabel, fields)
+	embed := d.slashFilterPreviewEmbed(i, title, state.Command, state.Args, profileLabel, fields)
 	d.respondComponentsEmbed(s, i, "", []*discordgo.MessageEmbed{embed}, []discordgo.MessageComponent{
 		discordgo.ActionsRow{Components: []discordgo.MessageComponent{
 			discordgo.Button{CustomID: slashConfirmButton, Label: translateOrDefault(tr, "Save Filter"), Style: discordgo.SuccessButton},

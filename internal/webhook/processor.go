@@ -61,9 +61,10 @@ type Processor struct {
 	pvpCalc       atomic.Pointer[pvp.Calculator]
 	discordQueue  *dispatch.Queue
 	telegramQueue *dispatch.Queue
-	scanner       *scanner.Client
-	questDigests  *digest.Store
-	cacheDir      string
+	scanner        *scanner.Client
+	questDigests   *digest.Store
+	recentActivity *RecentActivity
+	cacheDir       string
 	root          string
 	customEmoji   map[string]map[string]string
 
@@ -105,8 +106,9 @@ func NewProcessor(queue *Queue, cfg *config.Config, query *db.Query, fences *geo
 		discordQueue:  discordQueue,
 		telegramQueue: telegramQueue,
 		scanner:       scannerClient,
-		questDigests:  digestStore,
-		cacheDir:      cacheDir(root),
+		questDigests:   digestStore,
+		recentActivity: NewRecentActivity(),
+		cacheDir:       cacheDir(root),
 		root:          root,
 		customEmoji:   loadCustomEmoji(root),
 		alertState:    alertstate.NewManager(),
@@ -135,6 +137,14 @@ func (p *Processor) controllerLogger() *logging.Logger {
 
 func (p *Processor) webhooksLogger() *logging.Logger {
 	return logging.Get().Webhooks
+}
+
+// RecentActivity returns the tracker for recently-seen game entities.
+func (p *Processor) RecentActivity() *RecentActivity {
+	if p == nil {
+		return nil
+	}
+	return p.recentActivity
 }
 
 func (p *Processor) logInboundPayload(hook *Hook) {
