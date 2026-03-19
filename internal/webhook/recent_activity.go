@@ -190,31 +190,85 @@ func (p *Processor) recordRecentActivity(hook *Hook) {
 			p.recentActivity.RecordMaxBattle(id)
 		}
 	case "quest":
-		rewardType := getInt(hook.Message["reward_type"])
-		if rewardType == 0 {
-			rewardType = getInt(hook.Message["reward_type_id"])
-		}
-		reward := getInt(hook.Message["reward"])
-		if reward == 0 {
-			switch rewardType {
-			case rewardTypeItem:
-				reward = getInt(hook.Message["quest_item_id"])
-			case rewardTypePokemon:
-				reward = getInt(hook.Message["quest_pokemon_id"])
-			}
-		}
-		if reward == 0 {
-			reward = getInt(hook.Message["pokemon_id"])
-		}
+		p.recordQuestRecentActivity(hook)
+	}
+}
+
+// recordQuestRecentActivity extracts reward info from quest hooks.
+// Scanners (Golbat, RDM) typically send rewards as a structured
+// quest_rewards JSON array. We parse that first, falling back to
+// flat top-level fields if the array is empty.
+func (p *Processor) recordQuestRecentActivity(hook *Hook) {
+	// Try structured quest_rewards array first (primary path for most scanners).
+	rewards := questRewardsFromHook(hook)
+	for _, reward := range rewards {
+		rewardType := getInt(reward["type"])
+		info, _ := reward["info"].(map[string]any)
 		switch rewardType {
 		case rewardTypeItem:
-			p.recentActivity.RecordQuestItem(reward)
+			id := getIntFromMap(info, "item_id")
+			if id == 0 {
+				id = getIntFromMap(info, "id")
+			}
+			p.recentActivity.RecordQuestItem(id)
 		case rewardTypeCandy:
-			p.recentActivity.RecordQuestCandy(reward)
+			p.recentActivity.RecordQuestCandy(getIntFromMap(info, "pokemon_id"))
 		case rewardTypePokemon:
-			p.recentActivity.RecordQuestPokemon(reward)
+			p.recentActivity.RecordQuestPokemon(getIntFromMap(info, "pokemon_id"))
 		case rewardTypeMegaEnergy:
-			p.recentActivity.RecordQuestMegaEnergy(reward)
+			p.recentActivity.RecordQuestMegaEnergy(getIntFromMap(info, "pokemon_id"))
 		}
+	}
+	// Also record from the alternative/AR quest rewards.
+	for _, reward := range questRewardsFromHookAR(hook) {
+		rewardType := getInt(reward["type"])
+		info, _ := reward["info"].(map[string]any)
+		switch rewardType {
+		case rewardTypeItem:
+			id := getIntFromMap(info, "item_id")
+			if id == 0 {
+				id = getIntFromMap(info, "id")
+			}
+			p.recentActivity.RecordQuestItem(id)
+		case rewardTypeCandy:
+			p.recentActivity.RecordQuestCandy(getIntFromMap(info, "pokemon_id"))
+		case rewardTypePokemon:
+			p.recentActivity.RecordQuestPokemon(getIntFromMap(info, "pokemon_id"))
+		case rewardTypeMegaEnergy:
+			p.recentActivity.RecordQuestMegaEnergy(getIntFromMap(info, "pokemon_id"))
+		}
+	}
+	if len(rewards) > 0 {
+		return
+	}
+	// Fallback: flat top-level fields (older scanner formats).
+	rewardType := getInt(hook.Message["reward_type"])
+	if rewardType == 0 {
+		rewardType = getInt(hook.Message["quest_reward_type"])
+	}
+	if rewardType == 0 {
+		rewardType = getInt(hook.Message["reward_type_id"])
+	}
+	reward := getInt(hook.Message["reward"])
+	if reward == 0 {
+		switch rewardType {
+		case rewardTypeItem:
+			reward = getInt(hook.Message["quest_item_id"])
+		case rewardTypePokemon:
+			reward = getInt(hook.Message["quest_pokemon_id"])
+		}
+	}
+	if reward == 0 {
+		reward = getInt(hook.Message["pokemon_id"])
+	}
+	switch rewardType {
+	case rewardTypeItem:
+		p.recentActivity.RecordQuestItem(reward)
+	case rewardTypeCandy:
+		p.recentActivity.RecordQuestCandy(reward)
+	case rewardTypePokemon:
+		p.recentActivity.RecordQuestPokemon(reward)
+	case rewardTypeMegaEnergy:
+		p.recentActivity.RecordQuestMegaEnergy(reward)
 	}
 }

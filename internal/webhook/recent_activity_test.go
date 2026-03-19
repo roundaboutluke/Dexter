@@ -69,44 +69,70 @@ func TestRecordRecentActivityFromHook(t *testing.T) {
 		t.Fatalf("after max_battle hook, ActiveMaxBattleBosses() = %v, want [812]", maxIDs)
 	}
 
-	// Quest item hook
+	// Quest item hook via structured quest_rewards array (primary scanner format)
 	p.recordRecentActivity(&Hook{
-		Type:    "quest",
-		Message: map[string]any{"reward_type": float64(2), "reward": float64(1)},
+		Type: "quest",
+		Message: map[string]any{
+			"quest_rewards": []any{
+				map[string]any{"type": float64(2), "info": map[string]any{"item_id": float64(1), "amount": float64(3)}},
+			},
+		},
 	})
 	questIDs := p.recentActivity.ActiveQuestItems()
 	if len(questIDs) != 1 || questIDs[0] != 1 {
-		t.Fatalf("after quest item hook, ActiveQuestItems() = %v, want [1]", questIDs)
+		t.Fatalf("after quest item hook (structured), ActiveQuestItems() = %v, want [1]", questIDs)
 	}
 
-	// Quest mega energy hook
+	// Quest mega energy hook via structured quest_rewards
 	p.recordRecentActivity(&Hook{
-		Type:    "quest",
-		Message: map[string]any{"reward_type": float64(12), "reward": float64(6)},
+		Type: "quest",
+		Message: map[string]any{
+			"quest_rewards": []any{
+				map[string]any{"type": float64(12), "info": map[string]any{"pokemon_id": float64(6), "amount": float64(20)}},
+			},
+		},
 	})
 	megaIDs := p.recentActivity.ActiveQuestMegaEnergy()
 	if len(megaIDs) != 1 || megaIDs[0] != 6 {
-		t.Fatalf("after quest mega energy hook, ActiveQuestMegaEnergy() = %v, want [6]", megaIDs)
+		t.Fatalf("after quest mega energy hook (structured), ActiveQuestMegaEnergy() = %v, want [6]", megaIDs)
 	}
 
-	// Quest pokemon encounter hook
+	// Quest pokemon encounter hook via structured quest_rewards
 	p.recordRecentActivity(&Hook{
-		Type:    "quest",
-		Message: map[string]any{"reward_type": float64(7), "reward": float64(25)},
+		Type: "quest",
+		Message: map[string]any{
+			"quest_rewards": []any{
+				map[string]any{"type": float64(7), "info": map[string]any{"pokemon_id": float64(25)}},
+			},
+		},
 	})
 	pokemonIDs := p.recentActivity.ActiveQuestPokemon()
 	if len(pokemonIDs) != 1 || pokemonIDs[0] != 25 {
-		t.Fatalf("after quest pokemon hook, ActiveQuestPokemon() = %v, want [25]", pokemonIDs)
+		t.Fatalf("after quest pokemon hook (structured), ActiveQuestPokemon() = %v, want [25]", pokemonIDs)
 	}
 
-	// Quest candy hook
+	// Quest candy hook via structured quest_rewards
 	p.recordRecentActivity(&Hook{
-		Type:    "quest",
-		Message: map[string]any{"reward_type": float64(4), "reward": float64(143)},
+		Type: "quest",
+		Message: map[string]any{
+			"quest_rewards": []any{
+				map[string]any{"type": float64(4), "info": map[string]any{"pokemon_id": float64(143), "amount": float64(3)}},
+			},
+		},
 	})
 	candyIDs := p.recentActivity.ActiveQuestCandy()
 	if len(candyIDs) != 1 || candyIDs[0] != 143 {
-		t.Fatalf("after quest candy hook, ActiveQuestCandy() = %v, want [143]", candyIDs)
+		t.Fatalf("after quest candy hook (structured), ActiveQuestCandy() = %v, want [143]", candyIDs)
+	}
+
+	// Quest item via flat fallback fields (older scanner format)
+	p.recordRecentActivity(&Hook{
+		Type:    "quest",
+		Message: map[string]any{"reward_type": float64(2), "reward": float64(99)},
+	})
+	questIDs = p.recentActivity.ActiveQuestItems()
+	if len(questIDs) != 2 {
+		t.Fatalf("after quest item hook (flat), ActiveQuestItems() = %v, want 2 items", questIDs)
 	}
 }
 
