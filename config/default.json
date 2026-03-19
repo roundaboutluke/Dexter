@@ -1,5 +1,5 @@
 {
-  // **** This is the Poracle default configuration settings. Do not change this file,
+  // **** This is the Dexter default configuration settings. Do not change this file,
   // **** It is updated by us when new config parameters are added
 
   // **** Copy any sections you wish to modify your local.json
@@ -13,7 +13,7 @@
     // ipWhitelist, ipBlacklist - array of whitelisted or blacklisted addresses
       "ipWhitelist": [],
       "ipBlacklist": [],
-      "apiSecret": ""             // apiSecret to use for access to Poracle API -- blank API disabled
+      "apiSecret": ""             // apiSecret to use for access to Dexter API -- blank API disabled
   },
   //
   // These are general parameters
@@ -37,7 +37,7 @@
       },
       "requestShinyImages": false,
       "populatePokestopName": false,            // [RDM] lookup nearby pokestop names in scanner db for nearby mons
-      "locale": "en",                           // default locale for Poracle - eg en, fr, de, it, ru
+      "locale": "en",                           // default locale for Dexter - eg en, fr, de, it, ru
     // disabledCommands - array of commands which will be disabled from use
       "disabledCommands": [],
     // disableXXX - disables individual hook processing for particular scanner webhook types.  disablePokestop disables
@@ -66,12 +66,12 @@
     // - util/locale files are translation overlays/masterdata and do not make a language selectable for !language or Discord slash localizations on their own
     // - The configured general.locale still participates in text command parsing and Discord slash registration when a full runtime locale pack exists
     // - Each language can have it's own call word which pre-sets that language, and you also define the help text
-    // - command so that Poracle can always answer help in native language regardless of the users current settings
+    // - command so that Dexter can always answer help in native language regardless of the users current settings
     // An example might be:
     //         "availableLanguages": {
-    //            "en": {"poracle": "poracle", "help": "help" },
-    //            "de": {"poracle": "dasporacle", "help": "hilfe" },
-    //            "fr": {"poracle": "leporacle", "help": "aide" }
+    //            "en": {"poracle": "dexter", "help": "help" },
+    //            "de": {"poracle": "dexter", "help": "hilfe" },
+    //            "fr": {"poracle": "dexter", "help": "aide" }
     //        },
       "availableLanguages": {
       },
@@ -254,12 +254,12 @@
   //
   "discord": {
       "enabled": true,                                // is discord enabled?
-      "activity": "PoracleJS",                        // Bot Activity
+      "activity": "Dexter",                             // Bot Activity
       "workerStatus": "invisible",                          // Worker Status - available, dnd, idle, invisible
-      "workerActivity": "PoracleJS Helper",           // Worker Activity
-      "disableAutoGreetings": false,                  // whether Poracle will greet users who are assigned a role and get permission to use the bot
-      "uploadEmbedImages": false,                     // whether Poracle will retrieve and upload images direct to discord CDN
-      "disableCommandResponses": false,               // if true, suppress Poracle's responses to legacy !commands (useful if another tool provides responses)
+      "workerActivity": "Dexter Helper",              // Worker Activity
+      "disableAutoGreetings": false,                  // whether Dexter will greet users who are assigned a role and get permission to use the bot
+      "uploadEmbedImages": false,                     // whether Dexter will retrieve and upload images direct to discord CDN
+      "disableCommandResponses": false,               // if true, suppress Dexter's responses to legacy !commands (useful if another tool provides responses)
       "slash": {
         "disabled": false,                            // if true, do not register or handle Discord /commands (useful if another /command provider uses the same bot token)
         "deregisterOnStart": false,                   // if true, deletes registered global /commands on startup (use for a clean reinstall)
@@ -360,7 +360,7 @@
     //   them and this can be used to remind them of that
       "groupWelcomeText": "Welcome {user}, remember to click on me and 'start bot' to be able to receive messages",
     // botWelcomeText - message the bot sends to users who register
-      "botWelcomeText": "You are now registered with Poracle",
+      "botWelcomeText": "You are now registered with Dexter",
     // botGoodbyeMessage - message to send to user when they have lost their access (through reconciliation)
       "botGoodbyeMessage": "",
     // unregisteredMessage - message to reply to users who send a DM but are unregistered (default of empty gives a shrug)
@@ -375,7 +375,7 @@
       "registerOnStart": false            // Whether auto registration is attempted on /start being issued
   },
   //
-  // Alert limits - these are so Poracle can limit the amount of messages sent to a user/channel pro-actively
+  // Alert limits - these are so Dexter can limit the amount of messages sent to a user/channel pro-actively
   // to avoid individual users hogging the system (or channel explosions during an event)
   //
   "alertLimits": {
@@ -395,7 +395,7 @@
     }
   },
   //
-  // Area security -- this section allows you to define whether Poracle will restrict access to different
+  // Area security -- this section allows you to define whether Dexter will restrict access to different
   // communities based on individual membership. These settings override the relevant roles and channels in the discord/
   // telegram section above
   //
@@ -534,8 +534,8 @@
   // concurrent senders will reduce chance of hitting the global rate limit (probably) which is why we haven't defaulted too high here
   //
   // fastMonsters - Eliminate SQL lookups for monster matching by activating in memory pokemon matching
-  // disablePokemonCache - The impact of this will be that poracle uses a lot less memory
-  // maxDatabaseConnections - This is the max number of database connections Poracle can have (per worker)
+  // disablePokemonCache - The impact of this will be that Dexter uses a lot less memory
+  // maxDatabaseConnections - This is the max number of database connections Dexter can have (per worker)
   // webhookProcessingWorkers - Number of threads to run inbound webhook workers.  Five is enough for very big systems, going too high is probably
   //     counter productive so talk to me before playing with this one
   // concurrentWebhookProcessorsPerWorker - Number of inbound webhooks that can be processed at once per worker thread. Since each requires a database
