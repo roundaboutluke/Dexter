@@ -192,6 +192,7 @@ func (d *Discord) questMonsterChoices() []questChoice {
 		if name == "" {
 			continue
 		}
+		id := toInt(mon["id"], 0)
 		form := map[string]any{}
 		if entry, ok := mon["form"].(map[string]any); ok {
 			form = entry
@@ -201,8 +202,12 @@ func (d *Discord) questMonsterChoices() []questChoice {
 		lowerName := strings.ToLower(name)
 		if formID == 0 {
 			if !seen[lowerName] {
+				label := titleCaseWords(name)
+				if id > 0 {
+					label = fmt.Sprintf("%s (#%d)", label, id)
+				}
 				entries = append(entries, questChoice{
-					label: titleCaseWords(name),
+					label: label,
 					value: lowerName,
 				})
 				seen[lowerName] = true
@@ -213,7 +218,10 @@ func (d *Discord) questMonsterChoices() []questChoice {
 			continue
 		}
 		value := fmt.Sprintf("%s form:%s", lowerName, strings.ToLower(formName))
-		label := fmt.Sprintf("%s (%s)", titleCaseWords(name), titleCaseWords(formName))
+		label := fmt.Sprintf("%s %s", titleCaseWords(name), titleCaseWords(formName))
+		if id > 0 {
+			label = fmt.Sprintf("%s (#%d)", label, id)
+		}
 		if !seen[value] {
 			entries = append(entries, questChoice{
 				label: label,
@@ -459,9 +467,15 @@ func slashUserID(member *discordgo.Member, user *discordgo.User) string {
 	return ""
 }
 
-// sortQuestChoicesActiveFirst sorts quest choices with active items first, then alphabetical.
+// sortQuestChoicesActiveFirst sorts quest choices with "everything" pinned first,
+// then active items, then the rest alphabetical.
 func sortQuestChoicesActiveFirst(entries []questChoice, activeValues map[string]bool) {
 	sort.Slice(entries, func(i, j int) bool {
+		iEverything := strings.ToLower(entries[i].value) == "everything"
+		jEverything := strings.ToLower(entries[j].value) == "everything"
+		if iEverything != jEverything {
+			return iEverything
+		}
 		iActive := activeValues[strings.ToLower(entries[i].value)]
 		jActive := activeValues[strings.ToLower(entries[j].value)]
 		if iActive != jActive {
