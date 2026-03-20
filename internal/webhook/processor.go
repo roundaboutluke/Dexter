@@ -50,6 +50,7 @@ type Processor struct {
 	data          atomic.Pointer[data.GameData]
 	i18n          *i18n.Factory
 	templates     atomic.Pointer[[]dts.Template]
+	templateIdx   atomic.Pointer[templateIndex]
 	geocoder      *Geocoder
 	weather       *WeatherClient
 	weatherData   *WeatherTracker
@@ -117,6 +118,7 @@ func NewProcessor(queue *Queue, cfg *config.Config, query *db.Query, fences *geo
 	p.fences.Store(fences)
 	p.data.Store(gameData)
 	p.templates.Store(&templates)
+	p.templateIdx.Store(buildTemplateIndex(templates))
 	p.pvpCalc.Store(pvp.NewCalculator(cfg, gameData))
 	p.loadCaches()
 	return p

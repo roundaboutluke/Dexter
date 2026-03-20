@@ -199,6 +199,11 @@ func (s *Sender) maybeDeletePreviousForMonsterChangeDiscord(targetID, token stri
 }
 
 func (s *Sender) ensureDiscordDM(userID, token string) (string, error) {
+	// Check cached DM channel ID first.
+	if cached, ok := s.dmChannels.Load(userID); ok {
+		return cached.(string), nil
+	}
+
 	endpoint := "https://discord.com/api/v10/users/@me/channels"
 	headers := map[string]string{"Authorization": "Bot " + token}
 	payload := map[string]any{"recipient_id": userID}
@@ -219,6 +224,7 @@ func (s *Sender) ensureDiscordDM(userID, token string) (string, error) {
 	if result.ID == "" {
 		return "", fmt.Errorf("discord dm channel missing id")
 	}
+	s.dmChannels.Store(userID, result.ID)
 	return result.ID, nil
 }
 

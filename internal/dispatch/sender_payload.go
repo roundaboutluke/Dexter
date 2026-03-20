@@ -1,7 +1,6 @@
 package dispatch
 
 import (
-	"encoding/json"
 	"strconv"
 	"strings"
 )
@@ -219,13 +218,32 @@ func setEmbedImage(embed map[string]any, url string) {
 }
 
 func clonePayload(payload map[string]any) (map[string]any, error) {
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		return nil, err
+	return deepCopyMap(payload), nil
+}
+
+func deepCopyMap(src map[string]any) map[string]any {
+	if src == nil {
+		return nil
 	}
-	var clone map[string]any
-	if err := json.Unmarshal(raw, &clone); err != nil {
-		return nil, err
+	dst := make(map[string]any, len(src))
+	for k, v := range src {
+		dst[k] = deepCopyValue(v)
 	}
-	return clone, nil
+	return dst
+}
+
+func deepCopyValue(v any) any {
+	switch val := v.(type) {
+	case map[string]any:
+		return deepCopyMap(val)
+	case []any:
+		cp := make([]any, len(val))
+		for i, item := range val {
+			cp[i] = deepCopyValue(item)
+		}
+		return cp
+	default:
+		// Primitive types (string, float64, bool, nil) are immutable.
+		return v
+	}
 }

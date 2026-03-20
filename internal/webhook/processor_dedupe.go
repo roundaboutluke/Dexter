@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 	"time"
 
 	"dexter/internal/logging"
@@ -23,7 +24,7 @@ func (p *Processor) dedupePokemon(hook *Hook) bool {
 	formID := getInt(hook.Message["form"])
 	costume := getInt(hook.Message["costume"])
 	gender := getInt(hook.Message["gender"])
-	key := fmt.Sprintf("%s%t%s%d:%d:%d:%d", encounter, verified, cp, pokemonID, formID, costume, gender)
+	key := encounter + strconv.FormatBool(verified) + cp + strconv.Itoa(pokemonID) + ":" + strconv.Itoa(formID) + ":" + strconv.Itoa(costume) + ":" + strconv.Itoa(gender)
 	if p.cache.Get(key) {
 		return false
 	}
@@ -50,7 +51,7 @@ func (p *Processor) dedupeRaid(hook *Hook) bool {
 	}
 	end := getString(hook.Message["end"])
 	pokemonID := getString(hook.Message["pokemon_id"])
-	key := fmt.Sprintf("%s%s%s", gymID, end, pokemonID)
+	key := gymID + end + pokemonID
 	if key == "" {
 		return true
 	}
@@ -109,7 +110,7 @@ func (p *Processor) dedupeMaxBattle(hook *Hook) bool {
 
 	// PoracleJS uses a NodeCache (stdTTL=5400s). The PR-929 cache key is `${station_id}${battle_end}${battle_pokemon_id}`.
 	// For Go, keep this maxbattle-specific and align expiry to battle_end when present, so it remains useful for long battles.
-	key := fmt.Sprintf("maxbattle:%s:%d:%d:%d:%d", stationID, end, pokemonID, form, level)
+	key := "maxbattle:" + stationID + ":" + strconv.FormatInt(end, 10) + ":" + strconv.Itoa(pokemonID) + ":" + strconv.Itoa(form) + ":" + strconv.Itoa(level)
 	if p.cache.Get(key) {
 		return false
 	}
@@ -214,7 +215,7 @@ func (p *Processor) handlePokestop(hook *Hook) {
 	}
 
 	if lureExpiration > 0 && !p.disabled("general.disableLure") {
-		key := fmt.Sprintf("%sL%d", pokestopID, lureExpiration)
+		key := pokestopID + "L" + strconv.FormatInt(lureExpiration, 10)
 		if !p.cache.Get(key) {
 			ttl := expiryTTL(lureExpiration, 5*time.Minute)
 			p.cache.Set(key, ttl)
@@ -230,7 +231,7 @@ func (p *Processor) handlePokestop(hook *Hook) {
 	displayType := getInt(hook.Message["display_type"])
 	if incidentExpiration > 0 && !p.disabled("general.disableInvasion") {
 		if !p.disabled("general.disableUnconfirmedInvasion") || displayType > 6 {
-			key := fmt.Sprintf("%sI%d", pokestopID, incidentExpiration)
+			key := pokestopID + "I" + strconv.FormatInt(incidentExpiration, 10)
 			if !p.cache.Get(key) {
 				ttl := expiryTTL(incidentExpiration, 5*time.Minute)
 				p.cache.Set(key, ttl)
@@ -246,7 +247,7 @@ func (p *Processor) handlePokestop(hook *Hook) {
 
 	confirmed := getBool(hook.Message["confirmed"])
 	if confirmed && !p.disabled("general.disableInvasion") && p.enabled("general.processConfirmedInvasionLineups") {
-		key := fmt.Sprintf("%sI%dH02", pokestopID, incidentExpiration)
+		key := pokestopID + "I" + strconv.FormatInt(incidentExpiration, 10) + "H02"
 		if !p.cache.Get(key) {
 			ttl := expiryTTL(incidentExpiration, 5*time.Minute)
 			if ttl <= 0 {
@@ -269,7 +270,7 @@ func (p *Processor) dedupeQuest(hook *Hook) bool {
 	pokestopID := getString(hook.Message["pokestop_id"])
 	rewardsBytes, _ := json.Marshal(hook.Message["rewards"])
 	withAR := getBool(hook.Message["with_ar"])
-	key := fmt.Sprintf("%s_%s_%t", pokestopID, string(rewardsBytes), withAR)
+	key := pokestopID + "_" + string(rewardsBytes) + "_" + strconv.FormatBool(withAR)
 	if p.cache.Get(key) {
 		return false
 	}
@@ -285,7 +286,7 @@ func (p *Processor) dedupeGym(hook *Hook) bool {
 	}
 	team := teamFromHookMessage(hook.Message)
 	inBattle := gymInBattle(hook.Message)
-	cacheKey := fmt.Sprintf("%s_battle", id)
+	cacheKey := id + "_battle"
 	tooSoon := p.cache.Get(cacheKey)
 	if inBattle {
 		p.cache.Set(cacheKey, 5*time.Minute)
@@ -323,7 +324,7 @@ func (p *Processor) dedupeNest(hook *Hook) bool {
 	nestID := getString(hook.Message["nest_id"])
 	pokemonID := getString(hook.Message["pokemon_id"])
 	reset := getInt64(hook.Message["reset_time"])
-	key := fmt.Sprintf("%s_%s_%d", nestID, pokemonID, reset)
+	key := nestID + "_" + pokemonID + "_" + strconv.FormatInt(reset, 10)
 	if p.cache.Get(key) {
 		return false
 	}
@@ -350,7 +351,7 @@ func (p *Processor) dedupeWeather(hook *Hook) bool {
 		return true
 	}
 	hourStamp := updated - (updated % 3600)
-	key := fmt.Sprintf("%s_%d", cell, hourStamp)
+	key := cell + "_" + strconv.FormatInt(hourStamp, 10)
 	if p.cache.Get(key) {
 		return false
 	}

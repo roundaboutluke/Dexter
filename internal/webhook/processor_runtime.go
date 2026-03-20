@@ -66,6 +66,7 @@ func (p *Processor) UpdateTemplates(templates []dts.Template) {
 		return
 	}
 	p.templates.Store(&templates)
+	p.templateIdx.Store(buildTemplateIndex(templates))
 }
 
 // Stop signals background goroutines to exit.

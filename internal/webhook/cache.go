@@ -7,7 +7,7 @@ import (
 
 // TTLCache stores keys with optional expiration.
 type TTLCache struct {
-	mu    sync.Mutex
+	mu    sync.RWMutex
 	items map[string]time.Time
 }
 
@@ -18,17 +18,26 @@ func NewTTLCache() *TTLCache {
 
 // Get returns true if the key exists and has not expired.
 func (c *TTLCache) Get(key string) bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	// Fast path: read lock for cache misses (the common case).
+	c.mu.RLock()
 	expiry, ok := c.items[key]
 	if !ok {
+		c.mu.RUnlock()
 		return false
 	}
-	if !expiry.IsZero() && time.Now().After(expiry) {
+	if expiry.IsZero() || !time.Now().After(expiry) {
+		c.mu.RUnlock()
+		return true
+	}
+	c.mu.RUnlock()
+	// Slow path: upgrade to write lock to delete expired entry.
+	c.mu.Lock()
+	// Re-check under write lock in case another goroutine already cleaned it up.
+	if expiry, ok := c.items[key]; ok && !expiry.IsZero() && time.Now().After(expiry) {
 		delete(c.items, key)
-		return false
 	}
-	return true
+	c.mu.Unlock()
+	return false
 }
 
 // Set stores a key with an optional TTL. A non-positive ttl means no expiry.
@@ -70,8 +79,8 @@ func (c *TTLCache) Len() int {
 	if c == nil {
 		return 0
 	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	return len(c.items)
 }
 

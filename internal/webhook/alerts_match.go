@@ -119,7 +119,7 @@ func (p *Processor) matchTargets(hook *Hook) ([]alertMatch, error) {
 		questRewardsAR = questRewardDataAR(p, hook)
 	}
 
-	targets := []alertMatch{}
+	targets := make([]alertMatch, 0, 16)
 	for _, row := range rows {
 		matchRow := row
 		questMatchNoAR := false

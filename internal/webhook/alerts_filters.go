@@ -9,6 +9,7 @@ import (
 
 	"dexter/internal/alertstate"
 	"dexter/internal/config"
+	"dexter/internal/dts"
 	"dexter/internal/geofence"
 )
 
@@ -416,17 +417,52 @@ func selectTemplate(p *Processor, target alertTarget, hook *Hook) string {
 	return ""
 }
 
+// templateIndex groups non-hidden templates by "platform|type" for fast lookup.
+type templateIndex struct {
+	byKey map[string][]dts.Template
+}
+
+func buildTemplateIndex(templates []dts.Template) *templateIndex {
+	idx := &templateIndex{byKey: make(map[string][]dts.Template, len(templates)/4+1)}
+	for _, tpl := range templates {
+		if tpl.Hidden {
+			continue
+		}
+		key := tpl.Platform + "|" + tpl.Type
+		idx.byKey[key] = append(idx.byKey[key], tpl)
+	}
+	return idx
+}
+
+func (idx *templateIndex) lookup(platform, typ string) []dts.Template {
+	if idx == nil {
+		return nil
+	}
+	return idx.byKey[platform+"|"+typ]
+}
+
 func selectTemplatePayload(p *Processor, target alertTarget, hook *Hook) any {
 	if p == nil {
 		return nil
 	}
-	templates := p.getTemplates()
+	idx := p.templateIdx.Load()
 	for _, templateType := range templateTypeCandidates(hook) {
-		// 1) Exact id match with language preference.
-		for _, tpl := range templates {
-			if tpl.Hidden || tpl.Platform != target.Platform || tpl.Type != templateType {
-				continue
+		var candidates []dts.Template
+		if idx != nil {
+			candidates = idx.lookup(target.Platform, templateType)
+		} else {
+			// Fallback if index not built yet.
+			for _, tpl := range p.getTemplates() {
+				if !tpl.Hidden && tpl.Platform == target.Platform && tpl.Type == templateType {
+					candidates = append(candidates, tpl)
+				}
 			}
+		}
+		if len(candidates) == 0 {
+			continue
+		}
+		// 1) Exact id match with language preference.
+		for _, tpl := range candidates {
 			if target.Language != "" && tpl.Language != nil && *tpl.Language != target.Language {
 				continue
 			}
@@ -438,10 +474,7 @@ func selectTemplatePayload(p *Processor, target alertTarget, hook *Hook) any {
 			}
 		}
 		// 2) Default template for this type/platform/language.
-		for _, tpl := range templates {
-			if tpl.Hidden || tpl.Platform != target.Platform || tpl.Type != templateType {
-				continue
-			}
+		for _, tpl := range candidates {
 			if target.Language != "" && tpl.Language != nil && *tpl.Language != target.Language {
 				continue
 			}
@@ -450,30 +483,19 @@ func selectTemplatePayload(p *Processor, target alertTarget, hook *Hook) any {
 			}
 		}
 		// 3) Any default template for this type/platform.
-		for _, tpl := range templates {
-			if tpl.Hidden || tpl.Platform != target.Platform || tpl.Type != templateType {
-				continue
-			}
+		for _, tpl := range candidates {
 			if tpl.Default {
 				return tpl.Template
 			}
 		}
 		// 4) Last-resort first matching template for this type/platform.
-		for _, tpl := range templates {
-			if tpl.Hidden || tpl.Platform != target.Platform || tpl.Type != templateType {
-				continue
-			}
+		for _, tpl := range candidates {
 			if target.Language != "" && tpl.Language != nil && *tpl.Language != target.Language {
 				continue
 			}
 			return tpl.Template
 		}
-		for _, tpl := range templates {
-			if tpl.Hidden || tpl.Platform != target.Platform || tpl.Type != templateType {
-				continue
-			}
-			return tpl.Template
-		}
+		return candidates[0].Template
 	}
 	return nil
 }
