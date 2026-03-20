@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"dexter/internal/circuitbreaker"
 	"dexter/internal/config"
 	"dexter/internal/logging"
 )
@@ -26,7 +27,8 @@ type Worker struct {
 }
 
 // NewWorker constructs a queue worker.
-func NewWorker(queue *Queue, cfg *config.Config, name string, interval time.Duration, root string) *Worker {
+// breakers is an optional map of circuit breakers keyed by platform name.
+func NewWorker(queue *Queue, cfg *config.Config, name string, interval time.Duration, root string, breakers map[string]*circuitbreaker.Breaker) *Worker {
 	if interval <= 0 {
 		interval = 500 * time.Millisecond
 	}
@@ -35,7 +37,7 @@ func NewWorker(queue *Queue, cfg *config.Config, name string, interval time.Dura
 		name:        name,
 		interval:    interval,
 		cfg:         cfg,
-		sender:      NewSender(cfg, root),
+		sender:      NewSender(cfg, root, breakers),
 		pending:     map[string][]MessageJob{},
 		runningKeys: map[string]bool{},
 	}

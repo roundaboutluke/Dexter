@@ -6,10 +6,13 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
+	"dexter/internal/circuitbreaker"
 	"dexter/internal/config"
 	"dexter/internal/logging"
+	"dexter/internal/metrics"
 )
 
 // Sender delivers MessageJob payloads to Discord/Telegram/webhook targets.
@@ -17,12 +20,14 @@ type Sender struct {
 	cfg            *config.Config
 	client         *http.Client
 	root           string
+	breakers       map[string]*circuitbreaker.Breaker
 	cleanDiscord   *cleanCache
 	cleanWebhook   *cleanCache
 	cleanTelegram  *cleanCache
 	updateDiscord  *updateCache
 	updateWebhook  *updateCache
 	updateTelegram *updateCache
+	dmChannels     sync.Map // userID -> channelID cache for Discord DMs
 }
 
 func (s *Sender) loggerForType(targetType string) *logging.Logger {
@@ -55,7 +60,8 @@ func (s *Sender) logJobf(level logging.Level, job MessageJob, format string, arg
 }
 
 // NewSender constructs a sender with a shared HTTP client.
-func NewSender(cfg *config.Config, root string) *Sender {
+// breakers is an optional map of circuit breakers keyed by platform name (e.g. "discord", "telegram").
+func NewSender(cfg *config.Config, root string, breakers map[string]*circuitbreaker.Breaker) *Sender {
 	if root == "" {
 		root = "."
 	}
@@ -74,6 +80,7 @@ func NewSender(cfg *config.Config, root string) *Sender {
 		cfg:            cfg,
 		client:         &http.Client{Timeout: timeout},
 		root:           root,
+		breakers:       breakers,
 		cleanDiscord:   newCleanCache(filepath.Join(cacheDir, "cleancache-discord.json")),
 		cleanWebhook:   newCleanCache(filepath.Join(cacheDir, "cleancache-webhook.json")),
 		cleanTelegram:  newCleanCache(filepath.Join(cacheDir, "cleancache-telegram.json")),
@@ -87,38 +94,77 @@ func NewSender(cfg *config.Config, root string) *Sender {
 func (s *Sender) Send(job MessageJob) error {
 	start := time.Now()
 	s.logJobf(logging.LevelInfo, job, "sending message")
+
+	platform, subType := platformInfo(job.Type)
+	if b := s.breakers[platform]; b != nil && !b.Allow() {
+		s.recordSend(platform, subType, "circuit_open", time.Since(start))
+		return fmt.Errorf("%s circuit breaker open", platform)
+	}
+
+	var err error
 	switch job.Type {
 	case "webhook":
-		err := s.sendDiscordWebhook(job.Target, job)
+		err = s.sendDiscordWebhook(job.Target, job)
 		if err == nil {
 			s.logJobf(logging.TimingLevel(s.cfg), job, "WEBHOOK (%d ms)", time.Since(start).Milliseconds())
 		}
-		return err
 	case "discord:channel":
-		err := s.sendDiscordChannel(job.Target, job)
+		err = s.sendDiscordChannel(job.Target, job)
 		if err == nil {
 			s.logJobf(logging.TimingLevel(s.cfg), job, "CHANNEL (%d ms)", time.Since(start).Milliseconds())
 		}
-		return err
 	case "discord:user":
-		err := s.sendDiscordUser(job.Target, job)
+		err = s.sendDiscordUser(job.Target, job)
 		if err == nil {
 			s.logJobf(logging.TimingLevel(s.cfg), job, "USER (%d ms)", time.Since(start).Milliseconds())
 		}
-		return err
-	case "telegram:user", "telegram:channel":
-		err := s.sendTelegram(job.Target, job)
+	case "telegram:user", "telegram:channel", "telegram:group":
+		err = s.sendTelegram(job.Target, job)
 		if err == nil {
 			s.logJobf(logging.TimingLevel(s.cfg), job, "TELEGRAM (%d ms)", time.Since(start).Milliseconds())
 		}
-		return err
-	case "telegram:group":
-		err := s.sendTelegram(job.Target, job)
-		if err == nil {
-			s.logJobf(logging.TimingLevel(s.cfg), job, "TELEGRAM (%d ms)", time.Since(start).Milliseconds())
-		}
-		return err
 	default:
 		return fmt.Errorf("unsupported dispatch type %s", job.Type)
+	}
+
+	elapsed := time.Since(start)
+	if err != nil {
+		if b := s.breakers[platform]; b != nil {
+			b.RecordFailure()
+		}
+		s.recordSend(platform, subType, "error", elapsed)
+	} else {
+		if b := s.breakers[platform]; b != nil {
+			b.RecordSuccess()
+		}
+		s.recordSend(platform, subType, "success", elapsed)
+	}
+	return err
+}
+
+func (s *Sender) recordSend(platform, subType, status string, elapsed time.Duration) {
+	m := metrics.Get()
+	if m == nil {
+		return
+	}
+	m.DispatchSendTotal.WithLabelValues(platform, subType, status).Inc()
+	m.DispatchSendDuration.WithLabelValues(platform, subType).Observe(elapsed.Seconds())
+}
+
+func platformInfo(jobType string) (platform, subType string) {
+	switch {
+	case strings.HasPrefix(jobType, "telegram"):
+		parts := strings.SplitN(jobType, ":", 2)
+		if len(parts) == 2 {
+			return "telegram", parts[1]
+		}
+		return "telegram", jobType
+	case jobType == "webhook":
+		return "discord", "webhook"
+	case strings.HasPrefix(jobType, "discord:"):
+		parts := strings.SplitN(jobType, ":", 2)
+		return "discord", parts[1]
+	default:
+		return jobType, jobType
 	}
 }

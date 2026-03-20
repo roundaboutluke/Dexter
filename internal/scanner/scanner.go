@@ -8,6 +8,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 
+	"dexter/internal/circuitbreaker"
 	"dexter/internal/config"
 )
 
@@ -15,6 +16,7 @@ import (
 type Client struct {
 	scannerType string
 	conns       []*sql.DB
+	breaker     *circuitbreaker.Breaker
 }
 
 // GymNameResolver resolves gym ids to names.
@@ -101,6 +103,37 @@ func New(cfg *config.Config) (*Client, error) {
 	return &Client{scannerType: scannerType, conns: conns}, nil
 }
 
+// SetBreaker attaches a circuit breaker to the scanner client.
+func (c *Client) SetBreaker(b *circuitbreaker.Breaker) {
+	if c != nil {
+		c.breaker = b
+	}
+}
+
+// checkBreaker returns an error if the circuit breaker is open.
+// On nil breaker or closed/half-open state, it returns nil.
+func (c *Client) checkBreaker() error {
+	if c == nil || c.breaker == nil {
+		return nil
+	}
+	if !c.breaker.Allow() {
+		return fmt.Errorf("scanner db circuit breaker open")
+	}
+	return nil
+}
+
+func (c *Client) recordSuccess() {
+	if c != nil && c.breaker != nil {
+		c.breaker.RecordSuccess()
+	}
+}
+
+func (c *Client) recordFailure() {
+	if c != nil && c.breaker != nil {
+		c.breaker.RecordFailure()
+	}
+}
+
 // Close shuts down scanner DB connections.
 func (c *Client) Close() error {
 	if c == nil {
@@ -123,6 +156,9 @@ func (c *Client) GetGymName(gymID string) (string, error) {
 	if c == nil || gymID == "" {
 		return "", nil
 	}
+	if err := c.checkBreaker(); err != nil {
+		return "", err
+	}
 	query := "SELECT name FROM gym WHERE id = ? LIMIT 1"
 	if c.scannerType == "mad" {
 		query = "SELECT name FROM gymdetails WHERE gym_id = ? LIMIT 1"
@@ -137,8 +173,10 @@ func (c *Client) GetGymName(gymID string) (string, error) {
 			continue
 		}
 		if err != nil {
+			c.recordFailure()
 			return "", err
 		}
+		c.recordSuccess()
 		if name.Valid && name.String != "" {
 			return name.String, nil
 		}
@@ -310,6 +348,9 @@ func (c *Client) GetPokestopName(stopID string) (string, error) {
 	if c == nil || stopID == "" {
 		return "", nil
 	}
+	if err := c.checkBreaker(); err != nil {
+		return "", err
+	}
 	query := "SELECT name FROM pokestop WHERE id = ? LIMIT 1"
 	if c.scannerType == "mad" {
 		query = "SELECT name FROM pokestop WHERE pokestop_id = ? LIMIT 1"
@@ -324,8 +365,10 @@ func (c *Client) GetPokestopName(stopID string) (string, error) {
 			continue
 		}
 		if err != nil {
+			c.recordFailure()
 			return "", err
 		}
+		c.recordSuccess()
 		if name.Valid && name.String != "" {
 			return name.String, nil
 		}
@@ -341,6 +384,9 @@ func (c *Client) GetStationName(stationID string) (string, error) {
 	if c.scannerType != "golbat" {
 		return "", nil
 	}
+	if err := c.checkBreaker(); err != nil {
+		return "", err
+	}
 	query := "SELECT name FROM station WHERE id = ? LIMIT 1"
 	for _, conn := range c.conns {
 		if conn == nil {
@@ -352,8 +398,10 @@ func (c *Client) GetStationName(stationID string) (string, error) {
 			continue
 		}
 		if err != nil {
+			c.recordFailure()
 			return "", err
 		}
+		c.recordSuccess()
 		if name.Valid && name.String != "" {
 			return name.String, nil
 		}

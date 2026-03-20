@@ -52,7 +52,7 @@ func TestGeofenceReloadReplacesStoreInPlace(t *testing.T) {
 	store := &geofence.Store{Fences: []geofence.Fence{}}
 	queue := webhook.NewQueue()
 
-	s, err := New(cfg, queue, nil, nil, nil, nil, store, root, nil, nil, nil, nil)
+	s, err := New(cfg, queue, nil, nil, nil, nil, store, root, nil, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("server.New: %v", err)
 	}

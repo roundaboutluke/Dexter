@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -30,6 +31,7 @@ type Server struct {
 
 	cfg       *config.Config
 	query     *db.Query
+	db        *sql.DB
 	fences    atomic.Pointer[geofence.Store]
 	root      string
 	data      atomic.Pointer[data.GameData]
@@ -38,13 +40,14 @@ type Server struct {
 	scanner   *scanner.Client
 	processor *webhook.Processor
 
+	webhookQueue  *webhook.Queue
 	discordQueue  *dispatch.Queue
 	telegramQueue *dispatch.Queue
 	botManager    *bot.Manager
 }
 
 // New constructs a server with routes and config bindings.
-func New(cfg *config.Config, queue *webhook.Queue, processor *webhook.Processor, discordQueue *dispatch.Queue, telegramQueue *dispatch.Queue, query *db.Query, fences *geofence.Store, root string, gameData *data.GameData, i18nFactory *i18n.Factory, templates []dts.Template, scannerClient *scanner.Client) (*Server, error) {
+func New(cfg *config.Config, queue *webhook.Queue, processor *webhook.Processor, discordQueue *dispatch.Queue, telegramQueue *dispatch.Queue, query *db.Query, fences *geofence.Store, root string, gameData *data.GameData, i18nFactory *i18n.Factory, templates []dts.Template, scannerClient *scanner.Client, dbConn *sql.DB) (*Server, error) {
 	host, _ := cfg.GetString("server.host")
 	port, ok := cfg.GetInt("server.port")
 	if !ok {
@@ -57,10 +60,12 @@ func New(cfg *config.Config, queue *webhook.Queue, processor *webhook.Processor,
 	s := &Server{
 		cfg:           cfg,
 		query:         query,
+		db:            dbConn,
 		root:          root,
 		i18n:          i18nFactory,
 		scanner:       scannerClient,
 		processor:     processor,
+		webhookQueue:  queue,
 		discordQueue:  discordQueue,
 		telegramQueue: telegramQueue,
 	}

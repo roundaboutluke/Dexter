@@ -13,7 +13,26 @@
     // ipWhitelist, ipBlacklist - array of whitelisted or blacklisted addresses
       "ipWhitelist": [],
       "ipBlacklist": [],
-      "apiSecret": ""             // apiSecret to use for access to Dexter API -- blank API disabled
+      "apiSecret": "",            // apiSecret to use for access to Dexter API -- blank API disabled
+      "metrics": {
+          "enabled": true,        // expose Prometheus metrics at /metrics
+          "path": "/metrics"      // path for metrics endpoint
+      }
+  },
+  "circuitBreaker": {
+      "enabled": true,
+      "discord": {
+          "failThreshold": 5,     // consecutive failures before opening
+          "cooldownSeconds": 30   // seconds to wait before probing recovery
+      },
+      "telegram": {
+          "failThreshold": 5,
+          "cooldownSeconds": 30
+      },
+      "scannerDb": {
+          "failThreshold": 3,
+          "cooldownSeconds": 60
+      }
   },
   //
   // These are general parameters

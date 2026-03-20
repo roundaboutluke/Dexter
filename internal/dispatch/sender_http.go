@@ -16,6 +16,7 @@ import (
 
 	"dexter/internal/config"
 	"dexter/internal/logging"
+	"dexter/internal/metrics"
 )
 
 func (s *Sender) postJSONRaw(endpoint string, payload any, headers map[string]string) (int, string, error) {
@@ -134,6 +135,10 @@ func (s *Sender) discordRequestWithRetryOptions(method, endpoint string, body []
 			return nil, err
 		}
 		if status == http.StatusTooManyRequests {
+			if m := metrics.Get(); m != nil {
+				m.DiscordRateLimitTotal.Inc()
+				m.DispatchRetryTotal.WithLabelValues("discord").Inc()
+			}
 			if logger := logging.Get().Discord; logger != nil {
 				logger.Warnf("discord 429 rate limit endpoint=%s attempt=%d retry_after=%s", endpoint, attempt+1, discordRetryAfter(respHeaders, respBody))
 			}

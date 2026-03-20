@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"dexter/internal/logging"
+	"dexter/internal/metrics"
 )
 
 func (s *Sender) sendTelegram(chatID string, job MessageJob) error {
@@ -343,6 +344,10 @@ func (s *Sender) postTelegramWithResponse(endpoint string, payload map[string]an
 			return 0, err
 		}
 		if status == http.StatusTooManyRequests {
+			if m := metrics.Get(); m != nil {
+				m.TelegramRateLimitTotal.Inc()
+				m.DispatchRetryTotal.WithLabelValues("telegram").Inc()
+			}
 			retryAfter := 30
 			var resp struct {
 				Parameters struct {

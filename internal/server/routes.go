@@ -2,6 +2,10 @@ package server
 
 import (
 	"net/http"
+
+	"dexter/internal/metrics"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func (s *Server) registerRoutes(mux *http.ServeMux) {
@@ -24,6 +28,8 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 		})
 	})
 
+	registerHealthRoutes(s, mux)
+	registerMetricsRoute(s, mux)
 	registerTrackingExtras(s, mux)
 	registerConfigRoutes(s, mux)
 	registerMasterDataRoutes(s, mux)
@@ -35,4 +41,26 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	registerTrackingRaidRoutes(s, mux)
 	registerTrackingEggRoutes(s, mux)
 	registerTrackingPokemonRoutes(s, mux)
+}
+
+func registerMetricsRoute(s *Server, mux *http.ServeMux) {
+	m := metrics.Get()
+	if m == nil {
+		return
+	}
+	path := "/metrics"
+	if p, ok := s.cfg.GetString("server.metrics.path"); ok && p != "" {
+		path = p
+	}
+	handler := promhttp.HandlerFor(m.Registry, promhttp.HandlerOpts{})
+	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		if rejectNotAllowedByIP(s.cfg, r, w) {
+			return
+		}
+		handler.ServeHTTP(w, r)
+	})
 }

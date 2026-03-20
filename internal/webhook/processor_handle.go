@@ -7,9 +7,11 @@ import (
 
 	"dexter/internal/geo"
 	"dexter/internal/logging"
+	"dexter/internal/metrics"
 )
 
 func (p *Processor) handle(item any) {
+	start := time.Now()
 	hook, ok := normalizeHook(item)
 	if !ok {
 		logger := logging.Get().Webhooks
@@ -38,6 +40,10 @@ func (p *Processor) handle(item any) {
 		return
 	}
 	p.routeHook(hook)
+	if m := metrics.Get(); m != nil {
+		m.WebhookReceivedTotal.WithLabelValues(hook.Type).Inc()
+		m.WebhookProcessDuration.WithLabelValues(hook.Type).Observe(time.Since(start).Seconds())
+	}
 }
 
 func normalizeRaidOrEggHook(hook *Hook) {
@@ -388,10 +394,7 @@ func (p *Processor) shouldSkipLongRaid(hook *Hook) bool {
 	if !ignore {
 		return false
 	}
-	start := getInt64(hook.Message["start"])
-	if start == 0 {
-		start = getInt64(hook.Message["hatch_time"])
-	}
+	start := hookEggStart(hook.Message)
 	end := getInt64(hook.Message["end"])
 	if start == 0 || end == 0 {
 		return false

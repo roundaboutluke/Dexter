@@ -25,7 +25,7 @@ func TestAPIWhitelistRejectsWithPoracleJSShape(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load config: %v", err)
 	}
-	s, err := New(cfg, webhook.NewQueue(), nil, nil, nil, nil, &geofence.Store{}, root, nil, nil, nil, nil)
+	s, err := New(cfg, webhook.NewQueue(), nil, nil, nil, nil, &geofence.Store{}, root, nil, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("server.New: %v", err)
 	}
@@ -62,7 +62,7 @@ func TestAPISecretRejectsWithPoracleJSShape(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load config: %v", err)
 	}
-	s, err := New(cfg, webhook.NewQueue(), nil, nil, nil, nil, &geofence.Store{}, root, nil, nil, nil, nil)
+	s, err := New(cfg, webhook.NewQueue(), nil, nil, nil, nil, &geofence.Store{}, root, nil, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("server.New: %v", err)
 	}

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"dexter/internal/bot"
+	"dexter/internal/circuitbreaker"
 	"dexter/internal/config"
 	"dexter/internal/data"
 	"dexter/internal/db"
@@ -17,6 +18,7 @@ import (
 	"dexter/internal/geofence"
 	"dexter/internal/i18n"
 	"dexter/internal/logging"
+	"dexter/internal/metrics"
 	"dexter/internal/profile"
 	"dexter/internal/render"
 	"dexter/internal/scanner"
@@ -91,6 +93,13 @@ func (a *App) Run(ctx context.Context) error {
 	logf("Dexter startup - initialising from %s", root)
 	validate.CheckConfig(cfg, logf)
 
+	// Initialize Prometheus metrics.
+	metricsEnabled, _ := cfg.GetBool("server.metrics.enabled")
+	if metricsEnabled {
+		metrics.Init()
+		logf("Prometheus metrics enabled")
+	}
+
 	if data.HasData(root) {
 		logf("Refreshing game data")
 		data.GenerateBestEffort(root, true, logf)
@@ -109,8 +118,20 @@ func (a *App) Run(ctx context.Context) error {
 	a.queue = webhook.NewQueue()
 	a.discordQueue = dispatch.NewQueue("discord")
 	a.telegramQueue = dispatch.NewQueue("telegram")
-	a.discordWorker = dispatch.NewWorker(a.discordQueue, cfg, "discord", 750*time.Millisecond, root)
-	a.telegramWorker = dispatch.NewWorker(a.telegramQueue, cfg, "telegram", 750*time.Millisecond, root)
+
+	// Create circuit breakers for external services.
+	breakers := initCircuitBreakers(cfg)
+	discordBreakers := map[string]*circuitbreaker.Breaker{}
+	telegramBreakers := map[string]*circuitbreaker.Breaker{}
+	if b, ok := breakers["discord"]; ok {
+		discordBreakers["discord"] = b
+	}
+	if b, ok := breakers["telegram"]; ok {
+		telegramBreakers["telegram"] = b
+	}
+
+	a.discordWorker = dispatch.NewWorker(a.discordQueue, cfg, "discord", 750*time.Millisecond, root, discordBreakers)
+	a.telegramWorker = dispatch.NewWorker(a.telegramQueue, cfg, "telegram", 750*time.Millisecond, root, telegramBreakers)
 	a.discordWorker.Start()
 	a.telegramWorker.Start()
 	logf("Started dispatch workers")
@@ -142,6 +163,9 @@ func (a *App) Run(ctx context.Context) error {
 	scannerClient, err := scanner.New(cfg)
 	if err != nil {
 		return err
+	}
+	if b, ok := breakers["scanner_db"]; ok {
+		scannerClient.SetBreaker(b)
 	}
 	a.scannerClient = scannerClient
 
@@ -188,7 +212,7 @@ func (a *App) Run(ctx context.Context) error {
 	a.processor.Start()
 	logf("Webhook processor started")
 
-	srv, err := server.New(cfg, a.queue, a.processor, a.discordQueue, a.telegramQueue, a.query, a.fences, root, a.data, a.i18n, a.dts, a.scannerClient)
+	srv, err := server.New(cfg, a.queue, a.processor, a.discordQueue, a.telegramQueue, a.query, a.fences, root, a.data, a.i18n, a.dts, a.scannerClient, a.db.Conn)
 	if err != nil {
 		return err
 	}
@@ -200,6 +224,12 @@ func (a *App) Run(ctx context.Context) error {
 		port = 3030
 	}
 	logf("Service started on %s:%d", host, port)
+
+	// Start metrics background collector.
+	if metrics.Get() != nil {
+		metrics.StartCollector(ctx, a.queue, a.discordQueue, a.telegramQueue, a.db.Conn)
+		logf("Metrics collector started")
+	}
 
 	botManager := bot.NewManager(cfg, a.query, a.data, a.i18n, a.dts, a.fences, a.processor, a.discordQueue, a.telegramQueue, a.queue, statsTracker, a.weatherTracker, tzLocator, a.scannerClient)
 	botManager.Start()
@@ -247,6 +277,49 @@ func preloadAlertState(preloader alertStatePreloader, forcedMigrationFailure boo
 		return nil
 	}
 	return nil
+}
+
+func initCircuitBreakers(cfg *config.Config) map[string]*circuitbreaker.Breaker {
+	enabled, ok := cfg.GetBool("circuitBreaker.enabled")
+	if ok && !enabled {
+		return nil
+	}
+	breakers := map[string]*circuitbreaker.Breaker{}
+	m := metrics.Get()
+
+	type cbConfig struct {
+		name          string
+		thresholdPath string
+		cooldownPath  string
+		defaultThresh int
+		defaultCool   int
+	}
+	configs := []cbConfig{
+		{"discord", "circuitBreaker.discord.failThreshold", "circuitBreaker.discord.cooldownSeconds", 5, 30},
+		{"telegram", "circuitBreaker.telegram.failThreshold", "circuitBreaker.telegram.cooldownSeconds", 5, 30},
+		{"scanner_db", "circuitBreaker.scannerDb.failThreshold", "circuitBreaker.scannerDb.cooldownSeconds", 3, 60},
+	}
+	for _, c := range configs {
+		thresh := c.defaultThresh
+		if v, ok := cfg.GetInt(c.thresholdPath); ok && v > 0 {
+			thresh = v
+		}
+		cool := c.defaultCool
+		if v, ok := cfg.GetInt(c.cooldownPath); ok && v > 0 {
+			cool = v
+		}
+		b := circuitbreaker.New(c.name, thresh, time.Duration(cool)*time.Second)
+		if m != nil {
+			b.SetOnStateChange(func(name string, _, to circuitbreaker.State) {
+				m.CircuitBreakerState.WithLabelValues(name).Set(float64(to))
+				if to == circuitbreaker.Open {
+					m.CircuitBreakerTrips.WithLabelValues(name).Inc()
+				}
+			})
+		}
+		breakers[c.name] = b
+	}
+	return breakers
 }
 
 // Shutdown performs a graceful shutdown.

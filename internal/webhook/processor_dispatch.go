@@ -9,6 +9,7 @@ import (
 	"dexter/internal/dispatch"
 	"dexter/internal/geo"
 	"dexter/internal/logging"
+	"dexter/internal/metrics"
 )
 
 func (p *Processor) dispatch(hook *Hook) {
@@ -38,6 +39,9 @@ func (p *Processor) dispatch(hook *Hook) {
 	if len(targets) == 0 {
 		p.logControllerf(logging.LevelVerbose, hook, "no humans cared for %s", hook.Type)
 		return
+	}
+	if m := metrics.Get(); m != nil {
+		m.WebhookMatchedTotal.WithLabelValues(hook.Type).Inc()
 	}
 	queuedJobs := 0
 	trackWeather := false
@@ -196,10 +200,7 @@ func updateKeyForRaid(hook *Hook) string {
 		return ""
 	}
 	if hook.Type == "egg" {
-		start := getInt64(hook.Message["start"])
-		if start == 0 {
-			start = getInt64(hook.Message["hatch_time"])
-		}
+		start := hookEggStart(hook.Message)
 		level := getInt(hook.Message["level"])
 		if level == 0 {
 			level = getInt(hook.Message["raid_level"])
