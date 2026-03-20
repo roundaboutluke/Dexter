@@ -143,8 +143,10 @@ func (g *Geocoder) Forward(query string) []GeoLocation {
 	}
 }
 
-// Reverse returns a formatted address for lat/lon.
-func (g *Geocoder) Reverse(lat, lon float64) string {
+// reverseProvider returns the normalized geocoding provider name, or "" if reverse
+// geocoding is disabled. It handles the nil/none/forwardOnly checks shared by
+// Reverse and ReverseDetails.
+func (g *Geocoder) reverseProvider() string {
 	if g == nil || g.cfg == nil {
 		return ""
 	}
@@ -154,6 +156,28 @@ func (g *Geocoder) Reverse(lat, lon float64) string {
 	}
 	forwardOnly, _ := g.cfg.GetBool("geocoding.forwardOnly")
 	if forwardOnly {
+		return ""
+	}
+	return strings.ToLower(provider)
+}
+
+func (g *Geocoder) reverseDetailsByProvider(provider string, lat, lon float64) *ReverseResult {
+	switch provider {
+	case "nominatim", "poracle":
+		return g.reverseNominatimDetails(lat, lon)
+	case "pelias":
+		return g.reversePeliasDetails(lat, lon)
+	case "google":
+		return g.reverseGoogleDetails(lat, lon)
+	default:
+		return nil
+	}
+}
+
+// Reverse returns a formatted address for lat/lon.
+func (g *Geocoder) Reverse(lat, lon float64) string {
+	provider := g.reverseProvider()
+	if provider == "" {
 		return ""
 	}
 	start := time.Now()
@@ -175,38 +199,27 @@ func (g *Geocoder) Reverse(lat, lon float64) string {
 	}
 
 	var address string
-	switch strings.ToLower(provider) {
+	switch provider {
 	case "nominatim", "poracle":
 		address = g.reverseNominatim(lat, lon)
 	case "pelias":
 		address = g.reversePelias(lat, lon)
 	case "google":
 		address = g.reverseGoogle(lat, lon)
-	default:
-		address = ""
 	}
-	if address != "" {
-		if cacheKey != "" {
-			g.mu.Lock()
-			g.cache[cacheKey] = address
-			g.lastUsed[cacheKey] = time.Now()
-			g.mu.Unlock()
-		}
+	if address != "" && cacheKey != "" {
+		g.mu.Lock()
+		g.cache[cacheKey] = address
+		g.lastUsed[cacheKey] = time.Now()
+		g.mu.Unlock()
 	}
 	return address
 }
 
 // ReverseDetails returns reverse geocode fields for DTS templates.
 func (g *Geocoder) ReverseDetails(lat, lon float64) *ReverseResult {
-	if g == nil || g.cfg == nil {
-		return nil
-	}
-	provider, _ := g.cfg.GetString("geocoding.provider")
-	if strings.ToLower(provider) == "none" {
-		return nil
-	}
-	forwardOnly, _ := g.cfg.GetBool("geocoding.forwardOnly")
-	if forwardOnly {
+	provider := g.reverseProvider()
+	if provider == "" {
 		return nil
 	}
 	start := time.Now()
@@ -228,24 +241,13 @@ func (g *Geocoder) ReverseDetails(lat, lon float64) *ReverseResult {
 		g.mu.Unlock()
 	}
 
-	var result *ReverseResult
-	switch strings.ToLower(provider) {
-	case "nominatim", "poracle":
-		result = g.reverseNominatimDetails(lat, lon)
-	case "pelias":
-		result = g.reversePeliasDetails(lat, lon)
-	case "google":
-		result = g.reverseGoogleDetails(lat, lon)
-	default:
-	}
-	if result != nil && result.FormattedAddress != "" {
-		if cacheKey != "" {
-			g.mu.Lock()
-			g.detailCache[cacheKey] = *result
-			g.cache[cacheKey] = result.FormattedAddress
-			g.lastUsed[cacheKey] = time.Now()
-			g.mu.Unlock()
-		}
+	result := g.reverseDetailsByProvider(provider, lat, lon)
+	if result != nil && result.FormattedAddress != "" && cacheKey != "" {
+		g.mu.Lock()
+		g.detailCache[cacheKey] = *result
+		g.cache[cacheKey] = result.FormattedAddress
+		g.lastUsed[cacheKey] = time.Now()
+		g.mu.Unlock()
 	}
 	return result
 }

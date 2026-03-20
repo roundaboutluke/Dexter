@@ -14,7 +14,7 @@ import (
 )
 
 func buildRenderData(p *Processor, hook *Hook, match alertMatch) map[string]any {
-	data := map[string]any{}
+	data := make(map[string]any, 128)
 	base := applyBaseRenderData(p, hook, match, data)
 	ctx := renderDataContext{
 		p:         p,
@@ -45,10 +45,7 @@ func buildRenderData(p *Processor, hook *Hook, match alertMatch) map[string]any 
 	data["time"] = hookTime(p, hook)
 	expireForTTH := hookExpiryUnix(hook)
 	if hook.Type == "egg" {
-		start := getInt64(hook.Message["start"])
-		if start == 0 {
-			start = getInt64(hook.Message["hatch_time"])
-		}
+		start := hookEggStart(hook.Message)
 		if start > 0 {
 			expireForTTH = start
 		}
@@ -56,71 +53,14 @@ func buildRenderData(p *Processor, hook *Hook, match alertMatch) map[string]any 
 	if (hook.Type == "gym" || hook.Type == "gym_details") && expireForTTH <= 0 {
 		expireForTTH = time.Now().Unix() + 3600
 	}
-	if expireForTTH > 0 {
-		remaining := int(expireForTTH - time.Now().Unix())
-		data["tthSeconds"] = remaining
-		firstDateWasLater := remaining < 0
-		abs := remaining
-		if abs < 0 {
-			abs = -abs
-		}
-		days := abs / 86400
-		hours := (abs % 86400) / 3600
-		minutes := (abs % 3600) / 60
-		seconds := abs % 60
-		data["tthd"] = days
-		data["tthh"], data["tthm"], data["tths"] = hours, minutes, seconds
-		data["tth"] = map[string]any{
-			"years":             0,
-			"months":            0,
-			"days":              days,
-			"hours":             hours,
-			"minutes":           minutes,
-			"seconds":           seconds,
-			"firstDateWasLater": firstDateWasLater,
-		}
-	} else {
-		data["tthd"] = 0
-		data["tthh"], data["tthm"], data["tths"] = 0, 0, 0
-		data["tth"] = map[string]any{
-			"years":             0,
-			"months":            0,
-			"days":              0,
-			"hours":             0,
-			"minutes":           0,
-			"seconds":           0,
-			"firstDateWasLater": false,
-		}
-	}
+	applyTTH(data, expireForTTH)
 	if hook.Type == "egg" {
-		start := getInt64(hook.Message["start"])
-		if start == 0 {
-			start = getInt64(hook.Message["hatch_time"])
-		}
+		start := hookEggStart(hook.Message)
 		if start > 0 {
-			layout := "15:04:05"
-			if p != nil && p.cfg != nil {
-				if format := getStringFromConfig(p.cfg, "locale.time", ""); format != "" {
-					layout = momentFormatToGoLayout(format)
-				}
-			}
-			data["hatchTime"] = formatUnixInHookLocation(p, hook, start, layout)
+			data["hatchTime"] = formatUnixInHookLocation(p, hook, start, configTimeLayout(p))
 			data["hatchtime"] = data["hatchTime"]
 			data["time"] = data["hatchTime"]
-			remaining := int(start - time.Now().Unix())
-			firstDateWasLater := remaining < 0
-			abs := remaining
-			if abs < 0 {
-				abs = -abs
-			}
-			days := abs / 86400
-			h := (abs % 86400) / 3600
-			m := (abs % 3600) / 60
-			s := abs % 60
-			data["tthd"] = days
-			data["tthh"], data["tthm"], data["tths"] = h, m, s
-			data["tth"] = map[string]any{"years": 0, "months": 0, "days": days, "hours": h, "minutes": m, "seconds": s, "firstDateWasLater": firstDateWasLater}
-			data["tthSeconds"] = remaining
+			applyTTH(data, start)
 		}
 	}
 	if value := getInt64(hook.Message["disappear_time"]); value > 0 {
@@ -377,11 +317,7 @@ func buildRenderData(p *Processor, hook *Hook, match alertMatch) map[string]any 
 			data["previousControlTeamEmoji"] = translateMaybe(tr, getString(data["previousControlTeamEmojiEng"]))
 			data["color"] = data["gymColor"]
 			if loc := hookLocation(p, hook); loc != nil {
-				layout := "15:04:05"
-				if format := getStringFromConfig(p.cfg, "locale.time", ""); format != "" {
-					layout = momentFormatToGoLayout(format)
-				}
-				data["conqueredTime"] = time.Now().In(loc).Format(layout)
+				data["conqueredTime"] = time.Now().In(loc).Format(configTimeLayout(p))
 			} else {
 				data["conqueredTime"] = time.Now().Format("15:04:05")
 			}
@@ -551,12 +487,7 @@ func buildRenderData(p *Processor, hook *Hook, match alertMatch) map[string]any 
 		if len(rsvps) > 0 {
 			nowMs := time.Now().UnixMilli()
 			out := make([]map[string]any, 0, len(rsvps))
-			layout := "15:04:05"
-			if p != nil && p.cfg != nil {
-				if format := getStringFromConfig(p.cfg, "locale.time", ""); format != "" {
-					layout = momentFormatToGoLayout(format)
-				}
-			}
+			layout := configTimeLayout(p)
 			for _, entry := range rsvps {
 				timeslot := getInt64(entry["timeslot"])
 				if timeslot == 0 || timeslot <= nowMs {
@@ -574,13 +505,7 @@ func buildRenderData(p *Processor, hook *Hook, match alertMatch) map[string]any 
 	if hook.Type == "nest" {
 		pokemonID := getInt(hook.Message["pokemon_id"])
 		if pokemonID > 0 {
-			formID := getInt(hook.Message["form"])
-			if formID == 0 {
-				formID = getInt(hook.Message["form_id"])
-			}
-			if formID == 0 {
-				formID = getInt(hook.Message["pokemon_form"])
-			}
+			formID := hookFormID(hook.Message)
 			data["pokemonId"] = pokemonID
 			data["formId"] = formID
 			if monster := lookupMonster(p.getData(), fmt.Sprintf("%d_%d", pokemonID, formID)); monster != nil {

@@ -132,13 +132,7 @@ func nameOrID(p *Processor, hook *Hook, key string) string {
 	if id == "" {
 		return ""
 	}
-	form := getInt(hook.Message["form"])
-	if form == 0 {
-		form = getInt(hook.Message["form_id"])
-	}
-	if form == 0 {
-		form = getInt(hook.Message["pokemon_form"])
-	}
+	form := hookFormID(hook.Message)
 	keyWithForm := fmt.Sprintf("%s_%d", id, form)
 	if name := lookupMonsterName(d, keyWithForm); name != "" {
 		return name

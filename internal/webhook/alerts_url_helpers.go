@@ -9,6 +9,48 @@ import (
 	"dexter/internal/logging"
 )
 
+// configTimeLayout returns the Go time format string from config, defaulting to "15:04:05".
+func configTimeLayout(p *Processor) string {
+	layout := "15:04:05"
+	if p != nil && p.cfg != nil {
+		if format := getStringFromConfig(p.cfg, "locale.time", ""); format != "" {
+			layout = momentFormatToGoLayout(format)
+		}
+	}
+	return layout
+}
+
+// applyTTH computes time-to-hide/hatch decomposition and sets the standard TTH keys on data.
+func applyTTH(data map[string]any, expireUnix int64) {
+	if expireUnix <= 0 {
+		data["tthd"] = 0
+		data["tthh"], data["tthm"], data["tths"] = 0, 0, 0
+		data["tthSeconds"] = 0
+		data["tth"] = map[string]any{
+			"years": 0, "months": 0, "days": 0, "hours": 0,
+			"minutes": 0, "seconds": 0, "firstDateWasLater": false,
+		}
+		return
+	}
+	remaining := int(expireUnix - time.Now().Unix())
+	data["tthSeconds"] = remaining
+	abs := remaining
+	if abs < 0 {
+		abs = -abs
+	}
+	days := abs / 86400
+	hours := (abs % 86400) / 3600
+	minutes := (abs % 3600) / 60
+	seconds := abs % 60
+	data["tthd"] = days
+	data["tthh"], data["tthm"], data["tths"] = hours, minutes, seconds
+	data["tth"] = map[string]any{
+		"years": 0, "months": 0, "days": days, "hours": hours,
+		"minutes": minutes, "seconds": seconds,
+		"firstDateWasLater": remaining < 0,
+	}
+}
+
 func googleMapURL(hook *Hook) string {
 	lat := getFloat(hook.Message["latitude"])
 	lon := getFloat(hook.Message["longitude"])
@@ -191,13 +233,7 @@ func hookTime(p *Processor, hook *Hook) string {
 	if expire == 0 {
 		return ""
 	}
-	layout := "15:04:05"
-	if p != nil && p.cfg != nil {
-		if format := getStringFromConfig(p.cfg, "locale.time", ""); format != "" {
-			layout = momentFormatToGoLayout(format)
-		}
-	}
-	return formatUnixInHookLocation(p, hook, expire, layout)
+	return formatUnixInHookLocation(p, hook, expire, configTimeLayout(p))
 }
 
 func formatUnixInHookLocation(p *Processor, hook *Hook, unixTime int64, layout string) string {

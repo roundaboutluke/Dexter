@@ -59,13 +59,7 @@ func applyPokemonRenderData(ctx *renderDataContext) {
 	ctx.data["bearing"] = bearing
 	ctx.data["bearingEmoji"] = bearingEmoji
 
-	formID := getInt(ctx.hook.Message["form"])
-	if formID == 0 {
-		formID = getInt(ctx.hook.Message["form_id"])
-	}
-	if formID == 0 {
-		formID = getInt(ctx.hook.Message["pokemon_form"])
-	}
+	formID := hookFormID(ctx.hook.Message)
 	ctx.data["formId"] = formID
 	if formName := monsterFormName(ctx.p, ctx.data["pokemonId"].(int), formID); formName != "" {
 		ctx.data["formNameEng"] = formName
@@ -200,13 +194,7 @@ func applyRaidEggMaxBattleRenderData(ctx *renderDataContext) {
 	if pokemonID <= 0 {
 		return
 	}
-	formID := getInt(ctx.hook.Message["form"])
-	if formID == 0 {
-		formID = getInt(ctx.hook.Message["form_id"])
-	}
-	if formID == 0 {
-		formID = getInt(ctx.hook.Message["pokemon_form"])
-	}
+	formID := hookFormID(ctx.hook.Message)
 	ctx.data["pokemonId"] = pokemonID
 	ctx.data["formId"] = formID
 	if ctx.p != nil && ctx.p.shinyPossible != nil {

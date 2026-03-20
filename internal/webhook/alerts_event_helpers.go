@@ -216,10 +216,7 @@ func nightTimeReference(hook *Hook) (time.Time, bool) {
 	}
 	switch hook.Type {
 	case "egg":
-		start := getInt64(hook.Message["start"])
-		if start == 0 {
-			start = getInt64(hook.Message["hatch_time"])
-		}
+		start := hookEggStart(hook.Message)
 		if start > 0 {
 			return time.Unix(start, 0), true
 		}

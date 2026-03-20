@@ -23,13 +23,7 @@ func uiconsURL(baseURL, imageType string, hook *Hook, shinyPossible bool) string
 		if pokemonID == 0 {
 			return ""
 		}
-		form := getInt(hook.Message["form"])
-		if form == 0 {
-			form = getInt(hook.Message["form_id"])
-		}
-		if form == 0 {
-			form = getInt(hook.Message["pokemon_form"])
-		}
+		form := hookFormID(hook.Message)
 		evolution := getInt(hook.Message["evolution"])
 		if evolution == 0 {
 			evolution = getInt(hook.Message["evolution_id"])
@@ -131,13 +125,7 @@ func shinyPossibleForHook(p *Processor, hook *Hook) bool {
 	if pokemonID == 0 {
 		return false
 	}
-	form := getInt(hook.Message["form"])
-	if form == 0 {
-		form = getInt(hook.Message["form_id"])
-	}
-	if form == 0 {
-		form = getInt(hook.Message["pokemon_form"])
-	}
+	form := hookFormID(hook.Message)
 	return p.shinyPossible.IsPossible(pokemonID, form)
 }
 
@@ -156,13 +144,7 @@ func legacyUiconsURL(base, imageType string, hook *Hook) string {
 		if pokemonID == 0 {
 			return ""
 		}
-		form := getInt(hook.Message["form"])
-		if form == 0 {
-			form = getInt(hook.Message["form_id"])
-		}
-		if form == 0 {
-			form = getInt(hook.Message["pokemon_form"])
-		}
+		form := hookFormID(hook.Message)
 		evolution := getInt(hook.Message["evolution"])
 		if evolution == 0 {
 			evolution = getInt(hook.Message["evolution_id"])

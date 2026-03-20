@@ -109,13 +109,7 @@ func applyBaseRenderData(p *Processor, hook *Hook, match alertMatch, data map[st
 		data["id"] = match.Target.ID
 	}
 	if p != nil && p.shinyPossible != nil && data["pokemonId"].(int) > 0 {
-		formID := getInt(hook.Message["form"])
-		if formID == 0 {
-			formID = getInt(hook.Message["form_id"])
-		}
-		if formID == 0 {
-			formID = getInt(hook.Message["pokemon_form"])
-		}
+		formID := hookFormID(hook.Message)
 		data["shinyPossible"] = p.shinyPossible.IsPossible(data["pokemonId"].(int), formID)
 	}
 	weatherID := getInt(hook.Message["weather"])

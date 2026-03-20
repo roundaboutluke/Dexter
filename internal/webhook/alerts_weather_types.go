@@ -16,13 +16,7 @@ func caredPokemonFromHook(p *Processor, hook *Hook) *caredPokemon {
 	if pokemonID == 0 {
 		return nil
 	}
-	formID := getInt(hook.Message["form"])
-	if formID == 0 {
-		formID = getInt(hook.Message["form_id"])
-	}
-	if formID == 0 {
-		formID = getInt(hook.Message["pokemon_form"])
-	}
+	formID := hookFormID(hook.Message)
 	nameEng := monsterName(p, pokemonID)
 	formName := monsterFormName(p, pokemonID, formID)
 	fullName := nameEng

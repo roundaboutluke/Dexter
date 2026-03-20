@@ -10,6 +10,29 @@ import (
 	"dexter/internal/util"
 )
 
+// hookFormID resolves the pokemon form ID from a webhook message,
+// trying "form", then "form_id", then "pokemon_form" as fallbacks.
+func hookFormID(message map[string]any) int {
+	form := getInt(message["form"])
+	if form == 0 {
+		form = getInt(message["form_id"])
+	}
+	if form == 0 {
+		form = getInt(message["pokemon_form"])
+	}
+	return form
+}
+
+// hookEggStart resolves the egg/raid start time from a webhook message,
+// trying "start" then "hatch_time" as a fallback.
+func hookEggStart(message map[string]any) int64 {
+	start := getInt64(message["start"])
+	if start == 0 {
+		start = getInt64(message["hatch_time"])
+	}
+	return start
+}
+
 func normalizeHook(item any) (*Hook, bool) {
 	raw, ok := item.(map[string]any)
 	if !ok {

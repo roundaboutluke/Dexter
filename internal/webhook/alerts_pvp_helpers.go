@@ -264,10 +264,7 @@ func pvpDisplayList(p *Processor, raw any, leagueCap int, maxRank int, minCp int
 		if pokemonID == 0 {
 			continue
 		}
-		formID := getInt(m["form"])
-		if formID == 0 {
-			formID = getInt(m["form_id"])
-		}
+		formID := hookFormID(m)
 		evolutionID := getInt(m["evolution"])
 		level := getFloat(m["level"])
 		cap := getInt(m["cap"])

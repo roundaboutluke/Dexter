@@ -32,13 +32,7 @@ func matchRaid(hook *Hook, row map[string]any) bool {
 			return false
 		}
 	}
-	form := getInt(hook.Message["form"])
-	if form == 0 {
-		form = getInt(hook.Message["form_id"])
-	}
-	if form == 0 {
-		form = getInt(hook.Message["pokemon_form"])
-	}
+	form := hookFormID(hook.Message)
 	if trackedForm := getInt(row["form"]); trackedForm > 0 && form != trackedForm {
 		return false
 	}

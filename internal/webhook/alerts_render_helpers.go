@@ -58,13 +58,7 @@ func pokemonTypeColor(p *Processor, hook *Hook) string {
 	if pokemonID == 0 {
 		return ""
 	}
-	form := getInt(hook.Message["form"])
-	if form == 0 {
-		form = getInt(hook.Message["form_id"])
-	}
-	if form == 0 {
-		form = getInt(hook.Message["pokemon_form"])
-	}
+	form := hookFormID(hook.Message)
 	key := fmt.Sprintf("%d_%d", pokemonID, form)
 	monster := lookupMonster(d, key)
 	if monster == nil && form != 0 {
@@ -449,7 +443,7 @@ func tileserverMapURL(p *Processor, hook *Hook, data map[string]any, centerLat, 
 		return ""
 	}
 	templateType := tileserverTemplateForHook(hook.Type)
-	mapType := tileserverMapTypeForHook(hook.Type)
+	mapType := tileserverTemplateForHook(hook.Type)
 	opts := tileserver.GetOptions(p.cfg, mapType)
 	if strings.EqualFold(opts.Type, "none") {
 		return ""
@@ -662,27 +656,3 @@ func tileserverTemplateForHook(hookType string) string {
 	}
 }
 
-func tileserverMapTypeForHook(hookType string) string {
-	switch hookType {
-	case "pokemon":
-		return "monster"
-	case "raid", "egg":
-		return "raid"
-	case "max_battle":
-		return "maxbattle"
-	case "quest":
-		return "quest"
-	case "invasion", "lure", "pokestop":
-		return "pokestop"
-	case "gym", "gym_details":
-		return "gym"
-	case "nest":
-		return "nest"
-	case "weather":
-		return "weather"
-	case "fort_update":
-		return "fort-update"
-	default:
-		return "location"
-	}
-}

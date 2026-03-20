@@ -153,11 +153,7 @@ func applyPokemonWeatherRenderData(ctx *renderDataContext) {
 		return
 	}
 	changeTime := expire - (expire % 3600)
-	layout := "15:04:05"
-	if format := getStringFromConfig(ctx.p.cfg, "locale.time", ""); format != "" {
-		layout = momentFormatToGoLayout(format)
-	}
-	weatherChangeTime := trimWeatherChangeTime(formatUnixInHookLocation(ctx.p, ctx.hook, changeTime, layout))
+	weatherChangeTime := trimWeatherChangeTime(formatUnixInHookLocation(ctx.p, ctx.hook, changeTime, configTimeLayout(ctx.p)))
 	if (ctx.weatherID > 0 && !pokemonWillBeBoosted) || (ctx.weatherID == 0 && pokemonWillBeBoosted) {
 		if ctx.weatherID > 0 {
 			weatherCurrent = ctx.weatherID
@@ -220,11 +216,7 @@ func applyRaidEggWeatherRenderData(ctx *renderDataContext) {
 		return
 	}
 	changeTime := expire - (expire % 3600)
-	layout := "15:04:05"
-	if format := getStringFromConfig(ctx.p.cfg, "locale.time", ""); format != "" {
-		layout = momentFormatToGoLayout(format)
-	}
-	weatherChangeTime := trimWeatherChangeTime(formatUnixInHookLocation(ctx.p, ctx.hook, changeTime, layout))
+	weatherChangeTime := trimWeatherChangeTime(formatUnixInHookLocation(ctx.p, ctx.hook, changeTime, configTimeLayout(ctx.p)))
 	if (ctx.weatherID > 0 && !pokemonWillBeBoosted) || (ctx.weatherID == 0 && pokemonWillBeBoosted) {
 		if ctx.weatherID > 0 {
 			weatherCurrent = ctx.weatherID
