@@ -136,6 +136,8 @@ func (g *Geocoder) Forward(query string) []GeoLocation {
 		return g.forwardNominatim(query)
 	case "pelias":
 		return g.forwardPelias(query)
+	case "photon":
+		return g.forwardPhoton(query)
 	case "google":
 		return g.forwardGoogle(query)
 	default:
@@ -167,6 +169,8 @@ func (g *Geocoder) reverseDetailsByProvider(provider string, lat, lon float64) *
 		return g.reverseNominatimDetails(lat, lon)
 	case "pelias":
 		return g.reversePeliasDetails(lat, lon)
+	case "photon":
+		return g.reversePhotonDetails(lat, lon)
 	case "google":
 		return g.reverseGoogleDetails(lat, lon)
 	default:
@@ -204,6 +208,8 @@ func (g *Geocoder) Reverse(lat, lon float64) string {
 		address = g.reverseNominatim(lat, lon)
 	case "pelias":
 		address = g.reversePelias(lat, lon)
+	case "photon":
+		address = g.reversePhoton(lat, lon)
 	case "google":
 		address = g.reverseGoogle(lat, lon)
 	}
@@ -319,6 +325,19 @@ func geocodeCacheScope(cfg *config.Config) string {
 			parts = append(parts, "country="+strings.ToUpper(strings.TrimSpace(country)))
 		}
 		if size, ok := cfg.GetInt("geocoding.peliasResultSize"); ok && size > 0 {
+			parts = append(parts, fmt.Sprintf("size=%d", size))
+		}
+	case "photon":
+		if layers, _ := cfg.GetString("geocoding.photonLayers"); strings.TrimSpace(layers) != "" {
+			parts = append(parts, "layers="+normalizeCSVLower(layers))
+		}
+		if preferred, _ := cfg.GetString("geocoding.photonPreferredLayer"); strings.TrimSpace(preferred) != "" {
+			parts = append(parts, "preferred="+strings.ToLower(strings.TrimSpace(preferred)))
+		}
+		if lang, _ := cfg.GetString("geocoding.photonLang"); strings.TrimSpace(lang) != "" {
+			parts = append(parts, "lang="+strings.ToLower(strings.TrimSpace(lang)))
+		}
+		if size, ok := cfg.GetInt("geocoding.photonResultSize"); ok && size > 0 {
 			parts = append(parts, fmt.Sprintf("size=%d", size))
 		}
 	}
